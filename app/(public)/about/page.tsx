@@ -24,7 +24,7 @@ export default function AboutPage() {
             
             <div className="grid md:grid-cols-2 gap-12 items-end">
               <p className="text-xl md:text-2xl text-gray-600 leading-relaxed">
-                El mercado está lleno de CRMs genéricos. Techguros nace de una verdad incómoda: el asesor de seguros ha sido ignorado por la tecnología. Construimos el primer software que no solo organiza datos, sino que entiende tu oficio.
+                El mercado está lleno de CRMs genéricos. Asygurare nace de una verdad incómoda: el asesor de seguros ha sido ignorado por la tecnología. Construimos el primer software que no solo organiza datos, sino que entiende tu oficio.
               </p>
               <div className="flex justify-end">
                 <motion.div 
@@ -54,7 +54,7 @@ export default function AboutPage() {
             <div>
               <h2 className="text-4xl font-medium mb-4">"Nadie nos preguntó qué necesitábamos."</h2>
               <p className="text-xl opacity-80 max-w-xl">
-                Esa fue la frase que detonó Techguros. Hablamos con cientos de asesores cansados de herramientas complejas. Nuestra misión es simple: que tu única preocupación sea la relación con tu cliente.
+                Esa fue la frase que detonó Asygurare. Hablamos con cientos de asesores cansados de herramientas complejas. Nuestra misión es simple: que tu única preocupación sea la relación con tu cliente.
               </p>
             </div>
           </motion.div>
@@ -68,7 +68,7 @@ export default function AboutPage() {
             <Target size={40} className="text-(--main) mb-8" />
             <h3 className="text-2xl font-bold mb-4">Vender más <br/>es la consecuencia.</h3>
             <p className="text-gray-500">
-              No diseñamos para que llenes tablas; diseñamos para que cierres pólizas. Si el software no te hace ganar más dinero, no es Techguros.
+              No diseñamos para que llenes tablas; diseñamos para que cierres pólizas. Si el software no te hace ganar más dinero, no es Asygurare.
             </p>
           </motion.div>
 
@@ -140,7 +140,7 @@ export default function AboutPage() {
         <div className="max-w-7xl mx-auto bg-white rounded-[4rem] p-16 md:p-24 text-center shadow-sm border border-black/5">
           <h2 className="text-4xl md:text-6xl font-medium mb-10">¿Listo para sentirte escuchado?</h2>
           <button className="bg-(--accents) text-white px-12 py-6 rounded-2xl text-xl font-bold hover:shadow-2xl hover:scale-105 transition-all">
-            Únete a la nueva era de Techguros
+            Únete a la nueva era de Asygurare
           </button>
         </div>
       </section>

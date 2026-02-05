@@ -35,7 +35,7 @@ export default function Services() {
             <span className="text-(--main) italic">Simplicidad de juguete.</span>
           </h2>
           <p className="text-xl text-gray-600 leading-relaxed">
-            Techguros elimina la curva de aprendizaje. Si sabes usar un smartphone, sabes usar Techguros. Diseñado para asesores, no para ingenieros.
+            Asygurare elimina la curva de aprendizaje. Si sabes usar un smartphone, sabes usar Asygurare. Diseñado para asesores, no para ingenieros.
           </p>
         </div>
 
@@ -46,7 +46,7 @@ export default function Services() {
           <ServiceCard 
             icon={<Database className="text-white" size={28} />}
             title="CRM con Alma de Seguro"
-            description="Olvídate de configurar campos infinitos. Techguros viene pre-cargado con la estructura de pólizas, ramos y renovaciones que ya usas. Solo entra y empieza a organizar."
+            description="Olvídate de configurar campos infinitos. Asygurare viene pre-cargado con la estructura de pólizas, ramos y renovaciones que ya usas. Solo entra y empieza a organizar."
             tag="Cero Configuración"
           />
 
@@ -87,7 +87,7 @@ export default function Services() {
           <ServiceCard 
             icon={<Megaphone className="text-white" size={28} />}
             title="Centro de Anuncios y Novedades"
-            description="Mantente al día con las últimas funcionalidades de Techguros, noticias del sector o comunicados internos. Información clave, siempre a tu alcance."
+            description="Mantente al día con las últimas funcionalidades de Asygurare, noticias del sector o comunicados internos. Información clave, siempre a tu alcance."
             tag="Información Centralizada"
           />
 
@@ -105,7 +105,7 @@ export default function Services() {
           <div className="flex-1 text-center md:text-left">
             <h3 className="text-3xl font-bold mb-3 text-[#1a1a1a]">¿Sin experiencia en software? Perfecto.</h3>
             <p className="text-lg text-gray-500">
-              Techguros está hecho para que lo domines en 15 minutos. Sin manuales pesados, sin tutoriales eternos. Es la plataforma más sencilla jamás creada para el sector.
+              Asygurare está hecho para que lo domines en 15 minutos. Sin manuales pesados, sin tutoriales eternos. Es la plataforma más sencilla jamás creada para el sector.
             </p>
           </div>
           <div className="flex flex-col gap-3 shrink-0">

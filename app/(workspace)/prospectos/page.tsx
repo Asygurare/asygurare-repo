@@ -130,7 +130,7 @@ export default function ProspectosFinalUltraPage() {
       <section className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-black/5">
           <h2 className="text-4xl font-black italic text-black uppercase tracking-tighter">VENTAS.</h2>
-          <p className="text-black font-bold text-[10px] uppercase tracking-widest mt-1">Techguros Intelligence</p>
+          <p className="text-black font-bold text-[10px] uppercase tracking-widest mt-1">Asygurare Intelligence</p>
         </div>
         <div className="bg-black p-8 rounded-[2.5rem] text-white flex flex-col justify-center">
           <p className="text-[10px] font-black text-(--accents) uppercase mb-1 tracking-widest">Pipeline Activo</p>

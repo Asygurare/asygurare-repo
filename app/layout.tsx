@@ -15,7 +15,7 @@ const geistMono = Geist_Mono({
 const calSans = { variable: "--font-cal-sans" }; 
 
 export const metadata: Metadata = {
-  title: "Techguros | El Copiloto del Asesor",
+  title: "Asygurare | El Copiloto del Asesor",
   description: "Software especializado en seguros con IA, CRM y Funnels.",
 };
 

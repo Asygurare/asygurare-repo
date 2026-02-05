@@ -231,7 +231,7 @@ export default function ClientesPage() {
                   <h3 className="text-3xl font-black text-black italic uppercase tracking-tighter">
                     {selectedCustomer ? 'Expediente Cliente' : 'Alta de Cuenta'}
                   </h3>
-                  <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mt-1">Techguros Master CRM</p>
+                  <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mt-1">Asygurare Master CRM</p>
                 </div>
                 <button onClick={() => setIsPanelOpen(false)} className="p-4 hover:bg-gray-100 rounded-full text-black transition-all"><X size={32} /></button>
               </div>

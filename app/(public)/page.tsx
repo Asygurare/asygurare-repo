@@ -28,7 +28,7 @@ export default function Home() {
               Vende seguros con <span className="text-(--main) italic">superpoderes.</span>
             </h1>
             <p className="text-xl md:text-2xl text-gray-600 leading-relaxed mb-10 max-w-2xl">
-              Techguros es el ecosistema operativo diseñado para asesores que buscan escala. CRM de alto rendimiento, embudos inteligentes y el copiloto de IA más avanzado del sector.
+              Asygurare es el ecosistema operativo diseñado para asesores que buscan escala. CRM de alto rendimiento, embudos inteligentes y el copiloto de IA más avanzado del sector.
             </p>
             <div className="flex flex-col sm:flex-row gap-4">
               <button className="bg-(--accents) text-white px-8 py-4 rounded-xl text-lg font-medium hover:bg-blue-700 transition-all">
@@ -72,7 +72,7 @@ export default function Home() {
       <section className="py-32 bg-(--main) text-white rounded-[3rem] mx-4 mb-10 overflow-hidden relative">
         <div className="max-w-4xl mx-auto text-center relative z-10 px-7">
           <h2 className="text-4xl md:text-6xl font-medium mb-8">Tus ventas, garantizadas por datos, no por azar.</h2>
-          <p className="text-xl opacity-80 mb-12">Techguros elimina la carga administrativa para que vuelvas a hacer lo que mejor sabes: asesorar personas.</p>
+          <p className="text-xl opacity-80 mb-12">Asygurare elimina la carga administrativa para que vuelvas a hacer lo que mejor sabes: asesorar personas.</p>
           <button className="bg-(--accents) text-white px-10 py-5 rounded-full text-lg font-bold hover:scale-105 transition-transform">
             Eleva tu carrera ahora
           </button>
@@ -82,7 +82,7 @@ export default function Home() {
       </section>
 
       <footer className="py-12 px-7 border-t border-black/5 text-sm text-gray-500 flex justify-between">
-        <p>© 2026 Techguros. Todos los derechos reservados.</p>
+        <p>© 2026 Asygurare. Todos los derechos reservados.</p>
         <div className="flex gap-6">
           <a href="#">Privacidad</a>
           <a href="#">Términos</a>

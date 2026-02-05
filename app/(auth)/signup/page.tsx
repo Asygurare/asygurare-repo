@@ -55,7 +55,7 @@ export default function SignUpPage() {
             <div className="w-10 h-10 bg-(--accents) rounded-xl flex items-center justify-center text-[#ece7e2] shadow-lg">
               <ShieldCheck size={24} />
             </div>
-            <span className="text-2xl font-bold tracking-tighter text-(--text)">TECHGUROS<span className="text-[#4A7766]">.</span></span>
+            <span className="text-2xl font-bold tracking-tighter text-(--text)">Asygurare<span className="text-[#4A7766]">.</span></span>
           </Link>
 
           <h1 className="text-4xl text-(--text) font-medium tracking-tight mb-8">Crea tu cuenta.</h1>

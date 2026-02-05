@@ -22,7 +22,7 @@ export default function PricingPage() {
             <span className="text-(--accents) italic">Resultados masivos.</span>
           </h1 >
           <p className="text-xl text-gray-600 max-w-2xl mx-auto mb-10">
-            Prueba el poder de Techguros gratis por 15 días. Sin tarjetas, sin compromisos. Solo tú y tu nuevo copiloto.
+            Prueba el poder de Asygurare gratis por 15 días. Sin tarjetas, sin compromisos. Solo tú y tu nuevo copiloto.
           </p>
 
           {/* Selector Mensual/Anual */}

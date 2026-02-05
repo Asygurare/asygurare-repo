@@ -70,7 +70,7 @@ export default function LoginPage() {
               <ShieldCheck size={24} />
             </div>
             <span className="text-2xl font-bold tracking-tighter text-[#1a1a1a]">
-              TECHGUROS<span className="text-[#4A7766]">.</span>
+              Asygurare<span className="text-[#4A7766]">.</span>
             </span>
           </Link>
 
@@ -166,7 +166,7 @@ export default function LoginPage() {
           {/* Testimonial Card */}
           <div className="mb-8 inline-block p-4 bg-white/10 backdrop-blur-lg rounded-[2.5rem] border border-white/20">
             <div className="bg-white rounded-2xl p-6 shadow-2xl">
-              <p className="text-(--accents) font-bold text-lg mb-2 italic">"Techguros ha duplicado mi capacidad de respuesta. Es, literalmente, mi socio silencioso."</p>
+              <p className="text-(--accents) font-bold text-lg mb-2 italic">"Asygurare ha duplicado mi capacidad de respuesta. Es, literalmente, mi socio silencioso."</p>
               <div className="flex items-center justify-center gap-3">
                 <div className="w-8 h-8 rounded-full bg-gray-200" />
                 <div className="text-left">

@@ -32,7 +32,7 @@ export default function IASectorPage() {
             <h2 className="text-4xl font-black text-black tracking-tighter italic uppercase">Inteligencia de Negocio.</h2>
           </div>
           <p className="text-black/50 font-bold text-[10px] uppercase tracking-[0.4em] ml-1">
-            Datamara Core v2.5 Pro 
+            Potenciado por Datamara
           </p>
         </div>
 

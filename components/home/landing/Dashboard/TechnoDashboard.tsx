@@ -2,197 +2,278 @@
 
 import React from 'react'
 import { motion } from 'framer-motion'
-import { 
-  Bot, 
-  TrendingUp, 
-  Users, 
-  MessageSquare, 
-  PieChart, 
-  ArrowUpRight, 
-  Calendar,
-  Zap
+import {
+  TrendingUp, Users, FileCheck, ArrowUpRight,
+  Sparkles, Plus, Inbox, Loader2, AlertCircle,
+  CalendarDays, PhoneCall, MessageSquare, Briefcase, Clock, Target
 } from 'lucide-react'
 
-const ease = [0.76, 0, 0.24, 1]
+type TaskKind = 'Llamada' | 'Cita' | 'Mensaje' | 'Seguimiento' | 'Otro'
+type TaskPriority = 'Alta' | 'Media' | 'Baja'
+type TaskStatus = 'open' | 'done'
+type EntityType = 'lead' | 'customer' | 'none'
 
-export default function TechDashboard() {
+type MonthTask = {
+  id: string
+  title: string
+  kind: TaskKind
+  priority: TaskPriority
+  status: TaskStatus
+  due_at: string
+  entity_type: EntityType
+  entity_id: string | null
+  related_name?: string | null
+}
+
+function kindIcon(kind: TaskKind) {
+  if (kind === 'Llamada') return PhoneCall
+  if (kind === 'Mensaje') return MessageSquare
+  if (kind === 'Cita') return CalendarDays
+  if (kind === 'Seguimiento') return Briefcase
+  return Clock
+}
+
+function priorityDot(priority: TaskPriority) {
+  if (priority === 'Alta') return 'bg-red-500'
+  if (priority === 'Media') return 'bg-orange-500'
+  return 'bg-gray-300'
+}
+
+export default function TechnoDashboard() {
+  // Demo data (no funcional): usado solo para mostrar UI.
+  const loading = false
+  const tasksAvailable = true
+  const stats = {
+    primas: 2412500,
+    clientes: 128,
+    renovaciones: 9,
+    leads: 36
+  }
+
+  const now = new Date()
+  const inDays = (d: number) => new Date(now.getTime() + d * 24 * 60 * 60 * 1000).toISOString()
+  const monthTasks: MonthTask[] = [
+    {
+      id: 'demo-1',
+      title: 'Llamar a Carlos Ruiz (renovación GMM)',
+      kind: 'Llamada',
+      priority: 'Alta',
+      status: 'open',
+      due_at: inDays(1),
+      entity_type: 'customer',
+      entity_id: 'cust-demo-1',
+      related_name: 'Carlos Ruiz',
+    },
+    {
+      id: 'demo-2',
+      title: 'Enviar propuesta Vida Elite a Lucía Fernández',
+      kind: 'Mensaje',
+      priority: 'Media',
+      status: 'open',
+      due_at: inDays(3),
+      entity_type: 'lead',
+      entity_id: 'lead-demo-2',
+      related_name: 'Lucía Fernández',
+    },
+    {
+      id: 'demo-3',
+      title: 'Cita de análisis: flotilla Corporativo Sky',
+      kind: 'Cita',
+      priority: 'Alta',
+      status: 'open',
+      due_at: inDays(6),
+      entity_type: 'lead',
+      entity_id: 'lead-demo-3',
+      related_name: 'Corporativo Sky',
+    },
+    {
+      id: 'demo-4',
+      title: 'Seguimiento post-venta: entrega de póliza Hogar Global',
+      kind: 'Seguimiento',
+      priority: 'Baja',
+      status: 'done',
+      due_at: inDays(-2),
+      entity_type: 'customer',
+      entity_id: 'cust-demo-4',
+      related_name: 'Andrés Villaman',
+    },
+  ]
+
+  const cards = [
+    { label: 'Primas Totales', value: `$${stats.primas.toLocaleString()}`, color: 'text-black', icon: TrendingUp, detail: 'Cartera total' },
+    { label: 'Clientes Activos', value: stats.clientes.toString(), color: 'text-(--accents)', icon: Users, detail: 'Cuentas registradas' },
+    { label: 'Pólizas a Renovar', value: stats.renovaciones.toString(), color: 'text-orange-600', icon: FileCheck, detail: 'Próximos 30 días' },
+    { label: 'Oportunidades Lead', value: stats.leads.toString(), color: 'text-blue-600', icon: Sparkles, detail: 'En seguimiento' },
+  ]
+
   return (
-    <section className="px-7 py-24 bg-[#ece7e2]">
-      <div className="max-w-7xl mx-auto">
-        
-        {/* Encabezado de la sección */}
-        <div className="mb-16 text-center md:text-left">
-          <h2 className="text-4xl md:text-5xl text-(--text) font-medium tracking-tight mb-4">
-            Control total. <span className="text-(--accents)">Esfuerzo cero.</span>
-          </h2>
-          <p className="text-gray-600 max-w-xl">
-            Tu centro de mando integra cada etapa del ciclo de vida del asegurado con automatización de grado bancario.
-          </p>
-        </div>
-
-        <motion.div 
-          initial={{ opacity: 0, y: 40 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          className="relative bg-[#f9f7f5] rounded-[2.5rem] border border-white p-4 shadow-[0_32px_64px_-16px_rgba(74,119,102,0.1)] overflow-hidden"
-        >
-          {/* Main Interface Wrapper */}
-          <div className="bg-[#fff] rounded-[1.8rem] w-full min-h-[700px] flex overflow-hidden border border-gray-100 shadow-inner">
-            
-            {/* 1. Sidebar Inteligente */}
-            <div className="w-16 md:w-20 border-r border-gray-50 bg-[#fafafa] flex flex-col items-center py-10 gap-8">
-              <div className="w-10 h-10 bg-[#4A7766] rounded-xl flex items-center justify-center text-white shadow-lg shadow-[#4A7766]/20">
-                <Zap size={20} fill="currentColor" />
-              </div>
-              <nav className="flex flex-col gap-6 text-gray-400">
-                <Users size={22} className="hover:text-[#4A7766] cursor-pointer transition-colors" />
-                <PieChart size={22} className="hover:text-[#4A7766] cursor-pointer transition-colors" />
-                <MessageSquare size={22} className="hover:text-[#4A7766] cursor-pointer transition-colors" />
-                <Calendar size={22} className="hover:text-[#4A7766] cursor-pointer transition-colors" />
-              </nav>
-            </div>
-
-            {/* 2. Área de Trabajo Principal */}
-            <div className="flex-1 p-6 md:p-10 bg-[#fdfdfd] overflow-hidden">
-              
-              {/* Top Bar: Stats */}
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-                {[
-                  { label: "Primas Emitidas", val: "$2.4M", inc: "+12%", color: "#4A7766" },
-                  { label: "Leads Activos", val: "142", inc: "+5%", color: "#1a1a1a" },
-                  { label: "Tasa de Cierre", val: "68%", inc: "+24%", color: "#4A7766" },
-                  { label: "Renovaciones", val: "94%", inc: "+2%", color: "#1a1a1a" }
-                ].map((stat, i) => (
-                  <motion.div 
-                    initial={{ opacity: 0, x: -10 }}
-                    whileInView={{ opacity: 1, x: 0 }}
-                    transition={{ delay: i * 0.1 }}
-                    key={i} 
-                    className="p-5 rounded-2xl bg-gray-50/50 border border-gray-100"
-                  >
-                    <p className="text-[10px] uppercase tracking-widest text-gray-400 font-bold mb-1">{stat.label}</p>
-                    <div className="flex justify-between items-end">
-                      <span className="text-2xl font-semibold tracking-tight" style={{ color: stat.color }}>{stat.val}</span>
-                      <span className="text-[10px] text-[#4A7766] font-bold flex items-center gap-0.5 bg-[#4A7766]/5 px-2 py-0.5 rounded-full">
-                        <TrendingUp size={10} /> {stat.inc}
-                      </span>
-                    </div>
-                  </motion.div>
-                ))}
-              </div>
-
-              {/* Middle Section: CRM + Reportes */}
-              <div className="grid grid-cols-12 gap-6">
-                
-                {/* CRM Automatizado View */}
-                <div className="col-span-12 lg:col-span-8 space-y-6">
-                  <div className="p-6 bg-white rounded-3xl border border-gray-100 shadow-sm relative overflow-hidden group">
-                    <div className="flex justify-between items-center mb-6">
-                      <h4 className="font-bold text-gray-800">Pipeline de Conversión Inteligente</h4>
-                      <button className="text-[11px] font-bold text-[#4A7766] bg-[#4A7766]/10 px-3 py-1 rounded-lg">Ver todo el Funnel</button>
-                    </div>
-                    
-                    <div className="space-y-4">
-                      {[
-                        { name: "Andrés Villaman", status: "Cierre Pendiente", score: 98, policy: "Vida Elite" },
-                        { name: "Lucía Fernández", status: "Análisis de Riesgo", score: 72, policy: "Hogar Global" },
-                        { name: "Corporativo Sky", status: "Primer Contacto", score: 45, policy: "Flotilla" }
-                      ].map((lead, i) => (
-                        <div key={i} className="flex items-center justify-between p-4 rounded-xl border border-gray-50 hover:border-[#4A7766]/30 transition-all cursor-pointer bg-[#fafafa]/50">
-                          <div className="flex items-center gap-4">
-                            <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-gray-200 to-gray-50 flex items-center justify-center font-bold text-xs">
-                              {lead.name[0]}
-                            </div>
-                            <div>
-                              <p className="font-semibold text-sm">{lead.name}</p>
-                              <p className="text-[11px] text-gray-400">{lead.policy}</p>
-                            </div>
-                          </div>
-                          <div className="text-right">
-                            <p className="text-[11px] font-medium text-gray-500 mb-1">{lead.status}</p>
-                            <div className="w-24 h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                              <motion.div 
-                                initial={{ width: 0 }}
-                                whileInView={{ width: `${lead.score}%` }}
-                                className="h-full bg-[#4A7766]" 
-                              />
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Reportes Rápidos */}
-                <div className="col-span-12 lg:col-span-4 flex flex-col gap-6">
-                  <div className="flex-1 p-6 bg-[#1a1a1a] rounded-3xl text-white relative overflow-hidden">
-                    <p className="text-xs opacity-60 mb-2 uppercase tracking-tighter">Proyección Mensual</p>
-                    <h5 className="text-3xl font-light mb-6">Meta: <span className="text-[#4A7766] font-bold">115%</span></h5>
-                    <div className="flex items-end gap-2 h-24">
-                      {[40, 70, 50, 90, 60, 100, 80].map((h, i) => (
-                        <motion.div 
-                          key={i}
-                          initial={{ height: 0 }}
-                          whileInView={{ height: `${h}%` }}
-                          transition={{ delay: i * 0.05 }}
-                          className="flex-1 bg-[#4A7766] rounded-t-sm"
-                        />
-                      ))}
-                    </div>
-                  </div>
-                  
-                  <div className="p-6 bg-[#4A7766]/5 rounded-3xl border border-[#4A7766]/10">
-                    <div className="flex items-center gap-2 mb-4 text-[#4A7766]">
-                      <MessageSquare size={16} />
-                      <span className="text-xs font-bold uppercase">Chat Automatizado</span>
-                    </div>
-                    <div className="space-y-2">
-                      <div className="bg-white p-3 rounded-2xl rounded-tl-none shadow-sm text-[11px] text-gray-600 border border-gray-100">
-                        "Enviando recordatorio de renovación a 14 clientes..."
-                      </div>
-                      <div className="bg-[#4A7766] text-white p-3 rounded-2xl rounded-tr-none shadow-sm text-[11px] ml-4">
-                        "3 clientes ya confirmaron pago."
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-              </div>
-            </div>
-          </div>
-
-          {/* --- COPILOTO IA FLOATING (EL CEREBRO) --- */}
-          <motion.div 
-            style={{ x: "-50%" }}
-            initial={{ y: 100, x: "-50%", opacity: 0 }}
-            whileInView={{ y: 0, x: "-50%", opacity: 1 }}
-            className="absolute bottom-8 left-1/2 w-[90%] md:w-[600px] bg-white/80 backdrop-blur-xl border border-white rounded-2xl p-5 shadow-2xl flex items-center gap-5"
+    <main className='p-20  '>
+      <div className="space-y-8 p-20 rounded-md border-2 border-(--accents) bg-white">
+        {/* --- SALUDO E IA --- */}
+        <section className="flex flex-col md:flex-row gap-6 items-stretch">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
+            className="flex-1 bg-white p-8 rounded-[2rem] border border-black/5 shadow-sm"
           >
-            <div className="relative">
-              <div className="w-12 h-12 bg-[#4A7766] rounded-full flex items-center justify-center animate-pulse">
-                <Bot size={24} className="text-white" />
-              </div>
-              <div className="absolute -top-1 -right-1 w-4 h-4 bg-green-400 border-2 border-white rounded-full" />
-            </div>
-            
-            <div className="flex-1">
-              <div className="flex items-center gap-2 mb-1">
-                <span className="font-bold text-xs text-[#4A7766]">IA COPILOT</span>
-                <span className="text-[10px] bg-gray-100 px-2 py-0.5 rounded text-gray-400">PENSANDO...</span>
-              </div>
-              <p className="text-sm text-gray-700 leading-snug">
-                "Hay una oportunidad de <strong>Venta Cruzada</strong> en la póliza de Gastos Médicos de Carlos Ruiz. He preparado una propuesta de Seguro de Vida con un 15% de descuento por lealtad."
-              </p>
-            </div>
+            <h2 className="text-3xl font-black text-black mb-2">Panel de <span className="text-(--accents) italic">Control.</span></h2>
+            <p className="text-gray-500 mb-6 font-bold text-sm uppercase tracking-tight">
+              {stats.clientes > 0 ? `Gestionando ${stats.clientes} asegurados actualmente.` : "Tu workspace está listo. Comienza agregando a tu primer cliente."}
+            </p>
 
-            <button className="bg-[#1a1a1a] text-white text-[11px] font-bold px-4 py-3 rounded-xl hover:bg-black transition-colors shrink-0 flex items-center gap-2">
-              EJECUTAR <ArrowUpRight size={14} />
-            </button>
+            <div className="flex gap-4">
+              <button className="bg-black text-white px-8 py-4 rounded-2xl font-black text-sm flex items-center gap-2 hover:bg-(--accents) transition-all shadow-xl">
+                <Plus size={18} /> Nueva Acción
+              </button>
+            </div>
           </motion.div>
 
-        </motion.div>
+          <motion.div
+            initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}
+            className="md:w-1/3 bg-[#1a1a1a] p-8 rounded-[2rem] text-white relative overflow-hidden flex flex-col justify-center"
+          >
+            <div className="relative z-10">
+              <div className="flex items-center gap-2 text-(--accents) mb-4">
+                <Sparkles size={20} fill="currentColor" />
+                <span className="text-[10px] font-black uppercase tracking-[0.2em]">IA Insight</span>
+              </div>
+              <p className="text-sm font-bold leading-relaxed italic opacity-90">
+                {stats.renovaciones > 0
+                  ? `¡Atención! Tienes ${stats.renovaciones} pólizas por vencer. Es momento de iniciar campañas de retención.`
+                  : "Todo está en orden. No hay renovaciones críticas para los próximos 7 días."}
+              </p>
+            </div>
+            <div className="absolute -right-10 -bottom-10 w-40 h-40 bg-(--accents) blur-[80px] opacity-20" />
+          </motion.div>
+        </section>
+
+        {/* --- ESTADÍSTICAS REALES --- */}
+        <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          {cards.map((stat, i) => (
+            <motion.div
+              key={stat.label}
+              initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.1 }}
+              className="bg-white p-8 rounded-[2.5rem] border border-black/5 shadow-sm group hover:border-(--accents)/30 transition-all"
+            >
+              <div className="flex justify-between items-start mb-6">
+                <div className="p-4 bg-gray-50 rounded-2xl text-black group-hover:bg-(--accents) group-hover:text-white transition-all">
+                  <stat.icon size={24} />
+                </div>
+                <ArrowUpRight size={20} className="text-gray-300 group-hover:text-black" />
+              </div>
+              <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.15em] mb-2">{stat.label}</p>
+              {loading ? (
+                <Loader2 className="animate-spin text-gray-200" size={24} />
+              ) : (
+                <>
+                  <h4 className={`text-3xl font-black ${stat.color}`}>{stat.value}</h4>
+                  <p className="text-[10px] font-bold text-gray-400 mt-2 uppercase">{stat.detail}</p>
+                </>
+              )}
+            </motion.div>
+          ))}
+        </section>
+
+        {/* --- ACTIVIDAD Y TAREAS --- */}
+        <section className="grid lg:grid-cols-3 gap-8">
+
+          <div className="lg:col-span-2 bg-white rounded-[2.5rem] border border-black/5 p-10 flex flex-col">
+            <div className="flex justify-between items-center mb-10">
+              <h3 className="text-xl font-black text-black italic">Actividad del Mes</h3>
+              <span className="text-[10px] font-black text-(--accents) bg-(--accents)/10 px-4 py-2 rounded-full uppercase">En tiempo real</span>
+            </div>
+
+            {loading ? (
+              <div className="flex-1 flex items-center justify-center py-20">
+                <Loader2 className="animate-spin text-gray-200" size={28} />
+              </div>
+            ) : !tasksAvailable ? (
+              <div className="flex-1 flex flex-col items-center justify-center text-center opacity-50 py-10">
+                <CalendarDays size={54} className="text-gray-100 mb-4" />
+                <p className="font-bold text-black">Calendario no sincronizado</p>
+                <p className="text-[11px] font-bold text-black/40 max-w-md mt-2">
+                  No se detectó la tabla <span className="text-black">tasks</span> o no hay permisos. Crea tareas en Calendario y activa la tabla para ver actividad aquí.
+                </p>
+              </div>
+            ) : monthTasks.length === 0 ? (
+              <div className="flex-1 flex flex-col items-center justify-center text-center opacity-40">
+                <Inbox size={48} className="text-gray-200 mb-4" />
+                <p className="font-bold text-black">No hay tareas registradas este mes</p>
+                <p className="text-[11px] font-bold text-black/40 mt-2">Crea una llamada, cita o mensaje desde Calendario.</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {monthTasks.map((t) => {
+                  const Icon = kindIcon(t.kind)
+                  const dt = new Date(t.due_at)
+                  const timeLabel = new Intl.DateTimeFormat('es-MX', { day: '2-digit', month: 'short' }).format(dt).toUpperCase()
+                  const hourLabel = new Intl.DateTimeFormat('es-MX', { hour: '2-digit', minute: '2-digit' }).format(dt)
+                  const badge =
+                    t.entity_type === 'customer' ? 'Cliente' :
+                      t.entity_type === 'lead' ? 'Prospecto' : null
+
+                  return (
+                    <div key={t.id} className="flex items-center gap-4 p-4 hover:bg-gray-50 rounded-2xl transition-all">
+                      <div className={`w-2 h-2 rounded-full ${t.status === 'done' ? 'bg-green-500' : priorityDot(t.priority)}`} />
+
+                      <div className="p-2 bg-gray-50 rounded-xl text-black shrink-0">
+                        <Icon size={16} />
+                      </div>
+
+                      <div className="flex-1 min-w-0">
+                        <p className={`text-sm font-black text-black truncate ${t.status === 'done' ? 'line-through opacity-60' : ''}`}>
+                          {t.title}
+                        </p>
+                        <div className="flex items-center gap-3 mt-1 flex-wrap">
+                          <span className={`text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full ${t.status === 'done' ? 'bg-green-50 text-green-700' :
+                              t.priority === 'Alta' ? 'bg-red-50 text-red-600' :
+                                t.priority === 'Media' ? 'bg-orange-50 text-orange-700' :
+                                  'bg-gray-50 text-gray-600'
+                            }`}>
+                            {t.status === 'done' ? 'HECHA' : t.priority}
+                          </span>
+                          {badge ? (
+                            <span className="text-[10px] font-black uppercase tracking-widest text-black/30 flex items-center gap-2">
+                              <Target size={12} className="opacity-30" />
+                              {badge}{t.related_name ? `: ${t.related_name}` : ''}
+                            </span>
+                          ) : null}
+                        </div>
+                      </div>
+
+                      <span className="text-[10px] font-black text-gray-300 whitespace-nowrap">
+                        {timeLabel} · {hourLabel}
+                      </span>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+
+          <div className="bg-white rounded-[2.5rem] border border-black/5 shadow-sm p-10">
+            <h3 className="text-xl font-black text-black mb-8 italic">Urgente</h3>
+            <div className="space-y-6">
+              {stats.renovaciones > 0 ? (
+                <div className="p-6 bg-orange-50 rounded-[2rem] border border-orange-100">
+                  <div className="flex items-center gap-3 text-orange-700 mb-2">
+                    <AlertCircle size={18} />
+                    <span className="text-xs font-black uppercase tracking-widest">Renovaciones</span>
+                  </div>
+                  <p className="text-sm font-bold text-orange-900 leading-tight">
+                    Tienes {stats.renovaciones} pólizas que requieren contacto inmediato.
+                  </p>
+                </div>
+              ) : (
+                <p className="text-sm text-gray-400 font-bold italic text-center py-10">Nada urgente por ahora.</p>
+              )}
+            </div>
+            <button className="w-full mt-8 py-5 border-2 border-dashed border-gray-100 rounded-[2rem] text-gray-400 font-black text-[10px] uppercase tracking-widest hover:border-(--accents) hover:text-(--accents) transition-all">
+              + Crear Recordatorio
+            </button>
+          </div>
+
+        </section>
       </div>
-    </section>
+    </main>
   )
 }
