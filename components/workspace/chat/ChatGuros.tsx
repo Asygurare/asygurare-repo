@@ -200,7 +200,7 @@ export default function ChatDatamara({ conversationId, userId }: { conversationI
               </div>
             </div>
             <span className="text-[8px] font-black text-black/20 uppercase tracking-widest">
-              Engine: Techguros 3.0
+              Engine: Asygurare 
             </span>
           </div>
         </div>

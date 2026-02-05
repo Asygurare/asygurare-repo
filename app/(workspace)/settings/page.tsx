@@ -346,7 +346,7 @@ export default function SettingsPage() {
               <input
                 value={state.agencyName}
                 onChange={(e) => setState((s) => ({ ...s, agencyName: e.target.value }))}
-                placeholder="TECHGUROS"
+                placeholder="ASYGURARE"
                 className="w-full bg-[#ece7e2]/50 text-black font-black py-4 px-6 rounded-2xl outline-none border-2 border-transparent focus:border-(--accents)/30 transition-all uppercase"
               />
               <p className="text-[11px] font-bold text-black/40 leading-relaxed mt-2">
@@ -458,7 +458,7 @@ export default function SettingsPage() {
                 setState((s) => ({ ...s, notifications: { ...s.notifications, productUpdates: next } }))
               }
               label="Actualizaciones del sistema"
-              description="Mejoras y novedades de Techguros."
+              description="Mejoras y novedades de ASYGURARE."
             />
           </div>
         </div>

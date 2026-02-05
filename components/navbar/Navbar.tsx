@@ -45,7 +45,7 @@ export default function Navbar() {
               <ShieldCheck size={20} />
             </div>
             <span className="text-xl font-bold tracking-tighter text-[#1a1a1a]">
-              TECHGUROS<span className="text-[#4A7766]">.</span>
+              ASYGURARE<span className="text-[#4A7766]">.</span>
             </span>
           </Link>
 

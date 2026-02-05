@@ -28,7 +28,7 @@ export default function WorkspaceLayout({ children }: { children: React.ReactNod
       <aside className="w-64 bg-white border-r border-black/5 p-6 flex flex-col shrink-0">
         <div className="mb-10 px-2">
           <h1 className="text-xl font-black tracking-tighter text-(--accents)">
-            TECHGUROS<span className="text-black">.</span>
+            ASYGURARE<span className="text-black">.</span>
           </h1>
         </div>
         
