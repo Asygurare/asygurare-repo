@@ -1,9 +1,10 @@
 {
-  "name": "my-app",
+  "name": "asygurare",
   "version": "0.1.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "dev02": "next dev -H 127.0.0.1 -p 3002",
     "build": "next build",
     "start": "next start",
     "lint": "eslint"
