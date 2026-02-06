@@ -5,7 +5,8 @@ import { motion } from 'framer-motion'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase/supabase'
-import { ShieldCheck, ArrowRight, User, Mail, Lock, Building2, Loader2 } from 'lucide-react'
+import {  ArrowRight, User, Mail, Lock, Building2, Loader2 } from 'lucide-react'
+import Image from 'next/image'
 
 export default function SignUpPage() {
   const router = useRouter()
@@ -28,6 +29,8 @@ export default function SignUpPage() {
       email,
       password,
       options: {
+        // A dónde vuelve el usuario después de confirmar el correo
+        emailRedirectTo: `${window.location.origin}/login?message=Correo confirmado. Inicia sesión.`,
         // Estos datos son los que el trigger de SQL leerá para la tabla profiles
         data: {
           first_name: firstName,
@@ -42,7 +45,7 @@ export default function SignUpPage() {
       setLoading(false)
     } else {
       // Éxito: Redirigir o mostrar mensaje de confirmación
-      router.push('/login?message=Check your email to confirm your account')
+      router.push('/login?message=Revisa tu correo para confirmar tu cuenta.')
     }
   }
 
@@ -53,7 +56,7 @@ export default function SignUpPage() {
           
           <Link href="/" className="flex items-center gap-2 mb-8 group inline-block">
             <div className="w-10 h-10 bg-(--accents) rounded-xl flex items-center justify-center text-[#ece7e2] shadow-lg">
-              <ShieldCheck size={24} />
+            <Image src="/logo/logo.png" alt='logo' width={24} height={24} />
             </div>
             <span className="text-2xl font-bold tracking-tighter text-(--text)">Asygurare<span className="text-[#4A7766]">.</span></span>
           </Link>

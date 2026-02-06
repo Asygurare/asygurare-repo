@@ -4,7 +4,8 @@ import React, { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Menu, X, ArrowRight, ShieldCheck } from 'lucide-react'
+import { Menu, X, ArrowRight } from 'lucide-react'
+import Image from 'next/image'
 
 export default function Navbar() {
   const [isScrolled, setIsScrolled] = useState(false)
@@ -42,7 +43,7 @@ export default function Navbar() {
           {/* LOGO */}
           <Link href="/" className="flex items-center gap-2 group">
             <div className="w-8 h-8 bg-(--accents) rounded-lg flex items-center justify-center text-[#ece7e2] transition-transform group-hover:rotate-12">
-              <ShieldCheck size={20} />
+            <Image src="/logo/logo.png" alt='logo' width={24} height={24} />
             </div>
             <span className="text-xl font-bold tracking-tighter text-[#1a1a1a]">
               ASYGURARE<span className="text-[#4A7766]">.</span>
