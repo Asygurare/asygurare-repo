@@ -1,6 +1,7 @@
 "use client"
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react'
+import { DATABASE } from '@/config'
 import { motion, AnimatePresence } from 'framer-motion'
 import { 
   Shield, Search, Filter, X, Plus, Loader2, 
@@ -26,11 +27,11 @@ export default function PolizasPage() {
     setFetching(true)
     try {
       const { data: pols, error: polError } = await supabase
-        .from('policies')
+        .from(DATABASE.TABLES.WS_POLICIES)
         .select('*, customers(full_name, email)')
         .order('expiry_date', { ascending: true })
       
-      const { data: custs } = await supabase.from('customers').select('id, full_name')
+      const { data: custs } = await supabase.from(DATABASE.TABLES.WS_CUSTOMERS).select('id, full_name')
       
       if (polError) throw polError
       setPolicies(pols || [])
@@ -88,8 +89,8 @@ export default function PolizasPage() {
     }
 
     const res = selectedPolicy 
-      ? await supabase.from('policies').update(payload).eq('id', selectedPolicy.id)
-      : await supabase.from('policies').insert([{ ...payload, status: 'activa' }])
+      ? await supabase.from(DATABASE.TABLES.WS_POLICIES).update(payload).eq('id', selectedPolicy.id)
+      : await supabase.from(DATABASE.TABLES.WS_POLICIES).insert([{ ...payload, status: 'activa' }])
 
     if (!res.error) {
       setSuccess(true)
@@ -109,7 +110,7 @@ export default function PolizasPage() {
   const deletePolicy = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation()
     if (!confirm("¿Eliminar esta póliza? Esto borrará todos sus pagos asociados automáticamente.")) return
-    const { error } = await supabase.from('policies').delete().eq('id', id)
+    const { error } = await supabase.from(DATABASE.TABLES.WS_POLICIES).delete().eq('id', id)
     if (!error) {
       setPolicies(policies.filter(p => p.id !== id))
       toast.success("Expediente eliminado")

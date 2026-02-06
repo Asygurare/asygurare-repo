@@ -1,3 +1,4 @@
+import { DATABASE } from "@/config";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { NextResponse } from "next/server";
 import { createClient as createServerClient } from "@/lib/supabase/server";
@@ -18,9 +19,9 @@ export async function POST(request: Request) {
         // --- 1. DATA EXTRACTION (EL CONTEXTO REAL) ---
         // Traemos datos clave para que la IA no improvise
         const [{ data: stats }, { data: leads }, { data: recentPolicies }] = await Promise.all([
-            supabase.from('policies').select('total_premium, status'),
-            supabase.from('customers').select('id').eq('is_lead', true), // Asumiendo que marcas leads así
-            supabase.from('policies').select('policy_number, insurance_company, total_premium').order('created_at', { ascending: false }).limit(3)
+            supabase.from(DATABASE.TABLES.WS_POLICIES).select('total_premium, status'),
+            supabase.from(DATABASE.TABLES.WS_CUSTOMERS).select('id').eq('is_lead', true), // Asumiendo que marcas leads así
+            supabase.from(DATABASE.TABLES.WS_POLICIES).select('policy_number, insurance_company, total_premium').order('created_at', { ascending: false }).limit(3)
         ]);
 
         const totalCartera = stats?.reduce((acc, p) => acc + (p.total_premium || 0), 0) || 0;
@@ -60,7 +61,7 @@ export async function POST(request: Request) {
         const countResponse = await model.countTokens(message);
         const userTokens = countResponse.totalTokens;
 
-        await supabase.from('techguros_messages').insert([
+        await supabase.from(DATABASE.TABLES.WS_IA_MESSAGES).insert([
             { user_id, conversation_id, role: 'user', content: message, tokens_input: userTokens }
         ]);
 
@@ -68,7 +69,7 @@ export async function POST(request: Request) {
         const responseText = result.response.text();
         const aiTokens = result.response.usageMetadata?.candidatesTokenCount || 0;
 
-        await supabase.from('techguros_messages').insert([
+        await supabase.from(DATABASE.TABLES.WS_IA_MESSAGES).insert([
             {
                 user_id,
                 conversation_id,

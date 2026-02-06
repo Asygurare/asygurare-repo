@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
+import { DATABASE } from '@/config'
 import { Send, Loader2, Sparkles, Zap, ShieldCheck, TrendingUp, User } from 'lucide-react'
 import { supabase } from '@/lib/supabase/supabase'
 
@@ -19,7 +20,7 @@ export default function ChatDatamara({ conversationId, userId }: { conversationI
   useEffect(() => {
     const loadHistory = async () => {
       const { data } = await supabase
-        .from('techguros_messages')
+        .from(DATABASE.TABLES.WS_IA_MESSAGES)
         .select('role, content')
         .eq('conversation_id', conversationId)
         .order('created_at', { ascending: true })
@@ -67,7 +68,7 @@ export default function ChatDatamara({ conversationId, userId }: { conversationI
             : userMsg.toUpperCase();
 
           await supabase
-            .from('techguros_conversations')
+            .from(DATABASE.TABLES.WS_IA_CONVERSATIONS)
             .update({ title: newTitle })
             .eq('id', conversationId);
             

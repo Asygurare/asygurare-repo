@@ -1,6 +1,7 @@
 "use client"
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react'
+import { DATABASE } from '@/config'
 import { motion, AnimatePresence } from 'framer-motion'
 import { 
   CreditCard, Search, X, Plus, Loader2, 
@@ -26,11 +27,11 @@ export default function PagosPage() {
     setFetching(true)
     try {
       const { data: pays, error } = await supabase
-        .from('payments')
-        .select('*, policies(policy_number, customers(full_name))')
+        .from(DATABASE.TABLES.WS_PAYMENTS)
+        .select('*, WS_POLICIES(policy_number, customers(full_name))')
         .order('due_date', { ascending: true })
       
-      const { data: pols } = await supabase.from('policies').select('id, policy_number')
+      const { data: pols } = await supabase.from(DATABASE.TABLES.WS_POLICIES).select('id, policy_number')
       
       if (error) throw error
       setPayments(pays || [])
@@ -52,7 +53,7 @@ export default function PagosPage() {
 
     try {
       const { error } = await supabase
-        .from('payments')
+        .from(DATABASE.TABLES.WS_PAYMENTS)
         .update({ status: nextStatus, payment_date: timestamp })
         .eq('id', id)
 
@@ -73,7 +74,7 @@ export default function PagosPage() {
     if (!confirm("¿Estás seguro de eliminar este registro de pago?")) return
     
     try {
-      const { error } = await supabase.from('payments').delete().eq('id', id)
+      const { error } = await supabase.from(DATABASE.TABLES.WS_PAYMENTS).delete().eq('id', id)
       if (error) throw error
       setPayments(prev => prev.filter(p => p.id !== id))
       toast.success("Registro eliminado")
@@ -91,7 +92,7 @@ export default function PagosPage() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
 
-      const { error } = await supabase.from('payments').insert([{
+      const { error } = await supabase.from(DATABASE.TABLES.WS_PAYMENTS).insert([{
         user_id: user.id,
         policy_id: formData.get('policyId'),
         amount: parseFloat(formData.get('amount') as string),

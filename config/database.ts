@@ -1,0 +1,14 @@
+export const DATABASE = {
+    TABLES: {
+        PROFILES: 'PROFILES',
+        WS_CUSTOMERS: 'WS_CUSTOMERS',
+        WS_LEADS: 'WS_LEADS', 
+        WS_PAYMENTS: 'WS_PAYMENTS',
+        WS_POLICIES: 'WS_POLICIES',
+        WS_TASKS: 'WS_TASKS',
+        WS_USER_GOALS: 'WS_USER_GOALS', 
+        WS_IA_CONVERSATIONS: 'WS_IA_CONVERSATIONS',
+        WS_IA_MESSAGES: 'WS_IA_MESSAGES',
+    },
+    BUCKETS:{}
+}
