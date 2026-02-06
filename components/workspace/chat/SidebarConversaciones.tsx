@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react'
 import { Plus, MessageSquare, Trash2, Clock, Check, Edit2, X } from 'lucide-react'
 import { supabase } from '@/lib/supabase/supabase'
 import { motion, AnimatePresence } from 'framer-motion'
+import { DATABASE } from '@/config'
 
 export default function SidebarConversaciones({ 
   userId, 
@@ -24,7 +25,7 @@ export default function SidebarConversaciones({
 
   const fetchConversations = async () => {
     const { data } = await supabase
-      .from('techguros_conversations')
+      .from(DATABASE.TABLES.WS_IA_CONVERSATIONS)
       .select('*')
       .eq('user_id', userId)
       .order('updated_at', { ascending: false })
@@ -33,7 +34,7 @@ export default function SidebarConversaciones({
 
   const createNewChat = async () => {
     const { data } = await supabase
-      .from('techguros_conversations')
+      .from(DATABASE.TABLES.WS_IA_CONVERSATIONS)
       .insert([{ user_id: userId, title: 'NUEVA CONSULTA' }])
       .select().single()
 
@@ -48,7 +49,7 @@ export default function SidebarConversaciones({
     const confirm = window.confirm("¿Estás seguro de eliminar este análisis?")
     if (!confirm) return
 
-    const { error } = await supabase.from('techguros_conversations').delete().eq('id', id)
+    const { error } = await supabase.from(DATABASE.TABLES.WS_IA_CONVERSATIONS).delete().eq('id', id)
     if (!error) {
       setConversations(conversations.filter(c => c.id !== id))
       if (activeChatId === id) onSelectChat("")
@@ -66,7 +67,7 @@ export default function SidebarConversaciones({
     if (!editTitle.trim()) return
 
     const { error } = await supabase
-      .from('techguros_conversations')
+      .from(DATABASE.TABLES.WS_IA_CONVERSATIONS)
       .update({ title: editTitle.toUpperCase() })
       .eq('id', id)
 

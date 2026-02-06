@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
+import { DATABASE } from '@/config'
 import { 
   Zap, Target, X, Mail, Phone, Loader2, CheckCircle2, 
   TrendingUp, DollarSign, UserCheck, Trash2, Edit3, 
@@ -29,8 +30,8 @@ export default function ProspectosFinalUltraPage() {
 
     const currentMonth = new Date().toISOString().slice(0, 7)
     const [leadsRes, goalRes] = await Promise.all([
-      supabase.from('leads').select('*').order('updated_at', { ascending: false }),
-      supabase.from('user_goals').select('amount').eq('month_year', currentMonth).maybeSingle()
+      supabase.from(DATABASE.TABLES.WS_LEADS).select('*').order('updated_at', { ascending: false }),
+      supabase.from(DATABASE.TABLES.WS_USER_GOALS).select('amount').eq('month_year', currentMonth).maybeSingle()
     ])
 
     if (leadsRes.data) setLeads(leadsRes.data)
@@ -43,7 +44,7 @@ export default function ProspectosFinalUltraPage() {
   // --- ACCIONES REALES ---
 
   const updateStage = async (id: string, newStage: string) => {
-    const { error } = await supabase.from('leads').update({ 
+    const { error } = await supabase.from(DATABASE.TABLES.WS_LEADS).update({ 
       stage: newStage, 
       updated_at: new Date().toISOString() 
     }).eq('id', id)
@@ -57,7 +58,7 @@ export default function ProspectosFinalUltraPage() {
 
   const handleDelete = async (id: string) => {
     if (!confirm("¿Eliminar este prospecto?")) return
-    const { error } = await supabase.from('leads').delete().eq('id', id)
+    const { error } = await supabase.from(DATABASE.TABLES.WS_LEADS).delete().eq('id', id)
     if (!error) {
       toast.success("Lead eliminado")
       setLeads(leads.filter(l => l.id !== id))
@@ -69,7 +70,7 @@ export default function ProspectosFinalUltraPage() {
     const { data: { user } } = await supabase.auth.getUser()
 
     // 1. Insertar en clientes
-    const { error: insertError } = await supabase.from('customers').insert({
+    const { error: insertError } = await supabase.from(DATABASE.TABLES.WS_CUSTOMERS).insert({
       user_id: user?.id,
       full_name: lead.full_name,
       email: lead.email,
@@ -80,7 +81,7 @@ export default function ProspectosFinalUltraPage() {
       toast.error("Error al convertir: " + insertError.message)
     } else {
       // 2. Eliminar de leads
-      await supabase.from('leads').delete().eq('id', lead.id)
+      await supabase.from(DATABASE.TABLES.WS_LEADS).delete().eq('id', lead.id)
       toast.success("¡FELICIDADES! Venta cerrada y movida a Clientes.")
       setIsPanelOpen(false)
       fetchData()
@@ -107,8 +108,8 @@ export default function ProspectosFinalUltraPage() {
     }
 
     const res = selectedLead 
-      ? await supabase.from('leads').update(payload).eq('id', selectedLead.id)
-      : await supabase.from('leads').insert([{ ...payload, stage: 'Primer contacto' }])
+      ? await supabase.from(DATABASE.TABLES.WS_LEADS).update(payload).eq('id', selectedLead.id)
+      : await supabase.from(DATABASE.TABLES.WS_LEADS).insert([{ ...payload, stage: 'Primer contacto' }])
     
     if (res.error) toast.error("Error al guardar")
     else {

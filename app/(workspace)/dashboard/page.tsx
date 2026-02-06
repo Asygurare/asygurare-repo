@@ -1,6 +1,7 @@
 "use client"
 
 import React, { useEffect, useState } from 'react'
+import { DATABASE } from '@/config'
 import { motion } from 'framer-motion'
 import { 
   TrendingUp, Users, FileCheck, ArrowUpRight, 
@@ -66,11 +67,11 @@ export default function DashboardPage() {
       // 3. Obtener Prospectos (Leads) activos
       // 4. Obtener Actividad (tareas del Calendario del mes)
       const [policiesRes, customerCountRes, leadsCountRes, tasksRes] = await Promise.all([
-        supabase.from('policies').select('total_premium, expiry_date'),
-        supabase.from('customers').select('*', { count: 'exact', head: true }),
-        supabase.from('leads').select('*', { count: 'exact', head: true }),
+        supabase.from(DATABASE.TABLES.WS_POLICIES).select('total_premium, expiry_date'),
+        supabase.from(DATABASE.TABLES.WS_CUSTOMERS).select('*', { count: 'exact', head: true }),
+        supabase.from(DATABASE.TABLES.WS_LEADS).select('*', { count: 'exact', head: true }),
         supabase
-          .from('tasks')
+          .from(DATABASE.TABLES.WS_TASKS)
           .select('id, title, kind, priority, status, due_at, entity_type, entity_id')
           .gte('due_at', monthStart.toISOString())
           .lte('due_at', monthEnd.toISOString())
@@ -110,10 +111,10 @@ export default function DashboardPage() {
 
         const [custsRes, leadsRes] = await Promise.all([
           customerIds.length
-            ? supabase.from('customers').select('id, full_name').in('id', customerIds)
+            ? supabase.from(DATABASE.TABLES.WS_CUSTOMERS).select('id, full_name').in('id', customerIds)
             : Promise.resolve({ data: [] as any[], error: null }),
           leadIds.length
-            ? supabase.from('leads').select('id, full_name').in('id', leadIds)
+            ? supabase.from(DATABASE.TABLES.WS_LEADS).select('id, full_name').in('id', leadIds)
             : Promise.resolve({ data: [] as any[], error: null }),
         ])
 

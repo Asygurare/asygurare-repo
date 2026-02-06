@@ -1,6 +1,7 @@
 "use client"
 
 import React, { useCallback, useEffect, useMemo, useState } from "react"
+import { DATABASE } from "@/config"
 import { motion, AnimatePresence } from "framer-motion"
 import {
   CalendarDays,
@@ -206,8 +207,8 @@ export default function CalendarioPage() {
 
   const fetchPeople = useCallback(async () => {
     const [custRes, leadsRes] = await Promise.all([
-      supabase.from("customers").select("id, full_name, email, phone").order("created_at", { ascending: false }),
-      supabase.from("leads").select("id, full_name, email, phone").order("updated_at", { ascending: false }),
+      supabase.from(DATABASE.TABLES.WS_CUSTOMERS).select("id, full_name, email, phone").order("created_at", { ascending: false }),
+      supabase.from(DATABASE.TABLES.WS_LEADS).select("id, full_name, email, phone").order("updated_at", { ascending: false }),
     ])
 
     if (custRes.error) toast.error("Error al cargar clientes: " + custRes.error.message)
@@ -221,7 +222,7 @@ export default function CalendarioPage() {
     // Try Supabase first; if tasks table doesn't exist, fallback local
     try {
       const { data, error } = await supabase
-        .from("tasks")
+        .from(DATABASE.TABLES.WS_TASKS)
         .select("*")
         .order("due_at", { ascending: true })
 
@@ -450,7 +451,7 @@ export default function CalendarioPage() {
         updated_at: now,
       }
 
-      const { error } = await supabase.from("tasks").upsert(row)
+      const { error } = await supabase.from(DATABASE.TABLES.WS_TASKS).upsert(row)
       if (error) throw error
     } catch (e: any) {
       setStorageMode("local")
@@ -474,7 +475,7 @@ export default function CalendarioPage() {
     }
 
     try {
-      const { error } = await supabase.from("tasks").delete().eq("id", id)
+      const { error } = await supabase.from(DATABASE.TABLES.WS_TASKS).delete().eq("id", id)
       if (error) throw error
     } catch (e: any) {
       setStorageMode("local")

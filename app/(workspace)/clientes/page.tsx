@@ -1,6 +1,7 @@
 "use client"
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react'
+import { DATABASE } from '@/config'
 import { motion, AnimatePresence } from 'framer-motion'
 import { 
   Users, Search, X, UserPlus, Mail, Phone, 
@@ -24,7 +25,7 @@ export default function ClientesPage() {
     setFetching(true)
     try {
       const { data, error } = await supabase
-        .from('customers')
+        .from(DATABASE.TABLES.WS_CUSTOMERS)
         .select('*')
         .order('created_at', { ascending: false })
       
@@ -74,9 +75,9 @@ export default function ClientesPage() {
 
       let res;
       if (selectedCustomer) {
-        res = await supabase.from('customers').update(payload).eq('id', selectedCustomer.id)
+        res = await supabase.from(DATABASE.TABLES.WS_CUSTOMERS).update(payload).eq('id', selectedCustomer.id)
       } else {
-        res = await supabase.from('customers').insert([payload])
+        res = await supabase.from(DATABASE.TABLES.WS_CUSTOMERS).insert([payload])
       }
 
       if (res.error) throw res.error
@@ -100,7 +101,7 @@ export default function ClientesPage() {
   const deleteCustomer = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation()
     if (!confirm("¿Seguro que deseas eliminar este cliente de la cartera permanente?")) return
-    const { error } = await supabase.from('customers').delete().eq('id', id)
+    const { error } = await supabase.from(DATABASE.TABLES.WS_CUSTOMERS).delete().eq('id', id)
     if (!error) {
       setCustomers(customers.filter(c => c.id !== id))
       toast.success("Registro eliminado")
