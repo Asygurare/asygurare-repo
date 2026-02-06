@@ -3,9 +3,10 @@
 import React, { useState } from 'react'
 import { motion } from 'framer-motion'
 import Link from 'next/link'
+import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase/supabase'
-import { ShieldCheck, ArrowRight, Mail, Lock, Eye, EyeOff, Loader2 } from 'lucide-react'
+import { ArrowRight, Mail, Lock, Eye, EyeOff, Loader2 } from 'lucide-react'
 
 const transition = { duration: 0.8, ease: [0.76, 0, 0.24, 1] }
 
@@ -67,7 +68,7 @@ export default function LoginPage() {
           {/* Logo */}
           <Link href="/" className="flex items-center gap-2 mb-12 group inline-block">
             <div className="w-10 h-10 bg-(--accents) rounded-xl flex items-center justify-center text-[#ece7e2] shadow-lg shadow-[#4A7766]/20 transition-transform group-hover:rotate-12">
-              <ShieldCheck size={24} />
+              <Image src="/logo/logo.png" alt='logo' width={24} height={24} />
             </div>
             <span className="text-2xl font-bold tracking-tighter text-[#1a1a1a]">
               Asygurare<span className="text-[#4A7766]">.</span>
@@ -107,7 +108,9 @@ export default function LoginPage() {
             <div className="space-y-2">
               <div className="flex justify-between items-center px-1">
                 <label className="text-sm font-bold text-gray-700">Contraseña</label>
-                <Link href="#" className="text-xs font-bold text-(--accents) hover:underline">¿La olvidaste?</Link>
+                <Link href="/forget-password" className="text-xs font-bold text-(--accents) hover:underline">
+                  ¿La olvidaste?
+                </Link>
               </div>
               <div className="relative">
                 <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
