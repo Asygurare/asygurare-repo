@@ -4,10 +4,12 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
   LayoutDashboard, Users, Target, Shield,
-  CreditCard, Settings, BrainCircuit, CalendarDays, BarChart3
+  CreditCard, Settings, BrainCircuit, CalendarDays, BarChart3,
+  Cpu
 } from 'lucide-react'
 import WorkspaceNavbar from '@/src/components/navbar/WorkspaceNavbar'
 import Image from 'next/image'
+
 
 const menuItems = [
   { icon: LayoutDashboard, label: 'Dashboard', href: '/dashboard' },
@@ -16,8 +18,9 @@ const menuItems = [
   { icon: Shield, label: 'Pólizas', href: '/polizas' },
   { icon: CreditCard, label: 'Pagos', href: '/pagos' },
   { icon: CalendarDays, label: 'Calendario', href: '/calendario' },
-  { icon: BarChart3, label: 'Analytics', href: '/analytics', comingSoon: true },
-  { icon: BrainCircuit, label: 'Tu Asistente de IA', href: '/ia' }, // <-- NUEVA SECCIÓN
+  { icon: BrainCircuit, label: 'Tu Asistente de IA', href: '/ia' },
+  { icon: BarChart3, label: 'Análisis', href: '/analytics', comingSoon: true },
+  { icon: Cpu, label: 'Automatización', href: '/automatizaciones', comingSoon: true}
 ]
 
 export default function WorkspaceLayout({ children }: { children: React.ReactNode }) {
@@ -58,7 +61,7 @@ export default function WorkspaceLayout({ children }: { children: React.ReactNod
                     <item.icon size={20} />
                     {item.label}
                   </div>
-                  <span className="text-[9px] font-black uppercase tracking-widest px-3 py-1 rounded-full bg-black/5 text-gray-400">
+                  <span className="text-[9px] font-black uppercase tracking-widest px-3 py-1 rounded-full bg-(--accents)/50 text-white">
                     Soon
                   </span>
                 </div>
@@ -100,7 +103,7 @@ export default function WorkspaceLayout({ children }: { children: React.ReactNod
       <main className="flex-1 flex flex-col overflow-hidden">
 
         {/* Renderizado del Navbar en la parte superior del contenido */}
-        <div className="px-10 pt-10 pb-0 z-[999]">
+        <div className="px-10 pt-10 pb-0">
           <WorkspaceNavbar />
         </div>
 

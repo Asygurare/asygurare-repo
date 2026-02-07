@@ -107,21 +107,23 @@ export default function TechnoDashboard() {
   ]
 
   return (
-    <main className='p-20  '>
-      <div className="space-y-8 p-20 rounded-md border-2 border-(--accents) bg-white">
+    <main className="px-4 py-6 sm:px-6 sm:py-10 lg:px-10 lg:py-12 overflow-x-hidden">
+      <div className="mx-auto max-w-7xl space-y-6 sm:space-y-8 rounded-md border-2 border-(--accents) bg-white p-4 sm:p-8 lg:p-12">
         {/* --- SALUDO E IA --- */}
         <section className="flex flex-col md:flex-row gap-6 items-stretch">
           <motion.div
             initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
-            className="flex-1 bg-white p-8 rounded-[2rem] border border-black/5 shadow-sm"
+            className="flex-1 bg-white p-6 sm:p-8 rounded-[2rem] border border-black/5 shadow-sm"
           >
-            <h2 className="text-3xl font-black text-black mb-2">Panel de <span className="text-(--accents) italic">Control.</span></h2>
+            <h2 className="text-2xl sm:text-3xl font-black text-black mb-2">
+              Panel de <span className="text-(--accents) italic">Control.</span>
+            </h2>
             <p className="text-gray-500 mb-6 font-bold text-sm uppercase tracking-tight">
               {stats.clientes > 0 ? `Gestionando ${stats.clientes} asegurados actualmente.` : "Tu workspace está listo. Comienza agregando a tu primer cliente."}
             </p>
 
-            <div className="flex gap-4">
-              <button className="bg-black text-white px-8 py-4 rounded-2xl font-black text-sm flex items-center gap-2 hover:bg-(--accents) transition-all shadow-xl">
+            <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
+              <button className="w-full sm:w-auto justify-center bg-black text-white px-5 py-3 sm:px-8 sm:py-4 rounded-2xl font-black text-sm flex items-center gap-2 hover:bg-(--accents) transition-all shadow-xl">
                 <Plus size={18} /> Nueva Acción
               </button>
             </div>
@@ -129,7 +131,7 @@ export default function TechnoDashboard() {
 
           <motion.div
             initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}
-            className="md:w-1/3 bg-[#1a1a1a] p-8 rounded-[2rem] text-white relative overflow-hidden flex flex-col justify-center"
+            className="md:w-1/3 bg-[#1a1a1a] p-6 sm:p-8 rounded-[2rem] text-white relative overflow-hidden flex flex-col justify-center"
           >
             <div className="relative z-10">
               <div className="flex items-center gap-2 text-(--accents) mb-4">
@@ -152,7 +154,7 @@ export default function TechnoDashboard() {
             <motion.div
               key={stat.label}
               initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.1 }}
-              className="bg-white p-8 rounded-[2.5rem] border border-black/5 shadow-sm group hover:border-(--accents)/30 transition-all"
+              className="bg-white p-6 sm:p-8 rounded-[2.5rem] border border-black/5 shadow-sm group hover:border-(--accents)/30 transition-all"
             >
               <div className="flex justify-between items-start mb-6">
                 <div className="p-4 bg-gray-50 rounded-2xl text-black group-hover:bg-(--accents) group-hover:text-white transition-all">
@@ -165,7 +167,7 @@ export default function TechnoDashboard() {
                 <Loader2 className="animate-spin text-gray-200" size={24} />
               ) : (
                 <>
-                  <h4 className={`text-3xl font-black ${stat.color}`}>{stat.value}</h4>
+                  <h4 className={`text-2xl sm:text-3xl font-black ${stat.color}`}>{stat.value}</h4>
                   <p className="text-[10px] font-bold text-gray-400 mt-2 uppercase">{stat.detail}</p>
                 </>
               )}
@@ -176,8 +178,8 @@ export default function TechnoDashboard() {
         {/* --- ACTIVIDAD Y TAREAS --- */}
         <section className="grid lg:grid-cols-3 gap-8">
 
-          <div className="lg:col-span-2 bg-white rounded-[2.5rem] border border-black/5 p-10 flex flex-col">
-            <div className="flex justify-between items-center mb-10">
+          <div className="lg:col-span-2 bg-white rounded-[2.5rem] border border-black/5 p-6 sm:p-8 lg:p-10 flex flex-col overflow-hidden">
+            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-6 sm:mb-10">
               <h3 className="text-xl font-black text-black italic">Actividad del Mes</h3>
               <span className="text-[10px] font-black text-(--accents) bg-(--accents)/10 px-4 py-2 rounded-full uppercase">En tiempo real</span>
             </div>
@@ -212,7 +214,7 @@ export default function TechnoDashboard() {
                       t.entity_type === 'lead' ? 'Prospecto' : null
 
                   return (
-                    <div key={t.id} className="flex items-center gap-4 p-4 hover:bg-gray-50 rounded-2xl transition-all">
+                    <div key={t.id} className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 p-4 hover:bg-gray-50 rounded-2xl transition-all">
                       <div className={`w-2 h-2 rounded-full ${t.status === 'done' ? 'bg-green-500' : priorityDot(t.priority)}`} />
 
                       <div className="p-2 bg-gray-50 rounded-xl text-black shrink-0">
@@ -232,15 +234,17 @@ export default function TechnoDashboard() {
                             {t.status === 'done' ? 'HECHA' : t.priority}
                           </span>
                           {badge ? (
-                            <span className="text-[10px] font-black uppercase tracking-widest text-black/30 flex items-center gap-2">
-                              <Target size={12} className="opacity-30" />
-                              {badge}{t.related_name ? `: ${t.related_name}` : ''}
+                            <span className="text-[10px] font-black uppercase tracking-[0.15em] sm:tracking-widest text-black/30 inline-flex items-start gap-2 max-w-full min-w-0 flex-wrap">
+                              <Target size={12} className="opacity-30 shrink-0 mt-[1px]" />
+                              <span className="min-w-0 break-words">
+                                {badge}{t.related_name ? `: ${t.related_name}` : ''}
+                              </span>
                             </span>
                           ) : null}
                         </div>
                       </div>
 
-                      <span className="text-[10px] font-black text-gray-300 whitespace-nowrap">
+                      <span className="text-[10px] font-black text-gray-300 whitespace-normal sm:whitespace-nowrap self-end sm:self-auto sm:ml-auto">
                         {timeLabel} · {hourLabel}
                       </span>
                     </div>
@@ -250,8 +254,8 @@ export default function TechnoDashboard() {
             )}
           </div>
 
-          <div className="bg-white rounded-[2.5rem] border border-black/5 shadow-sm p-10">
-            <h3 className="text-xl font-black text-black mb-8 italic">Urgente</h3>
+          <div className="bg-white rounded-[2.5rem] border border-black/5 shadow-sm p-6 sm:p-8 lg:p-10 overflow-hidden">
+            <h3 className="text-xl font-black text-black mb-6 sm:mb-8 italic">Urgente</h3>
             <div className="space-y-6">
               {stats.renovaciones > 0 ? (
                 <div className="p-6 bg-orange-50 rounded-[2rem] border border-orange-100">
@@ -267,7 +271,7 @@ export default function TechnoDashboard() {
                 <p className="text-sm text-gray-400 font-bold italic text-center py-10">Nada urgente por ahora.</p>
               )}
             </div>
-            <button className="w-full mt-8 py-5 border-2 border-dashed border-gray-100 rounded-[2rem] text-gray-400 font-black text-[10px] uppercase tracking-widest hover:border-(--accents) hover:text-(--accents) transition-all">
+            <button className="w-full mt-8 py-4 sm:py-5 border-2 border-dashed border-gray-100 rounded-[2rem] text-gray-400 font-black text-[10px] uppercase tracking-[0.15em] sm:tracking-widest hover:border-(--accents) hover:text-(--accents) transition-all whitespace-normal break-words">
               + Crear Recordatorio
             </button>
           </div>

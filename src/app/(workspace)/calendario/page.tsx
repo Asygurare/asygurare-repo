@@ -208,14 +208,21 @@ export default function CalendarioPage() {
   const fetchPeople = useCallback(async () => {
     const [custRes, leadsRes] = await Promise.all([
       supabaseClient.from(DATABASE.TABLES.WS_CUSTOMERS).select("id, full_name, email, phone").order("created_at", { ascending: false }),
-      supabaseClient.from(DATABASE.TABLES.WS_LEADS).select("id, full_name, email, phone").order("updated_at", { ascending: false }),
+      supabaseClient.from(DATABASE.TABLES.WS_LEADS).select("id, name, last_name, email, phone").order("updated_at", { ascending: false }),
     ])
 
     if (custRes.error) toast.error("Error al cargar clientes: " + custRes.error.message)
     if (leadsRes.error) toast.error("Error al cargar prospectos: " + leadsRes.error.message)
 
     setCustomers((custRes.data || []) as any)
-    setLeads((leadsRes.data || []) as any)
+    setLeads(
+      (leadsRes.data || []).map((l: any) => ({
+        id: String(l.id),
+        full_name: `${String(l?.name || '').trim()} ${String(l?.last_name || '').trim()}`.trim(),
+        email: l.email ?? null,
+        phone: l.phone ?? null,
+      }))
+    )
   }, [])
 
   const fetchTasks = useCallback(async () => {

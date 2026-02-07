@@ -96,19 +96,12 @@ export default function ChatDatamara({ conversationId, userId }: { conversationI
             </div>
           </div>
           <div>
-            <h3 className="font-black text-lg tracking-tight italic uppercase leading-none">Gubot 2.5</h3>
+            <h3 className="font-black text-lg tracking-tight italic uppercase leading-none"></h3>
             <div className="flex items-center gap-2 mt-1">
               <span className="flex h-2 w-2 rounded-full bg-green-500" />
               <p className="text-[9px] font-black text-black/40 uppercase tracking-widest">Sincronizado con Cartera Real</p>
             </div>
           </div>
-        </div>
-
-        <div className="flex gap-4">
-            <div className="hidden sm:flex flex-col items-end">
-                <p className="text-[8px] font-black text-black/30 uppercase tracking-widest">Latencia IA</p>
-                <p className="text-[10px] font-bold">142ms</p>
-            </div>
         </div>
       </header>
 
