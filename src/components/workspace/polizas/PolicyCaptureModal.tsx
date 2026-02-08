@@ -9,31 +9,13 @@ import { DATABASE } from '@/src/config'
 import { supabaseClient } from '@/src/lib/supabase/client'
 import { getFullName } from '@/src/lib/utils/utils'
 import { toast } from 'sonner'
-
-export type CustomerOption = {
-  id: string
-  name?: string | null
-  last_name?: string | null
-  full_name?: string | null
-}
-
-export type PolicyForForm = {
-  id: string
-  customer_id?: string | null
-  policy_number?: string | null
-  insurance_company?: string | null
-  category?: string | null
-  effective_date?: string | null
-  expiry_date?: string | null
-  total_premium?: number | null
-  frecuencia_pago?: string | null
-}
+import { type Customer, type PolicyFormData } from '@/src/types/policy'
 
 type PolicyCaptureModalProps = {
   isOpen: boolean
   onClose: () => void
-  customers: CustomerOption[]
-  selectedPolicy?: PolicyForForm | null
+  customers: Customer[] // Usamos el tipo real
+  selectedPolicy?: PolicyFormData | null // Usamos el tipo de formulario
   onSuccess: () => void
 }
 

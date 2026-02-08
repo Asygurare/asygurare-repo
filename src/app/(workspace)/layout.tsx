@@ -17,7 +17,7 @@ const menuItems = [
   { icon: Target, label: 'Prospectos', href: '/prospectos' },
   { icon: Users, label: 'Clientes', href: '/clientes' },
   { icon: Shield, label: 'Pólizas', href: '/polizas' },
-  { icon: CreditCard, label: 'Pagos', href: '/pagos' },
+  { icon: CreditCard, label: 'Pagos', href: '/pagos', hidden: true }, // omitido por el momento
   { icon: CalendarDays, label: 'Calendario', href: '/calendario' },
   { icon: BrainCircuit, label: 'Tu Asistente de IA', href: '/ia' },
   { icon: BarChart3, label: 'Análisis', href: '/analytics', comingSoon: true },
@@ -43,7 +43,7 @@ export default function WorkspaceLayout({ children }: { children: React.ReactNod
         </Link>
 
         <nav className="flex-1 space-y-2">
-          {menuItems.map((item) => {
+          {menuItems.filter((item) => !(item as any).hidden).map((item) => {
             // Verificamos si es activo. 
             // Usamos startsWith para que si estás en un chat específico, el botón siga resaltado
             const isActive = pathname.startsWith(item.href)
