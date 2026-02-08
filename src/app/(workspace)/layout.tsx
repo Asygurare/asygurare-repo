@@ -5,7 +5,7 @@ import { usePathname } from 'next/navigation'
 import {
   LayoutDashboard, Users, Target, Shield,
   CreditCard, Settings, BrainCircuit, CalendarDays, BarChart3,
-  Cpu
+  Cpu, Flag
 } from 'lucide-react'
 import WorkspaceNavbar from '@/src/components/navbar/WorkspaceNavbar'
 import Image from 'next/image'
@@ -13,6 +13,7 @@ import Image from 'next/image'
 
 const menuItems = [
   { icon: LayoutDashboard, label: 'Dashboard', href: '/dashboard' },
+  { icon: Flag, label: 'Mis metas', href: '/metas', comingSoon: true },
   { icon: Target, label: 'Prospectos', href: '/prospectos' },
   { icon: Users, label: 'Clientes', href: '/clientes' },
   { icon: Shield, label: 'Pólizas', href: '/polizas' },

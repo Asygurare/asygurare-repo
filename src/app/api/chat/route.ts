@@ -17,10 +17,10 @@ export async function POST(request: Request) {
         }
 
         // --- 1. DATA EXTRACTION (EL CONTEXTO REAL) ---
-        // Traemos datos clave para que la IA no improvise
+        // Traemos datos clave para que la IA no improvise (leads desde WS_LEADS)
         const [{ data: stats }, { data: leads }, { data: recentPolicies }] = await Promise.all([
             supabase.from(DATABASE.TABLES.WS_POLICIES).select('total_premium, status'),
-            supabase.from(DATABASE.TABLES.WS_CUSTOMERS).select('id').eq('is_lead', true), // Asumiendo que marcas leads así
+            supabase.from(DATABASE.TABLES.WS_LEADS).select('id'),
             supabase.from(DATABASE.TABLES.WS_POLICIES).select('policy_number, insurance_company, total_premium').order('created_at', { ascending: false }).limit(3)
         ]);
 

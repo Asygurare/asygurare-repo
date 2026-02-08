@@ -10,6 +10,7 @@ import {
   ArrowUpRight, Clock, FileText, Download, Repeat
 } from 'lucide-react'
 import { supabaseClient } from '@/src/lib/supabase/client'
+import { getFullName } from '@/src/lib/utils/utils'
 import { toast, Toaster } from 'sonner'
 
 export default function PolizasPage() {
@@ -28,10 +29,10 @@ export default function PolizasPage() {
     try {
       const { data: pols, error: polError } = await supabaseClient
         .from(DATABASE.TABLES.WS_POLICIES)
-        .select('*, WS_CUSTOMERS(full_name, email)')
+        .select('*, WS_CUSTOMERS_2(name, last_name, email)')
         .order('expiry_date', { ascending: true })
       
-      const { data: custs } = await supabaseClient.from(DATABASE.TABLES.WS_CUSTOMERS).select('id, full_name')
+      const { data: custs } = await supabaseClient.from(DATABASE.TABLES.WS_CUSTOMERS_2).select('id, name, last_name')
       
       if (polError) throw polError
       setPolicies(pols || [])
@@ -49,7 +50,7 @@ export default function PolizasPage() {
   const filteredPolicies = useMemo(() => {
     return policies.filter(p => 
       p.policy_number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      p.customers?.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      getFullName(p.WS_CUSTOMERS_2 || {}).toLowerCase().includes(searchTerm.toLowerCase()) ||
       p.insurance_company?.toLowerCase().includes(searchTerm.toLowerCase())
     )
   }, [policies, searchTerm])
@@ -224,7 +225,7 @@ export default function PolizasPage() {
                             </div>
                         </td>
                         <td className="p-8">
-                            <p className="font-black text-black text-base uppercase leading-tight">{p.customers?.full_name}</p>
+                            <p className="font-black text-black text-base uppercase leading-tight">{getFullName(p.WS_CUSTOMERS_2 || {})}</p>
                             <p className="text-[10px] font-bold text-black/30 uppercase tracking-widest mt-1 italic">{p.insurance_company}</p>
                         </td>
                         <td className="p-8">
@@ -288,7 +289,7 @@ export default function PolizasPage() {
                     <div className="bg-white p-8 rounded-[2.5rem] border border-black/5 shadow-sm">
                         <select required name="customerId" defaultValue={selectedPolicy?.customer_id} className="w-full bg-[#ece7e2] text-black font-black py-5 px-6 rounded-2xl outline-none appearance-none cursor-pointer text-lg">
                             <option value="">Seleccionar Titular...</option>
-                            {customers.map(c => <option key={c.id} value={c.id}>{c.full_name}</option>)}
+                            {customers.map(c => <option key={c.id} value={c.id}>{getFullName(c)}</option>)}
                         </select>
                     </div>
                   </div>
