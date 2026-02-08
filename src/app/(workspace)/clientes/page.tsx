@@ -10,12 +10,14 @@ import {
 import { supabaseClient } from '@/src/lib/supabase/client'
 import { toast, Toaster } from 'sonner'
 import { getFullName } from '@/src/lib/utils/utils'
+import { SelectWithOther } from '@/src/components/ui/SelectWithOther'
+import { InsuranceType } from '@/src/config/constants'
 
-const INSURANCE_TYPES = ['Autos', 'Vida', 'Salud', 'Hogar / Empresa', 'Retiro', 'Otro']
+const INSURANCE_TYPES = Object.values(InsuranceType)
 const STATUSES = ['nuevo', 'en seguimiento', 'activo', 'otro']
 const SOURCES = ['Referido', 'Redes Sociales', 'Llamada en Frío', 'Campaña Web', 'Cartera Antigua', 'Otro']
 const MARITAL_STATUSES = ['Soltero/a', 'Casado/a', 'Unión libre', 'Divorciado/a', 'Viudo/a', 'Otro']
-const GENDERS = ['Masculino', 'Femenino', 'No binario', 'Otro', 'Prefiero no decir']
+const GENDERS = ['Masculino', 'Femenino', 'Otro']
 
 function parseTriBool(v: FormDataEntryValue | null): boolean | null {
   const s = String(v || '').trim()
@@ -443,73 +445,59 @@ export default function ClientesPage() {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="space-y-2">
                       <label className="text-[12px] font-black uppercase text-black italic">Género</label>
-                      <select
+                      <SelectWithOther
                         name="gender"
+                        options={GENDERS}
                         defaultValue={selectedCustomer?.gender ?? ''}
+                        emptyOption="Sin especificar"
                         className="w-full bg-white p-5 rounded-2xl font-black text-black text-lg outline-none appearance-none cursor-pointer"
-                      >
-                        <option value="">Sin especificar</option>
-                        {GENDERS.map((g) => (
-                          <option key={g} value={g}>{g}</option>
-                        ))}
-                      </select>
+                      />
                     </div>
                     <div className="space-y-2">
                       <label className="text-[12px] font-black uppercase text-black italic">Estado civil</label>
-                      <select
+                      <SelectWithOther
                         name="marital_status"
+                        options={MARITAL_STATUSES}
                         defaultValue={selectedCustomer?.marital_status ?? ''}
+                        emptyOption="Sin especificar"
                         className="w-full bg-white p-5 rounded-2xl font-black text-black text-lg outline-none appearance-none cursor-pointer"
-                      >
-                        <option value="">Sin especificar</option>
-                        {MARITAL_STATUSES.map((s) => (
-                          <option key={s} value={s}>{s}</option>
-                        ))}
-                      </select>
+                      />
                     </div>
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="space-y-2">
                       <label className="text-[12px] font-black uppercase text-black italic">Tipo de seguro</label>
-                      <select
+                      <SelectWithOther
                         name="insurance_type"
+                        options={INSURANCE_TYPES}
                         defaultValue={selectedCustomer?.insurance_type ?? ''}
+                        emptyOption="Selecciona..."
                         className="w-full bg-white p-5 rounded-2xl font-black text-black text-lg outline-none appearance-none cursor-pointer"
-                      >
-                        <option value="">Selecciona...</option>
-                        {INSURANCE_TYPES.map((t) => (
-                          <option key={t} value={t}>{t}</option>
-                        ))}
-                      </select>
+                      />
                     </div>
                     <div className="space-y-2">
                       <label className="text-[12px] font-black uppercase text-black italic">Estatus</label>
-                      <select
+                      <SelectWithOther
                         name="status"
+                        options={STATUSES}
                         defaultValue={selectedCustomer?.status ?? 'nuevo'}
+                        otherOptionValue="otro"
                         className="w-full bg-white p-5 rounded-2xl font-black text-black text-lg outline-none appearance-none cursor-pointer"
-                      >
-                        {STATUSES.map((s) => (
-                          <option key={s} value={s}>{s}</option>
-                        ))}
-                      </select>
+                      />
                     </div>
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="space-y-2">
                       <label className="text-[12px] font-black uppercase text-black italic">Origen</label>
-                      <select
+                      <SelectWithOther
                         name="source"
+                        options={SOURCES}
                         defaultValue={selectedCustomer?.source ?? ''}
+                        emptyOption="Selecciona..."
                         className="w-full bg-white p-5 rounded-2xl font-black text-black text-lg outline-none appearance-none cursor-pointer"
-                      >
-                        <option value="">Selecciona...</option>
-                        {SOURCES.map((s) => (
-                          <option key={s} value={s}>{s}</option>
-                        ))}
-                      </select>
+                      />
                     </div>
                     <div className="space-y-2">
                       <label className="text-[12px] font-black uppercase text-black italic">Ocupación</label>

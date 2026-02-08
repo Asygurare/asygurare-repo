@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { DATABASE } from '@/src/config'
+import { DATABASE, Gender, InsuranceType, MaritalStatus } from '@/src/config'
 import { 
   Zap, Target, X, Mail, Phone, Loader2, CheckCircle2, 
   TrendingUp, DollarSign, UserCheck, Trash2, Edit3, 
@@ -10,6 +10,7 @@ import {
 } from 'lucide-react'
 import { supabaseClient } from '@/src/lib/supabase/client'
 import { toast, Toaster } from 'sonner'
+import { SelectWithOther } from '@/src/components/ui/SelectWithOther'
 
 export default function ProspectosFinalUltraPage() {
   const [leads, setLeads] = useState<any[]>([])
@@ -42,10 +43,10 @@ export default function ProspectosFinalUltraPage() {
 
   const STAGES = ['Primer contacto', 'Cita agendada', 'Propuesta enviada', 'En negociación', 'Otro']
   const SOURCES = ['Referido', 'Redes Sociales', 'Llamada en Frío', 'Campaña Web', 'Cartera Antigua', 'Otro']
-  const STATUSES = ['nuevo', 'en seguimiento', 'descartado', 'ganado', 'otro']
-  const MARITAL_STATUSES = ['Soltero/a', 'Casado/a', 'Unión libre', 'Divorciado/a', 'Viudo/a', 'Otro']
-  const GENDERS = ['Masculino', 'Femenino', 'No binario', 'Otro', 'Prefiero no decir']
-  const INSURANCE_TYPES = ['Autos', 'Vida', 'Salud', 'Hogar / Empresa', 'Retiro', 'Otro']
+  const STATUSES = ['Nuevo', 'En seguimiento', 'Descartado', 'Ganado', 'Otro']
+  const MARITAL_STATUSES = Object.values(MaritalStatus)
+  const GENDERS = Object.values(Gender)
+  const INSURANCE_TYPES = Object.values(InsuranceType)
   const EDUCATION_LEVELS = ['Primaria', 'Secundaria', 'Preparatoria', 'Licenciatura', 'Posgrado', 'Otro']
   const CURRENCIES = ['MXN', 'USD', 'EUR']
   // Los campos adicionales se guardan en `WS_LEADS.additional_fields` (JSONB)
@@ -598,24 +599,23 @@ export default function ProspectosFinalUltraPage() {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div className="space-y-2">
                         <label className="text-[12px] font-black uppercase text-black italic">Origen</label>
-                        <select
+                        <SelectWithOther
                           name="source"
+                          options={SOURCES}
                           defaultValue={selectedLead?.source || ''}
+                          emptyOption="Selecciona una opción..."
                           className="w-full bg-[#ece7e2] p-5 rounded-2xl font-black text-black text-lg outline-none appearance-none cursor-pointer"
-                        >
-                          <option value="">Selecciona una opción...</option>
-                          {SOURCES.map(s => <option key={s} value={s}>{s}</option>)}
-                        </select>
+                        />
                       </div>
                       <div className="space-y-2">
                         <label className="text-[12px] font-black uppercase text-black italic">Estatus</label>
-                        <select
+                        <SelectWithOther
                           name="status"
+                          options={STATUSES}
                           defaultValue={selectedLead?.status || 'nuevo'}
+                          otherOptionValue="otro"
                           className="w-full bg-[#ece7e2] p-5 rounded-2xl font-black text-black text-lg outline-none appearance-none cursor-pointer"
-                        >
-                          {STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
-                        </select>
+                        />
                       </div>
                     </div>
                   </div>
@@ -635,24 +635,22 @@ export default function ProspectosFinalUltraPage() {
                       </div>
                       <div className="space-y-2">
                         <label className="text-[12px] font-black uppercase text-(--accents) italic">Tipo de seguro</label>
-                        <select
+                        <SelectWithOther
                           name="insurance_type"
+                          options={INSURANCE_TYPES}
                           defaultValue={selectedLead?.insurance_type || ''}
+                          emptyOption="Selecciona una opción..."
                           className="w-full bg-white p-5 rounded-2xl font-black text-black text-lg outline-none appearance-none cursor-pointer"
-                        >
-                          <option value="">Selecciona una opción...</option>
-                          {INSURANCE_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
-                        </select>
+                        />
                       </div>
                       <div className="space-y-2">
                         <label className="text-[12px] font-black uppercase text-(--accents) italic">Etapa</label>
-                        <select
+                        <SelectWithOther
                           name="stage"
+                          options={STAGES}
                           defaultValue={selectedLead?.stage || 'Primer contacto'}
                           className="w-full bg-white p-5 rounded-2xl font-black text-black text-lg outline-none appearance-none cursor-pointer"
-                        >
-                          {STAGES.map(s => <option key={s} value={s}>{s}</option>)}
-                        </select>
+                        />
                       </div>
                     </div>
 
@@ -684,25 +682,23 @@ export default function ProspectosFinalUltraPage() {
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="space-y-2">
                           <label className="text-[12px] font-black uppercase text-black italic">Género</label>
-                          <select
+                          <SelectWithOther
                             name="gender"
+                            options={GENDERS}
                             defaultValue={selectedLead?.gender || ''}
+                            emptyOption="Sin especificar"
                             className="w-full bg-[#ece7e2] p-5 rounded-2xl font-black text-black text-lg outline-none appearance-none cursor-pointer"
-                          >
-                            <option value="">Sin especificar</option>
-                            {GENDERS.map(g => <option key={g} value={g}>{g}</option>)}
-                          </select>
+                          />
                         </div>
                         <div className="space-y-2">
                           <label className="text-[12px] font-black uppercase text-black italic">Estado civil</label>
-                          <select
+                          <SelectWithOther
                             name="marital_status"
+                            options={MARITAL_STATUSES}
                             defaultValue={selectedLead?.marital_status || ''}
+                            emptyOption="Sin especificar"
                             className="w-full bg-[#ece7e2] p-5 rounded-2xl font-black text-black text-lg outline-none appearance-none cursor-pointer"
-                          >
-                            <option value="">Sin especificar</option>
-                            {MARITAL_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
-                          </select>
+                          />
                         </div>
                       </div>
 
@@ -803,15 +799,14 @@ export default function ProspectosFinalUltraPage() {
                       </div>
                       <div className="space-y-2">
                         <label className="text-[12px] font-black uppercase text-black italic">Nivel de estudios</label>
-                        <select
+                        <SelectWithOther
                           name="education_level"
+                          options={EDUCATION_LEVELS}
                           value={additionalForm.education_level}
-                          onChange={(e) => setAdditionalForm((p) => ({ ...p, education_level: e.target.value }))}
+                          onChange={(v) => setAdditionalForm((p) => ({ ...p, education_level: v }))}
+                          emptyOption="Sin especificar"
                           className="w-full bg-[#ece7e2] p-5 rounded-2xl font-black text-black text-lg outline-none appearance-none cursor-pointer"
-                        >
-                          <option value="">Sin especificar</option>
-                          {EDUCATION_LEVELS.map((x) => <option key={x} value={x}>{x}</option>)}
-                        </select>
+                        />
                       </div>
                     </div>
 
@@ -860,7 +855,6 @@ export default function ProspectosFinalUltraPage() {
                             onChange={(e) => setAdditionalForm((p) => ({ ...p, currency: e.target.value }))}
                             className="w-full bg-white p-5 rounded-2xl font-black text-black text-lg outline-none appearance-none cursor-pointer"
                           >
-                            <option value="">Selecciona…</option>
                             {CURRENCIES.map((c) => <option key={c} value={c}>{c}</option>)}
                           </select>
                         </div>

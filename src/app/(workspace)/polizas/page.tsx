@@ -124,17 +124,16 @@ export default function PolizasPage() {
   }
 
   const handleEdit = (policy: PolicyWithCustomer) => {
-    // Transformamos PolicyWithCustomer -> PolicyFormData
     const formPolicy: PolicyFormData = {
-        id: policy.id,
-        customer_id: policy.customer_id,
-        policy_number: policy.policy_number,
-        insurance_company: policy.insurance_company,
-        category: policy.category,
-        effective_date: policy.effective_date,
-        expiry_date: policy.expiry_date,
-        total_premium: policy.total_premium,
-        frecuencia_pago: policy.frecuencia_pago
+      id: policy.id,
+      customer_id: policy.customer_id,
+      policy_number: policy.policy_number,
+      insurance_company: policy.insurance_company,
+      category: policy.category,
+      effective_date: policy.effective_date,
+      expiry_date: policy.expiry_date,
+      total_premium: policy.total_premium,
+      frecuencia_pago: policy.frecuencia_pago,
     }
     setSelectedPolicy(formPolicy)
     setIsModalOpen(true)
@@ -143,7 +142,43 @@ export default function PolizasPage() {
   const handleModalSuccess = () => {
     fetchData(true)
     setIsModalOpen(false)
+    setSelectedPolicy(null)
   }
+
+  // Submit en la página (como clientes/prospectos): usamos selectedPolicy del estado para update vs insert
+  const handlePolicySubmit = useCallback(async (formData: FormData) => {
+    const { data: { user } } = await supabaseClient.auth.getUser()
+    if (!user) throw new Error('Sesión no válida')
+
+    const payload = {
+      user_id: user.id,
+      customer_id: formData.get('customerId'),
+      policy_number: formData.get('policyNumber'),
+      insurance_company: formData.get('company'),
+      category: formData.get('category'),
+      effective_date: formData.get('effectiveDate'),
+      expiry_date: formData.get('expiryDate'),
+      total_premium: parseFloat(String(formData.get('premium') || 0)),
+      frecuencia_pago: formData.get('frecuencia_pago'),
+      start_date: formData.get('effectiveDate'),
+    }
+
+    if (selectedPolicy?.id) {
+      console.log('selectedPolicy', selectedPolicy)
+      const { error } = await supabaseClient
+        .from(DATABASE.TABLES.WS_POLICIES)
+        .update(payload)
+        .eq('id', selectedPolicy.id)
+      if (error) throw error
+      toast.success('Contrato actualizado')
+    } else {
+      const { error } = await supabaseClient
+        .from(DATABASE.TABLES.WS_POLICIES)
+        .insert([{ ...payload, status: 'activa' }])
+      if (error) throw error
+      toast.success('Póliza emitida y pagos generados')
+    }
+  }, [selectedPolicy])
 
   // --- RENDER ---
   return (
@@ -245,12 +280,13 @@ export default function PolizasPage() {
         </div>
       )}
       
-      {/* MODAL */}
-      <PolicyCaptureModal 
+      {/* MODAL: submit lo maneja la página (selectedPolicy del estado) como en clientes/prospectos */}
+      <PolicyCaptureModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        customers={customers} // Ahora esto es Customer[]
+        customers={customers}
         selectedPolicy={selectedPolicy}
+        onSubmit={handlePolicySubmit}
         onSuccess={handleModalSuccess}
       />
     </div>

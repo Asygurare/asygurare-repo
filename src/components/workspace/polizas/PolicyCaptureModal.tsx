@@ -5,17 +5,20 @@ import { motion, AnimatePresence } from 'framer-motion'
 import {
   X, Loader2, CheckCircle2, DollarSign, Repeat, AlertCircle,
 } from 'lucide-react'
-import { DATABASE } from '@/src/config'
-import { supabaseClient } from '@/src/lib/supabase/client'
 import { getFullName } from '@/src/lib/utils/utils'
 import { toast } from 'sonner'
 import { type Customer, type PolicyFormData } from '@/src/types/policy'
+import { SelectWithOther } from '@/src/components/ui/SelectWithOther'
+import { InsuranceType } from '@/src/config/constants'
+const INSURANCE_TYPES = Object.values(InsuranceType)
 
 type PolicyCaptureModalProps = {
   isOpen: boolean
   onClose: () => void
-  customers: Customer[] // Usamos el tipo real
-  selectedPolicy?: PolicyFormData | null // Usamos el tipo de formulario
+  customers: Customer[]
+  selectedPolicy?: PolicyFormData | null
+  /** La página hace el update/insert usando su estado selectedPolicy (como clientes/prospectos) */
+  onSubmit: (formData: FormData) => Promise<void>
   onSuccess: () => void
 }
 
@@ -24,6 +27,7 @@ export function PolicyCaptureModal({
   onClose,
   customers,
   selectedPolicy = null,
+  onSubmit,
   onSuccess,
 }: PolicyCaptureModalProps) {
   const [loading, setLoading] = useState(false)
@@ -33,45 +37,19 @@ export function PolicyCaptureModal({
     e.preventDefault()
     setLoading(true)
     const formData = new FormData(e.currentTarget)
-    const { data: { user } } = await supabaseClient.auth.getUser()
-
-    if (!user) {
-      toast.error('Sesión no válida')
+    try {
+      await onSubmit(formData)
+      setSuccess(true)
+      onSuccess()
+      setTimeout(() => {
+        setSuccess(false)
+        onClose()
+      }, 1000)
+    } catch (err: any) {
+      toast.error(err?.message || 'Error al guardar')
+    } finally {
       setLoading(false)
-      return
     }
-
-    const payload = {
-      user_id: user.id,
-      customer_id: formData.get('customerId'),
-      policy_number: formData.get('policyNumber'),
-      insurance_company: formData.get('company'),
-      category: formData.get('category'),
-      effective_date: formData.get('effectiveDate'),
-      expiry_date: formData.get('expiryDate'),
-      total_premium: parseFloat(formData.get('premium') as string),
-      frecuencia_pago: formData.get('frecuencia_pago'),
-      start_date: formData.get('effectiveDate'),
-    }
-
-    const res = selectedPolicy
-      ? await supabaseClient.from(DATABASE.TABLES.WS_POLICIES).update(payload).eq('id', selectedPolicy.id)
-      : await supabaseClient.from(DATABASE.TABLES.WS_POLICIES).insert([{ ...payload, status: 'activa' }])
-
-    if (res.error) {
-      toast.error('Error técnico: ' + res.error.message)
-      setLoading(false)
-      return
-    }
-
-    setSuccess(true)
-    toast.success(selectedPolicy ? 'Contrato actualizado' : 'Póliza emitida y pagos generados')
-    onSuccess()
-    setTimeout(() => {
-      setSuccess(false)
-      onClose()
-    }, 1000)
-    setLoading(false)
   }
 
   return (
@@ -166,16 +144,13 @@ export function PolicyCaptureModal({
                   </div>
                   <div className="space-y-2">
                     <label className="text-[10px] font-black text-black/30 uppercase ml-2">Ramo</label>
-                    <select
+                    <SelectWithOther
                       name="category"
+                      options={INSURANCE_TYPES}
                       defaultValue={selectedPolicy?.category ?? 'Autos'}
+                      placeholder="Ej. Retiro, Agrícola..."
                       className="w-full bg-[#ece7e2] text-black font-black py-4 px-6 rounded-2xl outline-none text-sm cursor-pointer uppercase border-2 border-transparent focus:border-black/20"
-                    >
-                      <option value="Autos">Autos</option>
-                      <option value="Vida">Vida</option>
-                      <option value="GMM">Gastos Médicos</option>
-                      <option value="Hogar">Hogar</option>
-                    </select>
+                    />
                   </div>
                 </div>
               </div>
