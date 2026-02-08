@@ -2,6 +2,7 @@ export const DATABASE = {
     TABLES: {
         PROFILES: 'PROFILES',
         WS_CUSTOMERS: 'WS_CUSTOMERS',
+        WS_CUSTOMERS_2: 'WS_CUSTOMERS_2',
         WS_LEADS: 'WS_LEADS', 
         WS_PAYMENTS: 'WS_PAYMENTS',
         WS_POLICIES: 'WS_POLICIES',

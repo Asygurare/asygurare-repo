@@ -10,6 +10,7 @@ import {
   CalendarDays, PhoneCall, MessageSquare, Briefcase, Clock, CheckCircle2, Target
 } from 'lucide-react'
 import { supabaseClient } from '@/src/lib/supabase/client'
+import { getFullName } from '@/src/lib/utils/utils'
 
 type TaskKind = 'Llamada' | 'Cita' | 'Mensaje' | 'Seguimiento' | 'Otro'
 type TaskPriority = 'Alta' | 'Media' | 'Baja'
@@ -69,7 +70,7 @@ export default function DashboardPage() {
       // 4. Obtener Actividad (tareas del Calendario del mes)
       const [policiesRes, customerCountRes, leadsCountRes, tasksRes] = await Promise.all([
         supabaseClient.from(DATABASE.TABLES.WS_POLICIES).select('total_premium, expiry_date'),
-        supabaseClient.from(DATABASE.TABLES.WS_CUSTOMERS).select('*', { count: 'exact', head: true }),
+        supabaseClient.from(DATABASE.TABLES.WS_CUSTOMERS_2).select('*', { count: 'exact', head: true }),
         supabaseClient.from(DATABASE.TABLES.WS_LEADS).select('*', { count: 'exact', head: true }),
         supabaseClient
           .from(DATABASE.TABLES.WS_TASKS)
@@ -112,7 +113,7 @@ export default function DashboardPage() {
 
         const [custsRes, leadsRes] = await Promise.all([
           customerIds.length
-            ? supabaseClient.from(DATABASE.TABLES.WS_CUSTOMERS).select('id, full_name').in('id', customerIds)
+            ? supabaseClient.from(DATABASE.TABLES.WS_CUSTOMERS_2).select('id, name, last_name').in('id', customerIds)
             : Promise.resolve({ data: [] as any[], error: null }),
           leadIds.length
             ? supabaseClient.from(DATABASE.TABLES.WS_LEADS).select('id, name, last_name').in('id', leadIds)
@@ -122,13 +123,8 @@ export default function DashboardPage() {
         const custMap = new Map<string, string>()
         const leadMap = new Map<string, string>()
 
-          ; (custsRes.data || []).forEach((c: any) => custMap.set(String(c.id), String(c.full_name || '')))
-          ; (leadsRes.data || []).forEach((l: any) => {
-            const nm = String(l?.name || '').trim()
-            const ln = String(l?.last_name || '').trim()
-            const merged = `${nm} ${ln}`.trim()
-            leadMap.set(String(l.id), merged)
-          })
+        ;(custsRes.data || []).forEach((c: any) => custMap.set(String(c.id), getFullName(c)))
+        ;(leadsRes.data || []).forEach((l: any) => leadMap.set(String(l.id), getFullName(l)))
 
         const enriched = rawTasks.map(t => ({
           ...t,

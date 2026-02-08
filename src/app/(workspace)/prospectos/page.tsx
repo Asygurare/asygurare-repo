@@ -166,13 +166,40 @@ export default function ProspectosFinalUltraPage() {
   const handleConvertToCustomer = async (lead: any) => {
     setLoading(true)
     const { data: { user } } = await supabaseClient.auth.getUser()
+    if (!user?.id) {
+      toast.error('Sesión no válida')
+      setLoading(false)
+      return
+    }
 
-    // 1. Insertar en clientes
-    const { error: insertError } = await supabaseClient.from(DATABASE.TABLES.WS_CUSTOMERS).insert({
-      user_id: user?.id,
-      full_name: leadDisplayName(lead),
-      email: lead.email,
-      phone: lead.phone
+    const name = String(lead?.name || lead?.full_name || '').trim()
+    if (!name) {
+      toast.error('El prospecto no tiene nombre.')
+      setLoading(false)
+      return
+    }
+
+    // 1. Insertar en clientes (WS_CUSTOMERS_2, schema alineado con Prospectos)
+    const { error: insertError } = await supabaseClient.from(DATABASE.TABLES.WS_CUSTOMERS_2).insert({
+      user_id: user.id,
+      name,
+      last_name: lead?.last_name || null,
+      status: lead?.status || 'nuevo',
+      source: lead?.source || null,
+      insurance_type: lead?.insurance_type || null,
+      estimated_value: lead?.estimated_value ?? null,
+      email: lead?.email || null,
+      phone: lead?.phone || null,
+      birthday: lead?.birthday || null,
+      age: lead?.age ?? null,
+      smoking: lead?.smoking ?? null,
+      drinking: lead?.drinking ?? null,
+      marital_status: lead?.marital_status || null,
+      ocupation: lead?.ocupation || null,
+      gender: lead?.gender || null,
+      client_interests: lead?.client_interests || null,
+      notes: lead?.notes || null,
+      additional_fields: lead?.additional_fields ?? null,
     })
 
     if (insertError) {
