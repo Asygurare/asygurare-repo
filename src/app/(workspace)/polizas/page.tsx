@@ -2,23 +2,19 @@
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react'
 import { DATABASE } from '@/src/config'
-import { motion, AnimatePresence } from 'framer-motion'
-import { 
-  Shield, Search, Filter, X, Plus, Loader2, 
-  CheckCircle2, ChevronRight, ShieldCheck, AlertCircle,
-  Calendar, Building, Hash, DollarSign, Trash2, Edit3, 
-  ArrowUpRight, Clock, FileText, Download, Repeat
+import {
+  Shield, Search, Filter, Plus, Loader2, ChevronRight, ShieldCheck,
+  Calendar, Trash2, Clock
 } from 'lucide-react'
 import { supabaseClient } from '@/src/lib/supabase/client'
 import { getFullName } from '@/src/lib/utils/utils'
 import { toast, Toaster } from 'sonner'
+import { PolicyCaptureModal } from '@/src/components/workspace/polizas/PolicyCaptureModal'
 
 export default function PolizasPage() {
-  const [isPanelOpen, setIsPanelOpen] = useState(false)
+  const [isModalOpen, setIsModalOpen] = useState(false)
   const [selectedPolicy, setSelectedPolicy] = useState<any>(null)
-  const [loading, setLoading] = useState(false)
   const [fetching, setFetching] = useState(true)
-  const [success, setSuccess] = useState(false)
   const [policies, setPolicies] = useState<any[]>([])
   const [customers, setCustomers] = useState<any[]>([])
   const [searchTerm, setSearchTerm] = useState('')
@@ -66,46 +62,9 @@ export default function PolizasPage() {
     return { total, active, expiringSoon }
   }, [policies])
 
-  // 4. GUARDAR / EDITAR (CON LÓGICA DE FRECUENCIA)
-  const handleSavePolicy = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault()
-    setLoading(true)
-    const formData = new FormData(e.currentTarget)
-    const { data: { user } } = await supabaseClient.auth.getUser()
-
-    if (!user) return
-
-    // Payload actualizado con frecuencia_pago y total_premium
-    const payload = {
-      user_id: user.id,
-      customer_id: formData.get('customerId'),
-      policy_number: formData.get('policyNumber'),
-      insurance_company: formData.get('company'),
-      category: formData.get('category'),
-      effective_date: formData.get('effectiveDate'),
-      expiry_date: formData.get('expiryDate'),
-      total_premium: parseFloat(formData.get('premium') as string),
-      frecuencia_pago: formData.get('frecuencia_pago'), // <-- NUEVO
-      start_date: formData.get('effectiveDate'), // Para el Trigger de pagos
-    }
-
-    const res = selectedPolicy 
-      ? await supabaseClient.from(DATABASE.TABLES.WS_POLICIES).update(payload).eq('id', selectedPolicy.id)
-      : await supabaseClient.from(DATABASE.TABLES.WS_POLICIES).insert([{ ...payload, status: 'activa' }])
-
-    if (!res.error) {
-      setSuccess(true)
-      toast.success(selectedPolicy ? "Contrato actualizado" : "Póliza emitida y pagos generados")
-      await fetchData()
-      setTimeout(() => { 
-        setSuccess(false)
-        setIsPanelOpen(false)
-        setSelectedPolicy(null)
-      }, 1000)
-    } else {
-      toast.error("Error técnico: " + res.error.message)
-    }
-    setLoading(false)
+  const closeModal = () => {
+    setIsModalOpen(false)
+    setSelectedPolicy(null)
   }
 
   const deletePolicy = async (id: string, e: React.MouseEvent) => {
@@ -133,8 +92,8 @@ export default function PolizasPage() {
           </div>
           <p className="text-black/50 font-bold text-[10px] uppercase tracking-[0.4em] ml-1 italic">Master Policy Administrator v2.0</p>
         </div>
-        <button 
-          onClick={() => { setSelectedPolicy(null); setIsPanelOpen(true); }}
+        <button
+          onClick={() => { setSelectedPolicy(null); setIsModalOpen(true); }}
           className="bg-black text-white px-10 py-6 rounded-[2.5rem] font-black text-sm flex items-center gap-4 hover:bg-(--accents) transition-all shadow-2xl active:scale-95 group"
         >
           <Plus size={20} className="group-hover:rotate-90 transition-transform" /> EMITIR NUEVO CONTRATO
@@ -205,9 +164,9 @@ export default function PolizasPage() {
                     const isExpiringSoon = !isExpired && (expiry.getTime() - new Date().getTime() < (30 * 24 * 60 * 60 * 1000));
 
                     return (
-                    <tr 
-                        key={p.id} 
-                        onClick={() => { setSelectedPolicy(p); setIsPanelOpen(true); }}
+                    <tr
+                        key={p.id}
+                        onClick={() => { setSelectedPolicy(p); setIsModalOpen(true); }}
                         className="hover:bg-[#ece7e2]/40 transition-all group cursor-pointer"
                     >
                         <td className="p-8">
@@ -261,134 +220,13 @@ export default function PolizasPage() {
         )}
       </div>
 
-      {/* PANEL LATERAL */}
-      <AnimatePresence>
-        {isPanelOpen && (
-          <>
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setIsPanelOpen(false)} className="fixed inset-0 bg-black/80 backdrop-blur-md z-40" />
-            <motion.div 
-              initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }}
-              className="fixed right-0 top-0 h-screen w-full max-w-xl bg-[#ece7e2] z-50 flex flex-col shadow-2xl"
-            >
-              <div className="p-10 bg-white border-b-4 border-black/5 flex justify-between items-center">
-                <div>
-                  <h3 className="text-3xl font-black text-black italic uppercase tracking-tighter italic">
-                    {selectedPolicy ? 'Expediente Póliza' : 'Emisión Técnica'}
-                  </h3>
-                  <p className="text-[10px] font-black text-(--accents) uppercase tracking-widest mt-1 italic">Sincronización Supabase Cloud</p>
-                </div>
-                <button onClick={() => setIsPanelOpen(false)} className="p-4 hover:rotate-90 transition-transform text-black"><X size={32}/></button>
-              </div>
-
-              <div className="flex-1 overflow-y-auto p-10 space-y-10 custom-scrollbar">
-                <form id="policy-form" onSubmit={handleSavePolicy} className="space-y-10">
-                  
-                  {/* CLIENTE */}
-                  <div className="space-y-4">
-                    <label className="text-[11px] font-black text-black uppercase tracking-widest italic">01. Responsable del Riesgo</label>
-                    <div className="bg-white p-8 rounded-[2.5rem] border border-black/5 shadow-sm">
-                        <select required name="customerId" defaultValue={selectedPolicy?.customer_id} className="w-full bg-[#ece7e2] text-black font-black py-5 px-6 rounded-2xl outline-none appearance-none cursor-pointer text-lg">
-                            <option value="">Seleccionar Titular...</option>
-                            {customers.map(c => <option key={c.id} value={c.id}>{getFullName(c)}</option>)}
-                        </select>
-                    </div>
-                  </div>
-
-                  {/* DATOS */}
-                  <div className="space-y-4">
-                    <label className="text-[11px] font-black text-black uppercase tracking-widest italic">02. Especificaciones</label>
-                    <div className="bg-white p-8 rounded-[2.5rem] border border-black/5 shadow-sm space-y-6">
-                        <div className="space-y-2">
-                            <label className="text-[10px] font-black text-black/30 uppercase ml-2">Referencia de Póliza</label>
-                            <input required name="policyNumber" defaultValue={selectedPolicy?.policy_number} placeholder="POL-X" className="w-full bg-[#ece7e2] text-black font-black py-5 px-6 rounded-2xl outline-none text-xl uppercase" />
-                        </div>
-                        <div className="grid grid-cols-2 gap-4">
-                            <div className="space-y-2">
-                                <label className="text-[10px] font-black text-black/30 uppercase ml-2">Aseguradora</label>
-                                <input required name="company" defaultValue={selectedPolicy?.insurance_company} placeholder="GNP / AXA" className="w-full bg-[#ece7e2] text-black font-black py-4 px-6 rounded-2xl outline-none text-sm uppercase" />
-                            </div>
-                            <div className="space-y-2">
-                                <label className="text-[10px] font-black text-black/30 uppercase ml-2">Ramo</label>
-                                <select name="category" defaultValue={selectedPolicy?.category || "Autos"} className="w-full bg-[#ece7e2] text-black font-black py-4 px-6 rounded-2xl outline-none text-sm cursor-pointer uppercase">
-                                    <option value="Autos">Autos</option>
-                                    <option value="Vida">Vida</option>
-                                    <option value="GMM">Gastos Médicos</option>
-                                    <option value="Hogar">Hogar</option>
-                                </select>
-                            </div>
-                        </div>
-                    </div>
-                  </div>
-
-                  {/* VIGENCIAS */}
-                  <div className="grid grid-cols-2 gap-6">
-                    <div className="bg-white p-8 rounded-[2.5rem] border border-black/5">
-                      <label className="text-[10px] font-black text-black/40 uppercase block mb-3 tracking-widest italic">Inicio Cobertura</label>
-                      <input required name="effectiveDate" type="date" defaultValue={selectedPolicy?.effective_date} className="w-full bg-transparent text-black font-black text-xl outline-none" />
-                    </div>
-                    <div className="bg-white p-8 rounded-[2.5rem] border border-black/5 shadow-lg shadow-orange-100">
-                      <label className="text-[10px] font-black text-orange-500 uppercase block mb-3 tracking-widest italic">Fin Vigencia</label>
-                      <input required name="expiryDate" type="date" defaultValue={selectedPolicy?.expiry_date} className="w-full bg-transparent text-black font-black text-xl outline-none" />
-                    </div>
-                  </div>
-
-                  {/* FINANZAS Y REPETICIÓN (LO NUEVO) */}
-                  <div className="space-y-4">
-                    <label className="text-[11px] font-black text-black uppercase tracking-widest italic">03. Estructura Financiera</label>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {/* MONTO */}
-                      <div className="bg-black p-8 rounded-[2.5rem] shadow-2xl relative overflow-hidden group">
-                        <DollarSign className="absolute -right-4 -top-4 text-(--accents)/20 group-hover:scale-110 transition-transform" size={100} />
-                        <label className="text-[10px] font-black text-(--accents) uppercase block mb-2 tracking-widest italic relative z-10">Prima Total</label>
-                        <input required name="premium" type="number" step="0.01" defaultValue={selectedPolicy?.total_premium} placeholder="0.00" className="w-full bg-transparent text-white text-4xl font-black outline-none relative z-10" />
-                      </div>
-
-                      {/* FRECUENCIA */}
-                      <div className="bg-white p-8 rounded-[2.5rem] border-2 border-black flex flex-col justify-center">
-                        <div className="flex items-center gap-2 mb-2 text-black/30">
-                          <Repeat size={14} />
-                          <label className="text-[10px] font-black uppercase tracking-widest italic">Esquema de Cobro</label>
-                        </div>
-                        <select 
-                          required 
-                          name="frecuencia_pago" 
-                          defaultValue={selectedPolicy?.frecuencia_pago || "Mensual"}
-                          className="w-full bg-transparent text-black font-black text-xl outline-none cursor-pointer appearance-none uppercase"
-                        >
-                          <option value="Mensual">Mensual (12)</option>
-                          <option value="Trimestral">Trimestral (4)</option>
-                          <option value="Semestral">Semestral (2)</option>
-                          <option value="Contado">Contado (1)</option>
-                        </select>
-                      </div>
-                    </div>
-                    {!selectedPolicy && (
-                      <div className="bg-blue-50 p-6 rounded-2xl flex items-start gap-4 border border-blue-100">
-                        <AlertCircle className="text-blue-500 shrink-0" size={20} />
-                        <p className="text-[10px] font-bold text-blue-900 leading-relaxed uppercase tracking-tight">
-                          Al emitir este contrato, el sistema generará automáticamente los recibos de cobro basados en la frecuencia seleccionada.
-                        </p>
-                      </div>
-                    )}
-                  </div>
-
-                </form>
-              </div>
-
-              <div className="p-10 bg-white border-t-4 border-black/5">
-                <button 
-                  form="policy-form" type="submit" disabled={loading || success}
-                  className={`w-full py-7 rounded-[2.5rem] font-black text-2xl transition-all flex items-center justify-center gap-4 shadow-2xl active:scale-95 ${
-                    success ? 'bg-green-600 text-white' : 'bg-black text-white hover:bg-(--accents)'
-                  }`}
-                >
-                  {loading ? <Loader2 className="animate-spin" size={32} /> : success ? <><CheckCircle2 size={32}/> OPERACIÓN EXITOSA</> : selectedPolicy ? "ACTUALIZAR CONTRATO" : "EMITIR PÓLIZA"}
-                </button>
-              </div>
-            </motion.div>
-          </>
-        )}
-      </AnimatePresence>
+      <PolicyCaptureModal
+        isOpen={isModalOpen}
+        onClose={closeModal}
+        customers={customers}
+        selectedPolicy={selectedPolicy}
+        onSuccess={fetchData}
+      />
     </div>
   )
 }
