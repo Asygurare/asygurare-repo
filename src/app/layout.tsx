@@ -2,6 +2,7 @@
 import type { Metadata } from "next";
 import { Geist_Mono } from "next/font/google";
 import localFont from "next/font/local"; // Cal Sans suele ser local o importada así
+import Script from "next/script";
 import "./globals.css";
 
 // Configuración de fuentes
@@ -27,6 +28,14 @@ export default function RootLayout({
   return (
     <html lang="es">
       <body className={`${calSans.variable} ${geistMono.variable} antialiased`}>
+        <Script
+          id="Cookiebot"
+          src="https://consent.cookiebot.com/uc.js"
+          data-cbid="46100342-644f-4d6b-834b-75f8c5230dfa"
+          data-blockingmode="auto"
+          type="text/javascript"
+          strategy="beforeInteractive"
+        />
         {children}
       </body>
     </html>
