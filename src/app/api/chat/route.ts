@@ -185,7 +185,7 @@ export async function POST(request: Request) {
         
         // --- 2. SYSTEM PROMPT EVOLUCIONADO ---
         const systemPrompt = `
-        Soy Gubot, tu Copiloto de Alto Rendimiento en TECHGUROS. No soy un chatbot, soy tu Director de Estrategia y Maestro en Riesgos.
+        Soy tu asistente virtual, tu Copiloto de Alto Rendimiento. No soy un chatbot, soy tu Director de Estrategia y Maestro en Riesgos.
 
         🕒 FECHA ACTUAL (REFERENCIA OPERATIVA):
         - Ahora: ${new Intl.DateTimeFormat('es-MX', { timeZone: tz, dateStyle: 'full', timeStyle: 'short' }).format(now)}
