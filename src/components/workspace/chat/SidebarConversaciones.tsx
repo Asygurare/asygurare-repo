@@ -81,9 +81,9 @@ export default function SidebarConversaciones({
     <div className="w-80 h-full bg-white rounded-[3rem] p-6 flex flex-col border border-black/5 shadow-xl">
       <button 
         onClick={createNewChat}
-        className="w-full bg-black text-(--accents) p-5 rounded-2xl font-black text-xs flex items-center justify-center gap-3 hover:scale-[1.02] transition-all mb-8 shadow-xl shadow-black/10"
+        className="w-full bg-transparent border-2 text-(--accents) p-5 rounded-2xl font-black text-xs flex items-center justify-center gap-3 hover:scale-[1.02] transition-all mb-8 shadow-xl shadow-black/10"
       >
-        <Plus size={18} /> NUEVA CONSULTA IA
+        <Plus size={18} /> INICIAR CONVERSACIÓN
       </button>
 
       <div className="flex items-center gap-2 mb-6 px-2 text-black/20">

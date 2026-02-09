@@ -4,20 +4,24 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
   LayoutDashboard, Users, Target, Shield,
-  CreditCard, Settings, BrainCircuit, CalendarDays, BarChart3
+  CreditCard, Settings, BrainCircuit, CalendarDays, BarChart3,
+  Cpu, Flag
 } from 'lucide-react'
 import WorkspaceNavbar from '@/src/components/navbar/WorkspaceNavbar'
 import Image from 'next/image'
 
+
 const menuItems = [
   { icon: LayoutDashboard, label: 'Dashboard', href: '/dashboard' },
+  { icon: Flag, label: 'Mis metas', href: '/metas', comingSoon: true },
   { icon: Target, label: 'Prospectos', href: '/prospectos' },
   { icon: Users, label: 'Clientes', href: '/clientes' },
   { icon: Shield, label: 'Pólizas', href: '/polizas' },
-  { icon: CreditCard, label: 'Pagos', href: '/pagos' },
+  { icon: CreditCard, label: 'Pagos', href: '/pagos', hidden: true }, // omitido por el momento
   { icon: CalendarDays, label: 'Calendario', href: '/calendario' },
-  { icon: BarChart3, label: 'Analytics', href: '/analytics', comingSoon: true },
-  { icon: BrainCircuit, label: 'Tu Asistente de IA', href: '/ia' }, // <-- NUEVA SECCIÓN
+  { icon: BrainCircuit, label: 'Tu Asistente de IA', href: '/ia' },
+  { icon: BarChart3, label: 'Análisis', href: '/analytics', comingSoon: true },
+  { icon: Cpu, label: 'Automatización', href: '/automatizaciones', comingSoon: true}
 ]
 
 export default function WorkspaceLayout({ children }: { children: React.ReactNode }) {
@@ -39,7 +43,7 @@ export default function WorkspaceLayout({ children }: { children: React.ReactNod
         </Link>
 
         <nav className="flex-1 space-y-2">
-          {menuItems.map((item) => {
+          {menuItems.filter((item) => !(item as any).hidden).map((item) => {
             // Verificamos si es activo. 
             // Usamos startsWith para que si estás en un chat específico, el botón siga resaltado
             const isActive = pathname.startsWith(item.href)
@@ -58,7 +62,7 @@ export default function WorkspaceLayout({ children }: { children: React.ReactNod
                     <item.icon size={20} />
                     {item.label}
                   </div>
-                  <span className="text-[9px] font-black uppercase tracking-widest px-3 py-1 rounded-full bg-black/5 text-gray-400">
+                  <span className="text-[9px] font-black uppercase tracking-widest px-3 py-1 rounded-full bg-(--accents)/50 text-white">
                     Soon
                   </span>
                 </div>
@@ -100,7 +104,7 @@ export default function WorkspaceLayout({ children }: { children: React.ReactNod
       <main className="flex-1 flex flex-col overflow-hidden">
 
         {/* Renderizado del Navbar en la parte superior del contenido */}
-        <div className="px-10 pt-10 pb-0 z-[999]">
+        <div className="px-10 pt-10 pb-0">
           <WorkspaceNavbar />
         </div>
 
