@@ -38,6 +38,7 @@ export default function Navbar() {
     { name: 'Funciones', href: '/sections' },
     { name: 'Nosotros', href: '/about' },
     { name: 'Precios', href: '/pricing' },
+    { name: 'Contacto', href: '/contact'}
   ]
 
   return (
@@ -68,14 +69,14 @@ export default function Navbar() {
               <Link
                 key={link.name}
                 href={link.href}
-                className={`text-sm font-medium transition-colors hover:text-[#4A7766] relative ${pathname === link.href ? 'text-[#4A7766]' : 'text-gray-600'
+                className={`text-sm font-medium transition-colors hover:text-(--accents) relative ${pathname === link.href ? 'text-(--accents)' : 'text-gray-600'
                   }`}
               >
                 {link.name}
                 {pathname === link.href && (
                   <motion.div
                     layoutId="nav-underline"
-                    className="absolute -bottom-1 left-0 w-full h-0.5 bg-[#4A7766]"
+                    className="absolute -bottom-1 left-0 w-full h-0.5 bg-(--accents)"
                   />
                 )}
               </Link>
