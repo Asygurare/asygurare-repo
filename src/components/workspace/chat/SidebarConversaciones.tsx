@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useState, useEffect } from 'react'
-import { Plus, MessageSquare, Trash2, Clock, Check, Edit2, X } from 'lucide-react'
+import { Plus, MessageSquare, Trash2, Clock, Check, Edit2 } from 'lucide-react'
 import { supabaseClient } from '@/src/lib/supabase/client'
 import { motion, AnimatePresence } from 'framer-motion'
 import { DATABASE } from '@/src/config'
@@ -78,10 +78,10 @@ export default function SidebarConversaciones({
   }
 
   return (
-    <div className="w-80 h-full bg-white rounded-[3rem] p-6 flex flex-col border border-black/5 shadow-xl">
+    <div className="w-full md:w-80 h-full bg-white rounded-[2rem] sm:rounded-[3rem] p-4 sm:p-6 flex flex-col border border-black/5 shadow-xl">
       <button 
         onClick={createNewChat}
-        className="w-full bg-transparent border-2 text-(--accents) p-5 rounded-2xl font-black text-xs flex items-center justify-center gap-3 hover:scale-[1.02] transition-all mb-8 shadow-xl shadow-black/10"
+        className="w-full bg-transparent border-2 text-(--accents) p-4 sm:p-5 rounded-2xl font-black text-[11px] sm:text-xs flex items-center justify-center gap-3 hover:scale-[1.02] transition-all mb-6 sm:mb-8 shadow-xl shadow-black/10"
       >
         <Plus size={18} /> INICIAR CONVERSACIÓN
       </button>

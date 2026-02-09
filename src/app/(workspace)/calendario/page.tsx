@@ -579,7 +579,7 @@ export default function CalendarioPage() {
   }
 
   return (
-    <div className="space-y-8 p-4">
+    <div className="space-y-6 sm:space-y-8 p-3 sm:p-4">
       <Toaster richColors position="top-center" />
 
       {/* HEADER */}
@@ -589,20 +589,20 @@ export default function CalendarioPage() {
             <div className="p-3 bg-black rounded-2xl shadow-xl">
               <CalendarDays className="text-(--accents)" size={26} />
             </div>
-            <h2 className="text-4xl font-black text-black tracking-tighter italic uppercase">Calendario.</h2>
+            <h2 className="text-3xl sm:text-4xl font-black text-black tracking-tighter italic uppercase">Calendario.</h2>
           </div>
           <p className="text-black/50 font-bold text-[10px] uppercase tracking-[0.4em] ml-1">
             Tareas, llamadas, citas y seguimiento de tu cartera
           </p>
         </div>
 
-        <div className="flex items-center gap-3 w-full md:w-auto">
-          <div className="bg-white border border-black/5 rounded-[2rem] p-2 flex items-center gap-2 shadow-sm w-full md:w-auto justify-between">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3 w-full md:w-auto">
+          <div className="bg-white border border-black/5 rounded-[2rem] p-2 flex items-center gap-2 shadow-sm w-full md:w-auto overflow-x-auto flex-nowrap">
             {viewModes.map((m) => (
               <button
                 key={m}
                 onClick={() => setViewMode(m)}
-                className={`px-5 py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all border ${
+                className={`px-4 sm:px-5 py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all border shrink-0 whitespace-nowrap ${
                   viewMode === m
                     ? "bg-black text-white border-black shadow-lg"
                     : "bg-white text-black/40 border-black/5 hover:bg-gray-50"
@@ -615,9 +615,11 @@ export default function CalendarioPage() {
 
           <button
             onClick={openNewTask}
-            className="bg-black text-white px-10 py-5 rounded-[2rem] font-black text-sm flex items-center gap-3 hover:bg-(--accents) transition-all shadow-2xl active:scale-95 shrink-0"
+            className="bg-black text-white px-6 py-4 sm:px-10 sm:py-5 rounded-[2rem] font-black text-[11px] sm:text-sm flex items-center justify-center gap-3 hover:bg-(--accents) transition-all shadow-2xl active:scale-95 shrink-0 w-full sm:w-auto"
           >
-            <Plus size={18} /> NUEVA TAREA
+            <Plus size={18} />
+            <span className="sm:hidden">NUEVA</span>
+            <span className="hidden sm:inline">NUEVA TAREA</span>
           </button>
         </div>
       </div>
@@ -634,12 +636,12 @@ export default function CalendarioPage() {
           />
         </div>
 
-        <div className="flex gap-2 shrink-0 w-full md:w-auto justify-between md:justify-start">
+        <div className="flex gap-2 shrink-0 w-full md:w-auto overflow-x-auto flex-nowrap">
           {priorities.map((p) => (
             <button
               key={p}
               onClick={() => setPriorityTab(p)}
-              className={`px-5 py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all border ${
+              className={`px-4 sm:px-5 py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all border shrink-0 whitespace-nowrap ${
                 priorityTab === p
                   ? "bg-black text-white border-black shadow-lg"
                   : "bg-white text-black/40 border-black/5 hover:bg-gray-50"
@@ -652,7 +654,7 @@ export default function CalendarioPage() {
 
         <button
           onClick={() => setShowDone((v) => !v)}
-          className={`px-6 py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all border shrink-0 ${
+          className={`px-6 py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all border shrink-0 w-full md:w-auto ${
             showDone ? "bg-(--accents) text-white border-(--accents)" : "bg-white text-black/40 border-black/5 hover:bg-gray-50"
           }`}
         >
@@ -664,8 +666,8 @@ export default function CalendarioPage() {
       {viewMode === "Mes" ? (
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* CALENDARIO */}
-        <div className="lg:col-span-2 bg-white rounded-[2.5rem] border border-black/5 shadow-sm p-8">
-          <div className="flex items-center justify-between mb-6">
+        <div className="lg:col-span-2 bg-white rounded-[2.5rem] border border-black/5 shadow-sm p-4 sm:p-6 lg:p-8">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
             <div>
               <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Mes</p>
               <h3 className="text-2xl font-black text-black italic">{monthLabel}</h3>
@@ -673,10 +675,10 @@ export default function CalendarioPage() {
                 {storageMode === "supabase" ? "Sync con Supabase" : "Modo local (este dispositivo)"}
               </p>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 w-full sm:w-auto justify-between sm:justify-start">
               <button
                 onClick={() => setMonthCursor((d) => addMonths(d, -1))}
-                className="p-3 rounded-2xl bg-gray-50 text-black hover:bg-black hover:text-white transition-all"
+                className="p-3 rounded-2xl bg-gray-50 text-black hover:bg-black hover:text-white transition-all shrink-0"
               >
                 <ChevronLeft size={18} />
               </button>
@@ -685,13 +687,13 @@ export default function CalendarioPage() {
                   setMonthCursor(startOfMonth(new Date()))
                   setSelectedDate(new Date())
                 }}
-                className="px-5 py-3 rounded-2xl bg-black text-white font-black text-[10px] uppercase tracking-widest hover:bg-(--accents) transition-all"
+                className="px-5 py-3 rounded-2xl bg-black text-white font-black text-[10px] uppercase tracking-widest hover:bg-(--accents) transition-all shrink-0"
               >
                 Hoy
               </button>
               <button
                 onClick={() => setMonthCursor((d) => addMonths(d, 1))}
-                className="p-3 rounded-2xl bg-gray-50 text-black hover:bg-black hover:text-white transition-all"
+                className="p-3 rounded-2xl bg-gray-50 text-black hover:bg-black hover:text-white transition-all shrink-0"
               >
                 <ChevronRight size={18} />
               </button>
@@ -699,7 +701,7 @@ export default function CalendarioPage() {
           </div>
 
           {/* Weekdays */}
-          <div className="grid grid-cols-7 gap-2 mb-2">
+          <div className="grid grid-cols-7 gap-1 sm:gap-2 mb-2">
             {weekdayLabels.map((w, i) => (
               <div key={i} className="text-center text-[10px] font-black uppercase tracking-widest text-black/30 py-2">
                 {w}
@@ -708,7 +710,7 @@ export default function CalendarioPage() {
           </div>
 
           {/* Days */}
-          <div className="grid grid-cols-7 gap-2">
+          <div className="grid grid-cols-7 gap-1 sm:gap-2">
             {monthGrid.map(({ date, inMonth }) => {
               const key = dayKey(date)
               const list = tasksByDay.get(key) || []
@@ -720,14 +722,14 @@ export default function CalendarioPage() {
                 <button
                   key={key}
                   onClick={() => setSelectedDateAndSync(date)}
-                  className={`text-left p-3 rounded-2xl border transition-all min-h-[78px] ${
+                  className={`text-left p-2 sm:p-3 rounded-2xl border transition-all min-h-[56px] sm:min-h-[78px] ${
                     selected
                       ? "bg-black text-white border-black shadow-lg"
                       : "bg-white border-black/5 hover:bg-[#ece7e2]/30"
                   }`}
                 >
                   <div className="flex items-start justify-between gap-2">
-                    <div className={`text-sm font-black ${inMonth ? "" : selected ? "text-white/60" : "text-black/20"}`}>
+                    <div className={`text-[13px] sm:text-sm font-black ${inMonth ? "" : selected ? "text-white/60" : "text-black/20"}`}>
                       {date.getDate()}
                     </div>
                     {isToday(date) ? (
@@ -742,13 +744,13 @@ export default function CalendarioPage() {
                   <div className="mt-3 flex items-center gap-2">
                     {openCount > 0 ? (
                       <>
-                        <span className={`text-[10px] font-black uppercase tracking-widest ${
+                        <span className={`text-[9px] sm:text-[10px] font-black uppercase tracking-widest leading-none ${
                           selected ? "text-white/70" : "text-black/40"
                         }`}>
                           {openCount} tarea{openCount === 1 ? "" : "s"}
                         </span>
                         {highCount > 0 ? (
-                          <span className={`text-[10px] font-black uppercase tracking-widest ${
+                          <span className={`text-[9px] sm:text-[10px] font-black uppercase tracking-widest leading-none ${
                             selected ? "text-red-200" : "text-red-600"
                           }`}>
                             · {highCount} alta
@@ -756,7 +758,7 @@ export default function CalendarioPage() {
                         ) : null}
                       </>
                     ) : (
-                      <span className={`text-[10px] font-bold uppercase tracking-widest ${
+                      <span className={`text-[9px] sm:text-[10px] font-bold uppercase tracking-widest leading-none ${
                         selected ? "text-white/30" : "text-black/20"
                       }`}>
                         —
@@ -770,7 +772,7 @@ export default function CalendarioPage() {
         </div>
 
         {/* LISTA DEL DÍA */}
-        <div className="bg-white rounded-[2.5rem] border border-black/5 shadow-sm p-8 flex flex-col">
+        <div className="bg-white rounded-[2.5rem] border border-black/5 shadow-sm p-4 sm:p-6 lg:p-8 flex flex-col">
           <div className="mb-6">
             <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Agenda</p>
             <h3 className="text-2xl font-black text-black italic">{selectedDateLabel}</h3>
@@ -805,7 +807,7 @@ export default function CalendarioPage() {
                 return (
                   <div
                     key={t.id}
-                    className={`p-6 rounded-[2rem] border transition-all group ${
+                    className={`p-4 sm:p-6 rounded-[2rem] border transition-all group ${
                       t.status === "done" ? "bg-gray-50/60 border-gray-100 opacity-70" : "bg-white border-black/5 hover:border-(--accents)/30"
                     }`}
                   >
@@ -813,7 +815,7 @@ export default function CalendarioPage() {
                       <div className="flex items-start gap-4 min-w-0">
                         <button
                           onClick={() => toggleDone(t)}
-                          className={`mt-1 w-10 h-10 rounded-2xl flex items-center justify-center transition-all ${
+                          className={`mt-1 w-9 h-9 sm:w-10 sm:h-10 rounded-2xl flex items-center justify-center transition-all shrink-0 ${
                             t.status === "done" ? "bg-green-600 text-white" : "bg-gray-50 text-black hover:bg-black hover:text-white"
                           }`}
                           title={t.status === "done" ? "Marcar como pendiente" : "Marcar como hecha"}
@@ -888,7 +890,7 @@ export default function CalendarioPage() {
       {viewMode === "Día" ? (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* AGENDA DEL DÍA (FULL) */}
-          <div className="lg:col-span-2 bg-white rounded-[2.5rem] border border-black/5 shadow-sm p-8 flex flex-col">
+          <div className="lg:col-span-2 bg-white rounded-[2.5rem] border border-black/5 shadow-sm p-4 sm:p-6 lg:p-8 flex flex-col">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
               <div>
                 <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Día</p>
@@ -898,7 +900,7 @@ export default function CalendarioPage() {
                 </p>
               </div>
 
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2 w-full md:w-auto justify-between md:justify-start">
                 <button
                   onClick={() => setSelectedDateAndSync(addDays(selectedDate, -1))}
                   className="p-3 rounded-2xl bg-gray-50 text-black hover:bg-black hover:text-white transition-all"
@@ -926,7 +928,7 @@ export default function CalendarioPage() {
                     if (!y || !m || !d) return
                     setSelectedDateAndSync(new Date(y, m - 1, d))
                   }}
-                  className="hidden md:block bg-[#ece7e2]/50 border border-black/5 rounded-2xl px-4 py-3 text-[11px] font-black text-black outline-none"
+                  className="bg-[#ece7e2]/50 border border-black/5 rounded-2xl px-4 py-3 text-[11px] font-black text-black outline-none w-full sm:w-auto"
                 />
               </div>
             </div>
@@ -960,7 +962,7 @@ export default function CalendarioPage() {
                   return (
                     <div
                       key={t.id}
-                      className={`p-6 rounded-[2rem] border transition-all group ${
+                      className={`p-4 sm:p-6 rounded-[2rem] border transition-all group ${
                         t.status === "done"
                           ? "bg-gray-50/60 border-gray-100 opacity-70"
                           : "bg-white border-black/5 hover:border-(--accents)/30"
@@ -970,7 +972,7 @@ export default function CalendarioPage() {
                         <div className="flex items-start gap-4 min-w-0">
                           <button
                             onClick={() => toggleDone(t)}
-                            className={`mt-1 w-10 h-10 rounded-2xl flex items-center justify-center transition-all ${
+                            className={`mt-1 w-9 h-9 sm:w-10 sm:h-10 rounded-2xl flex items-center justify-center transition-all shrink-0 ${
                               t.status === "done" ? "bg-green-600 text-white" : "bg-gray-50 text-black hover:bg-black hover:text-white"
                             }`}
                             title={t.status === "done" ? "Marcar como pendiente" : "Marcar como hecha"}
@@ -1039,7 +1041,7 @@ export default function CalendarioPage() {
           </div>
 
           {/* PRÓXIMOS */}
-          <div className="bg-white rounded-[2.5rem] border border-black/5 shadow-sm p-8 flex flex-col">
+          <div className="bg-white rounded-[2.5rem] border border-black/5 shadow-sm p-4 sm:p-6 lg:p-8 flex flex-col">
             <div className="mb-6">
               <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Siguiente</p>
               <h3 className="text-2xl font-black text-black italic">Próximas tareas</h3>
@@ -1104,7 +1106,7 @@ export default function CalendarioPage() {
       ) : null}
 
       {viewMode === "Año" ? (
-        <div className="bg-white rounded-[2.5rem] border border-black/5 shadow-sm p-8">
+        <div className="bg-white rounded-[2.5rem] border border-black/5 shadow-sm p-4 sm:p-6 lg:p-8">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
             <div>
               <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Año</p>
@@ -1204,9 +1206,9 @@ export default function CalendarioPage() {
               animate={{ x: 0 }}
               exit={{ x: "100%" }}
               transition={{ type: "spring", damping: 25 }}
-              className="fixed right-0 top-0 h-screen w-full max-w-xl bg-[#ece7e2] z-50 flex flex-col shadow-2xl"
+              className="fixed right-0 top-0 h-screen w-full sm:max-w-xl bg-[#ece7e2] z-50 flex flex-col shadow-2xl"
             >
-              <div className="p-10 bg-white flex justify-between items-center border-b-4 border-black/5">
+              <div className="p-5 sm:p-10 bg-white flex justify-between items-center border-b-4 border-black/5 sticky top-0 z-10">
                 <div>
                   <h3 className="text-3xl font-black text-black italic uppercase tracking-tighter">
                     {selectedTask ? "Editar Tarea" : "Nueva Tarea"}
@@ -1224,7 +1226,7 @@ export default function CalendarioPage() {
                 </button>
               </div>
 
-              <form onSubmit={onSubmit} className="flex-1 overflow-y-auto p-10 space-y-8 custom-scrollbar">
+              <form onSubmit={onSubmit} className="flex-1 overflow-y-auto p-5 sm:p-10 space-y-8 custom-scrollbar">
                 {/* BASICOS */}
                 <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-black/5 space-y-6">
                   <div className="space-y-2">
@@ -1235,7 +1237,7 @@ export default function CalendarioPage() {
                       value={form.title}
                       onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
                       placeholder="Llamar para agendar cita / Enviar propuesta / Seguimiento..."
-                      className="w-full bg-[#ece7e2] text-black font-black py-5 px-6 rounded-2xl outline-none focus:ring-2 focus:ring-black text-lg uppercase"
+                      className="w-full bg-[#ece7e2] text-black font-black py-5 px-6 rounded-2xl outline-none focus:ring-2 focus:ring-black text-base sm:text-lg uppercase"
                     />
                   </div>
 
@@ -1373,7 +1375,7 @@ export default function CalendarioPage() {
                 </div>
 
                 {/* ACTIONS */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pb-10">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4 pt-4 pb-8 sticky bottom-0 bg-[#ece7e2] border-t border-black/5 -mx-5 sm:-mx-10 px-5 sm:px-10">
                   {selectedTask ? (
                     <button
                       type="button"
@@ -1392,7 +1394,7 @@ export default function CalendarioPage() {
                           setDeleting(false)
                         }
                       }}
-                      className="w-full py-6 rounded-3xl font-black text-sm transition-all flex items-center justify-center gap-3 shadow-xl active:scale-95 bg-red-50 text-red-600 hover:bg-red-600 hover:text-white"
+                      className="w-full py-5 sm:py-6 rounded-3xl font-black text-sm transition-all flex items-center justify-center gap-3 shadow-xl active:scale-95 bg-red-50 text-red-600 hover:bg-red-600 hover:text-white"
                     >
                       {deleting ? <Loader2 className="animate-spin" size={18} /> : <Trash2 size={18} />}
                       ELIMINAR
@@ -1404,7 +1406,7 @@ export default function CalendarioPage() {
                   <button
                     type="submit"
                     disabled={saving || deleting}
-                    className="w-full py-6 rounded-3xl font-black text-sm transition-all flex items-center justify-center gap-3 shadow-2xl active:scale-95 bg-black text-white hover:bg-(--accents)"
+                    className="w-full py-5 sm:py-6 rounded-3xl font-black text-sm transition-all flex items-center justify-center gap-3 shadow-2xl active:scale-95 bg-black text-white hover:bg-(--accents)"
                   >
                     {saving ? <Loader2 className="animate-spin" size={18} /> : <Save size={18} />}
                     {selectedTask ? "GUARDAR CAMBIOS" : "CREAR TAREA"}

@@ -182,9 +182,9 @@ export default function DashboardPage() {
           </p>
 
           <div className="flex gap-4">
-            <button className="bg-black text-white px-8 py-4 rounded-2xl font-black text-sm flex items-center gap-2 hover:bg-(--accents) transition-all shadow-xl">
+            {/* <button className="bg-black text-white px-8 py-4 rounded-2xl font-black text-sm flex items-center gap-2 hover:bg-(--accents) transition-all shadow-xl">
               <Plus size={18} /> Nueva Acción
-            </button>
+            </button> */}
           </div>
         </motion.div>
 
@@ -315,7 +315,7 @@ export default function DashboardPage() {
           )}
         </div>
 
-        <div className="bg-white rounded-[2.5rem] border border-black/5 shadow-sm p-10">
+        {/* <div className="bg-white rounded-[2.5rem] border border-black/5 shadow-sm p-10">
           <h3 className="text-xl font-black text-black mb-8 italic">Urgente</h3>
           <div className="space-y-6">
             {stats.renovaciones > 0 ? (
@@ -335,7 +335,7 @@ export default function DashboardPage() {
           <button className="w-full mt-8 py-5 border-2 border-dashed border-gray-100 rounded-[2rem] text-gray-400 font-black text-[10px] uppercase tracking-widest hover:border-(--accents) hover:text-(--accents) transition-all">
             + Crear Recordatorio
           </button>
-        </div>
+        </div> */}
 
       </section>
     </div>

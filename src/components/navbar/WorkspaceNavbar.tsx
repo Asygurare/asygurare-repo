@@ -1,11 +1,15 @@
 "use client"
 import React, { useEffect, useState } from 'react'
-import { Bell, Search, User, LogOut, ChevronDown, Sparkles } from 'lucide-react'
+import { Bell, Search, User, LogOut, ChevronDown, Menu } from 'lucide-react'
 import { supabaseClient } from '@/src/lib/supabase/client'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useRouter } from 'next/navigation'
 
-export default function WorkspaceNavbar() {
+type WorkspaceNavbarProps = {
+  onMenuClick?: () => void
+}
+
+export default function WorkspaceNavbar({ onMenuClick }: WorkspaceNavbarProps) {
   const [user, setUser] = useState<any>(null)
   const [isProfileOpen, setIsProfileOpen] = useState(false)
   const router = useRouter()
@@ -26,13 +30,26 @@ export default function WorkspaceNavbar() {
   return (
     <header className="bg-white/70 backdrop-blur-xl border border-white rounded-[2.5rem] p-4 flex items-center justify-between shadow-sm mb-10">
       {/* BUSCADOR */}
-      <div className="relative w-96 hidden md:block ml-4">
-        <Search className="absolute left-5 top-1/2 -translate-y-1/2 text-black/20" size={18} />
-        <input 
-          type="text" 
-          placeholder="BUSCAR CLIENTE O PÓLIZA..."
-          className="w-full bg-transparent py-3 pl-14 pr-6 rounded-2xl text-[10px] font-black uppercase tracking-widest text-black outline-none placeholder:text-black/20"
-        />
+      <div className="flex items-center gap-2">
+        {onMenuClick && (
+          <button
+            type="button"
+            onClick={onMenuClick}
+            className="md:hidden p-4 text-black/30 hover:text-black transition-all"
+            aria-label="Abrir menú"
+          >
+            <Menu size={20} />
+          </button>
+        )}
+
+        <div className="relative w-96 hidden md:block ml-4">
+          <Search className="absolute left-5 top-1/2 -translate-y-1/2 text-black/20" size={18} />
+          <input 
+            type="text" 
+            placeholder="BUSCAR CLIENTE O PÓLIZA..."
+            className="w-full bg-transparent py-3 pl-14 pr-6 rounded-2xl text-[10px] font-black uppercase tracking-widest text-black outline-none placeholder:text-black/20"
+          />
+        </div>
       </div>
 
       {/* ACCIONES */}

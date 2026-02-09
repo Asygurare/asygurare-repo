@@ -3,6 +3,7 @@
 import React from 'react'
 import { motion } from 'framer-motion'
 import { Heart, Target, Eye, MessageSquare, ArrowDown } from 'lucide-react'
+import Link from 'next/link'
 
 const transition = { duration: 1, ease: [0.76, 0, 0.24, 1] }
 
@@ -139,9 +140,11 @@ export default function AboutPage() {
       <section className="pb-32 px-7">
         <div className="max-w-7xl mx-auto bg-white rounded-[4rem] p-16 md:p-24 text-center shadow-sm border border-black/5">
           <h2 className="text-4xl md:text-6xl font-medium mb-10">¿Listo para sentirte escuchado?</h2>
+          <Link href="/signup">
           <button className="bg-(--accents) text-white px-12 py-6 rounded-2xl text-xl font-bold hover:shadow-2xl hover:scale-105 transition-all">
             Únete a la nueva era de Asygurare
           </button>
+          </Link>
         </div>
       </section>
 

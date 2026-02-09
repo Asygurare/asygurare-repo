@@ -361,6 +361,7 @@ export default function ProspectosFinalUltraPage() {
   }
 
   const totalValue = useMemo(() => leads.reduce((acc, l) => acc + (Number(l.estimated_value) || 0), 0), [leads])
+  const totalProspectos = useMemo(() => leads.length, [leads])
   const leadsFiltrados = leads.filter(l => leadDisplayName(l).toLowerCase().includes(searchTerm.toLowerCase()))
 
   return (
@@ -370,17 +371,21 @@ export default function ProspectosFinalUltraPage() {
       {/* DASHBOARD */}
       <section className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-black/5">
-          <h2 className="text-4xl font-black italic text-black uppercase tracking-tighter">VENTAS.</h2>
+          <h2 className="text-4xl font-black italic text-black uppercase tracking-tighter">Mis prospectos.</h2>
           <p className="text-black font-bold text-[10px] uppercase tracking-widest mt-1">Asygurare Intelligence</p>
         </div>
         <div className="bg-black p-8 rounded-[2.5rem] text-white flex flex-col justify-center">
           <p className="text-[10px] font-black text-(--accents) uppercase mb-1 tracking-widest">Pipeline Activo</p>
           <h3 className="text-4xl font-black">${totalValue.toLocaleString()}</h3>
         </div>
-        <div className="bg-(--accents) p-8 rounded-[2.5rem] text-white flex flex-col justify-center">
+        <div className="bg-black p-8 rounded-[2.5rem] text-white flex flex-col justify-center">
+          <p className="text-[10px] font-black text-(--accents) uppercase mb-1 tracking-widest">Total de prospectos</p>
+          <h3 className="text-4xl font-black">{totalProspectos.toLocaleString()}</h3>
+        </div>
+        {/* <div className="bg-(--accents) p-8 rounded-[2.5rem] text-white flex flex-col justify-center">
           <p className="text-[10px] font-black text-white/60 uppercase mb-1 tracking-widest">Avance vs Meta</p>
           <h3 className="text-4xl font-black">{monthlyGoal > 0 ? ((totalValue/monthlyGoal)*100).toFixed(0) : 0}%</h3>
-        </div>
+        </div> */}
       </section>
 
       {/* GUIA DE ETAPAS */}

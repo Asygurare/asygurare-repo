@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useEffect, useRef } from 'react'
+import Link from 'next/link'
 import { motion } from 'framer-motion'
 import { Shield, BarChart3, Bot, ChevronRight, CheckCircle2 } from 'lucide-react'
 import TechDashboard from '@/src/components/landing/Dashboard/TechnoDashboard'
@@ -28,15 +28,19 @@ export default function Home() {
               Vende seguros con <span className="text-(--main) italic">superpoderes.</span>
             </h1>
             <p className="text-xl md:text-2xl text-gray-600 leading-relaxed mb-10 max-w-2xl">
-              Asygurare es el ecosistema operativo diseñado para asesores que buscan escala. CRM de alto rendimiento, embudos inteligentes y el copiloto de IA más avanzado del sector.
+              Asygurare es el ecosistema operativo diseñado para asesores que buscan escala. Somos el asesor del asesor y el copiloto de IA más avanzado del sector.
             </p>
             <div className="flex flex-col sm:flex-row gap-4">
+              <Link href="/signup">
               <button className="bg-(--accents) text-white px-8 py-4 rounded-xl text-lg font-medium hover:bg-blue-700 transition-all">
                 Comenzar ahora
               </button>
+              </Link>
+              <Link href="/sections">
               <button className="text-(--text) px-8 py-4 rounded-xl text-lg font-medium border border-black/10 hover:bg-black/5 transition-all">
-                Ver capacidades
+                Ver Funciones
               </button>
+              </Link>
             </div>
           </motion.div>
         </div>

@@ -212,14 +212,14 @@ export default function ClientesPage() {
           <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">Cuentas Activas</p>
           <h4 className="text-4xl font-black text-black mt-2">{customers.length}</h4>
         </div>
-        <div className="bg-black p-8 rounded-[2.5rem] shadow-sm text-white">
+        {/* <div className="bg-black p-8 rounded-[2.5rem] shadow-sm text-white">
           <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">Retención</p>
           <h4 className="text-4xl font-black mt-2">99.2%</h4>
         </div>
         <div className="bg-white p-8 rounded-[2.5rem] border border-black/5 shadow-sm text-black">
           <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">Crecimiento</p>
           <h4 className="text-4xl font-black mt-2">+15%</h4>
-        </div>
+        </div> */}
       </div>
 
       <div className="bg-white p-4 rounded-[2rem] border border-black/5 flex gap-4 items-center shadow-sm">
