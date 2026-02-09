@@ -5,18 +5,25 @@ import { motion } from 'framer-motion'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { supabaseClient } from '@/src/lib/supabase/client'
-import {  ArrowRight, User, Mail, Lock, Building2, Loader2 } from 'lucide-react'
+import { ArrowRight, Mail, Lock, Building2, Loader2 } from 'lucide-react'
 import Image from 'next/image'
 
 export default function SignUpPage() {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [acceptedTerms, setAcceptedTerms] = useState(false)
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
-    setLoading(true)
     setError(null)
+
+    if (!acceptedTerms) {
+      setError("Debes aceptar los Términos y Condiciones para continuar.")
+      return
+    }
+
+    setLoading(true)
 
     const formData = new FormData(e.currentTarget)
     const email = formData.get('email') as string
@@ -105,8 +112,30 @@ export default function SignUpPage() {
               </div>
             </div>
 
+            <label className="flex items-start gap-3 pt-2 select-none">
+              <input
+                name="acceptTerms"
+                type="checkbox"
+                checked={acceptedTerms}
+                onChange={(e) => setAcceptedTerms(e.target.checked)}
+                className="mt-1 h-4 w-4 rounded border-black/20 accent-[#4A7766]"
+                aria-required="true"
+              />
+              <span className="text-sm text-gray-600 leading-relaxed">
+                Acepto los{" "}
+                <Link href="/terms" className="underline text-[#1a1a1a] font-semibold">
+                  Términos y Condiciones
+                </Link>{" "}
+                y la{" "}
+                <Link href="/privacy" className="underline text-[#1a1a1a] font-semibold">
+                  Política de Privacidad
+                </Link>
+                .
+              </span>
+            </label>
+
             <button 
-              disabled={loading}
+              disabled={loading || !acceptedTerms}
               className="w-full bg-(--accents) text-white py-4 rounded-2xl font-bold hover:bg-blue-500 transition-all flex items-center justify-center gap-2 group disabled:opacity-50"
             >
               {loading ? <Loader2 className="animate-spin" /> : "Crear mi cuenta gratis"}

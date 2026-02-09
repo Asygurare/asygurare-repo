@@ -85,13 +85,6 @@ export default function Home() {
         <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-white/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
       </section>
 
-      <footer className="py-12 px-7 border-t border-black/5 text-sm text-gray-500 flex justify-between">
-        <p>© 2026 Asygurare. Todos los derechos reservados.</p>
-        <div className="flex gap-6">
-          <a href="#">Privacidad</a>
-          <a href="#">Términos</a>
-        </div>
-      </footer>
     </main>
   )
 }
