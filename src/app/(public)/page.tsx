@@ -56,7 +56,7 @@ export default function Home() {
         <div className="max-w-6xl mx-auto grid md:grid-cols-3 gap-12">
           <FeatureCard 
             icon={<Shield className="text-(--accents)" />}
-            title="CRM Especializado"
+            title="Un ecosistema para el asesor moderno"
             desc="No es un CRM genérico. Está diseñado para el ciclo de vida de una póliza, renovaciones y siniestros."
           />
           <FeatureCard 
