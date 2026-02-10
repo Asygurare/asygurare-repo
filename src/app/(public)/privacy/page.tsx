@@ -36,6 +36,10 @@ export default function Privacy() {
               para fines comerciales propios de esos terceros.
             </li>
             <li>
+              - Si conectas tu cuenta de Google (Gmail) vía OAuth, usamos el permiso <span className="font-medium">gmail.send</span>{" "}
+              exclusivamente para enviar correos que tú redactas y confirmas dentro de la plataforma.
+            </li>
+            <li>
               - Puedes solicitar acceso, rectificación, eliminación u oposición según tu normativa
               aplicable.
             </li>
@@ -55,20 +59,23 @@ export default function Privacy() {
             <a className="hover:underline" href="#finalidades">
               3. Finalidades y base legal
             </a>
+            <a className="hover:underline" href="#google-gmail">
+              4. Integración con Google (Gmail)
+            </a>
             <a className="hover:underline" href="#cookies">
-              4. Cookies y tecnologías similares
+              5. Cookies y tecnologías similares
             </a>
             <a className="hover:underline" href="#compartimos">
-              5. Con quién compartimos datos
+              6. Con quién compartimos datos
             </a>
             <a className="hover:underline" href="#conservacion">
-              6. Conservación y seguridad
+              7. Conservación y seguridad
             </a>
             <a className="hover:underline" href="#derechos">
-              7. Tus derechos
+              8. Tus derechos
             </a>
             <a className="hover:underline" href="#cambios">
-              8. Cambios a esta Política
+              9. Cambios a esta Política
             </a>
           </div>
         </nav>
@@ -145,6 +152,10 @@ export default function Privacy() {
               <li>- Responder consultas, solicitudes de demo y soporte.</li>
               <li>- Mejorar el producto, medir rendimiento y prevenir fraude/abuso.</li>
               <li>- Enviar comunicaciones operativas (por ejemplo, avisos de cambios relevantes).</li>
+              <li>
+                - Si conectas Gmail: facilitar el envío de correos que redactas/confirmas dentro de la plataforma a tus
+                destinatarios seleccionados (por ejemplo, prospectos o clientes).
+              </li>
               <li>- Cumplir obligaciones legales y requerimientos de autoridades.</li>
             </ul>
             <p className="mt-4">
@@ -162,9 +173,64 @@ export default function Privacy() {
             </div>
           </section>
 
+          <section id="google-gmail" className="scroll-mt-32">
+            <h2 className="text-2xl md:text-3xl font-semibold text-(--text) mb-3">
+              4. Integración con Google (Gmail)
+            </h2>
+            <p>
+              Asygurare permite, de forma opcional, que conectes tu cuenta de Google (Gmail) mediante OAuth para poder
+              enviar correos desde la plataforma.
+            </p>
+
+            <div className="mt-4 grid gap-4 md:grid-cols-2">
+              <div className="rounded-2xl bg-white/50 border border-black/5 p-5">
+                <h3 className="font-semibold text-(--text) mb-2">Permiso (scope) solicitado</h3>
+                <p className="text-gray-700">
+                  Solicitamos el permiso <span className="font-medium">https://www.googleapis.com/auth/gmail.send</span> para poder
+                  enviar correos en tu nombre <span className="font-medium">únicamente</span> cuando tú lo indiques explícitamente
+                  (por ejemplo, al presionar “Enviar”).
+                </p>
+              </div>
+              <div className="rounded-2xl bg-white/50 border border-black/5 p-5">
+                <h3 className="font-semibold text-(--text) mb-2">Qué hace y qué no hace</h3>
+                <ul className="space-y-2 text-gray-700">
+                  <li>- Enviamos correos que tú redactas o generas y luego confirmas.</li>
+                  <li>- No leemos tu bandeja de entrada ni tus correos.</li>
+                  <li>- No enviamos correos sin una acción explícita tuya.</li>
+                </ul>
+              </div>
+            </div>
+
+            <div className="rounded-2xl bg-white/50 border border-black/5 p-5 mt-4">
+              <h3 className="font-semibold text-(--text) mb-2">Datos que se procesan para el envío</h3>
+              <p className="text-gray-700">
+                Para enviar un correo, procesamos los datos que tú proporcionas en la UI (por ejemplo: destinatario(s),
+                asunto y contenido). Estos datos se envían a Google (Gmail API) con el único objetivo de entregar el correo.
+              </p>
+            </div>
+
+            <div className="rounded-2xl bg-white/50 border border-black/5 p-5 mt-4">
+              <h3 className="font-semibold text-(--text) mb-2">Tokens y registros</h3>
+              <p className="text-gray-700">
+                Para mantener la conexión activa, podemos almacenar tokens de acceso/renovación asociados a tu usuario de la
+                plataforma. Además, para mostrar “Correos enviados”, podemos almacenar un registro básico del envío (por ejemplo:
+                destinatario, asunto, fecha/hora y un identificador del mensaje). No es nuestro objetivo almacenar el contenido
+                completo del correo salvo que el producto lo indique explícitamente.
+              </p>
+            </div>
+
+            <div className="rounded-2xl bg-white/50 border border-black/5 p-5 mt-4">
+              <h3 className="font-semibold text-(--text) mb-2">Cómo revocar acceso</h3>
+              <p className="text-gray-700">
+                Puedes desconectar Gmail desde la sección de Automatizaciones dentro de Asygurare. También puedes revocar el
+                acceso desde la configuración de tu cuenta de Google, en “Seguridad” → “Acceso de terceros”.
+              </p>
+            </div>
+          </section>
+
           <section id="cookies" className="scroll-mt-32">
             <h2 className="text-2xl md:text-3xl font-semibold text-(--text) mb-3">
-              4. Cookies y tecnologías similares
+              5. Cookies y tecnologías similares
             </h2>
             <p>
               Usamos cookies y tecnologías similares para que el sitio funcione, recordar preferencias y
@@ -181,7 +247,7 @@ export default function Privacy() {
 
           <section id="compartimos" className="scroll-mt-32">
             <h2 className="text-2xl md:text-3xl font-semibold text-(--text) mb-3">
-              5. Con quién compartimos datos
+              6. Con quién compartimos datos
             </h2>
             <p>
               No vendemos tus datos. En particular, los datos de tus clientes (si los tratas dentro de
@@ -194,6 +260,10 @@ export default function Privacy() {
                 infraestructura y base de datos como Supabase, correo y soporte), bajo instrucciones y
                 con fines limitados a la prestación del servicio.
               </li>
+              <li>
+                - Google (Gmail API): si conectas Gmail y envías correos desde la plataforma, se comparten con Google los
+                datos necesarios para el envío (por ejemplo, destinatario, asunto y contenido) a fin de entregar el mensaje.
+              </li>
               <li>- Autoridades competentes, si es requerido por ley o para proteger derechos y seguridad.</li>
             </ul>
             <p className="mt-4">
@@ -204,13 +274,19 @@ export default function Privacy() {
 
           <section id="conservacion" className="scroll-mt-32">
             <h2 className="text-2xl md:text-3xl font-semibold text-(--text) mb-3">
-              6. Conservación y seguridad
+              7. Conservación y seguridad
             </h2>
             <p>
               Conservamos los datos solo durante el tiempo necesario para las finalidades descritas y/o
               los plazos exigidos por ley. Aplicamos medidas técnicas y organizativas orientadas a
               proteger la información frente a acceso no autorizado, alteración, divulgación o
               destrucción.
+            </p>
+            <p className="mt-4">
+              Si conectas Gmail, los tokens de acceso/renovación se conservan mientras mantengas la integración activa. Al
+              desconectar, revocamos el acceso y dejamos de poder enviar correos en tu nombre. Los registros de “Correos
+              enviados” se conservan para fines de historial y trazabilidad, y puedes solicitar su eliminación al ejercer tus
+              derechos.
             </p>
             <p className="mt-4">
               Usamos medidas de seguridad estándar de la industria, incluyendo <span className="font-medium">cifrado en tránsito (TLS)</span>{" "}
@@ -229,10 +305,10 @@ export default function Privacy() {
 
           <section id="derechos" className="scroll-mt-32">
             <h2 className="text-2xl md:text-3xl font-semibold text-(--text) mb-3">
-              7. Tus derechos
+              8. Tus derechos
             </h2>
             <p>
-              Dependiendo de tu país/region, puedes tener derechos sobre tus datos personales, como:
+              Dependiendo de tu país/región, puedes tener derechos sobre tus datos personales, como:
               acceso, rectificación, actualización, eliminación, portabilidad, limitación u oposición al
               tratamiento, y retirar tu consentimiento cuando corresponda.
             </p>
@@ -248,7 +324,7 @@ export default function Privacy() {
 
           <section id="cambios" className="scroll-mt-32">
             <h2 className="text-2xl md:text-3xl font-semibold text-(--text) mb-3">
-              8. Cambios a esta Política
+              9. Cambios a esta Política
             </h2>
             <p>
               Podemos actualizar esta Política ocasionalmente para reflejar cambios en el servicio o en

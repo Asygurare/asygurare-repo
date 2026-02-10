@@ -20,8 +20,8 @@ const menuItems = [
   { icon: Shield, label: 'Pólizas', href: '/polizas' },
   { icon: CreditCard, label: 'Pagos', href: '/pagos', hidden: true }, // omitido por el momento
   { icon: CalendarDays, label: 'Calendario', href: '/calendario' },
-  { icon: BrainCircuit, label: 'Tu Asistente de IA', href: '/ia' },
-  { icon: BarChart3, label: 'Análisis', href: '/analytics', comingSoon: true },
+  { icon: BrainCircuit, label: 'Guros AI', href: '/ia' },
+  { icon: BarChart3, label: 'Análisis', href: '/analytics', comingSoon: false },
   { icon: Cpu, label: 'Automatización', href: '/automatizaciones', comingSoon: true}
 ]
 
@@ -31,8 +31,9 @@ export default function WorkspaceLayout({ children }: { children: React.ReactNod
 
   useEffect(() => {
     // Cierra el menú en móvil al navegar
-    setIsMobileSidebarOpen(false)
-  }, [pathname])
+    if (!isMobileSidebarOpen) return
+    queueMicrotask(() => setIsMobileSidebarOpen(false))
+  }, [pathname, isMobileSidebarOpen])
 
   useEffect(() => {
     if (!isMobileSidebarOpen) return

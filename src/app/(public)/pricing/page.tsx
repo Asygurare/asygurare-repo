@@ -4,10 +4,63 @@ import React, { useState } from 'react'
 import { motion } from 'framer-motion'
 import { Check, Zap, Crown, Rocket, ArrowRight } from 'lucide-react'
 
+type BillingPeriod = "monthly" | "annual"
+
+type PricingPlan = {
+  key: "pro" | "ultimate"
+  icon: React.ReactNode
+  title: string
+  desc: string
+  priceMonthly: number
+  priceAnnualMonthlyEquivalent: number
+  highlight?: boolean
+  tag?: string
+  features: string[]
+  cta: string
+}
 
 
 export default function PricingPage() {
   const [isAnnual, setIsAnnual] = useState(false)
+  const billing: BillingPeriod = isAnnual ? "annual" : "monthly"
+
+  const plans: PricingPlan[] = [
+    {
+      key: "pro",
+      icon: <Zap size={24} className="text-white" />,
+      title: "Pro",
+      desc: "El plan para vender más con automatización real.",
+      priceMonthly: 20,
+      priceAnnualMonthlyEquivalent: 16,
+      highlight: true,
+      tag: "Más popular",
+      features: [
+        "Workspace completo (Prospectos, Clientes, Pólizas, Calendario)",
+        "Análisis (KPIs + gráficas del negocio)",
+        "Automatizaciones con Gmail (OAuth) + envíos a listas",
+        "GUROS AI (copiloto): redacta, sugiere y acelera tu operación",
+        "Historial de correos enviados",
+        "Soporte prioritario",
+      ],
+      cta: "Elegir Pro",
+    },
+    {
+      key: "ultimate",
+      icon: <Crown size={24} className="text-(--accents)" />,
+      title: "Ultimate",
+      desc: "Para equipos o asesores que operan con volumen y datos.",
+      priceMonthly: 59,
+      priceAnnualMonthlyEquivalent: 47,
+      features: [
+        "Todo en Pro",
+        "GUROS AI: flujos, plantillas y automatizaciones avanzadas",
+        "Segmentación y campañas a gran escala",
+        "Analítica avanzada y reportes premium",
+        "Onboarding + soporte premium",
+      ],
+      cta: "Elegir Ultimate",
+    },
+  ]
 
   return (
     <main className="bg-white min-h-screen pt-40 pb-24 px-7">
@@ -15,15 +68,28 @@ export default function PricingPage() {
 
         {/* Header de Pricing */}
         <div className="text-center mb-20">
-          <h1
-            className="text-5xl md:text-7xl text-(--text) font-medium tracking-tighter mb-6"
-          >
-            Inversión pequeña. <br />
-            <span className="text-(--accents) italic">Resultados masivos.</span>
-          </h1 >
+          <h1 className="text-5xl md:text-7xl text-(--text) font-medium tracking-tighter mb-6">
+            Pruébalo gratis por 15 días. <br />
+            <span className="text-(--accents) italic">Después, elige tu plan.</span>
+          </h1>
           <p className="text-xl text-gray-600 max-w-2xl mx-auto mb-10">
-            Prueba el poder de Asygurare gratis por 15 días. Sin tarjetas, sin compromisos. Solo tú y tu nuevo copiloto.
+            Asygurare es el workspace para seguros. Prospectos, clientes, análisis y automatizaciones con correo.
+            GUROS AI es tu copiloto: el asesor del asesor. Te ayuda a automatizar tu operación e incrementar tus ventas.
           </p>
+
+          <div className="max-w-3xl mx-auto mb-10">
+            <div className="rounded-[2rem] border border-black/5 bg-gray-50/60 p-6 md:p-8">
+              <div className="flex items-center gap-3 mb-2">
+                <div className="w-10 h-10 rounded-2xl bg-(--accents) flex items-center justify-center">
+                  <Rocket size={18} className="text-white" />
+                </div>
+                <p className="text-[11px] font-black uppercase tracking-widest text-black">Prueba gratis (15 días)</p>
+              </div>
+              <p className="text-sm font-bold text-black/50 leading-relaxed">
+                Acceso al workspace para conocer el flujo completo. Sin tarjeta. Cancela cuando quieras antes de que termine.
+              </p>
+            </div>
+          </div>
 
           {/* Selector Mensual/Anual */}
           <div className="flex items-center justify-center gap-4">
@@ -42,57 +108,21 @@ export default function PricingPage() {
         </div>
 
         {/* Grid de Precios */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 items-end">
-
-          {/* Plan 1: Free Trial */}
-          <PricingCard
-            icon={<Rocket size={24} className="text-(--accents)" />}
-            title="Trial"
-            price="0"
-            desc="Ideal para probar la potencia de la plataforma."
-            features={[
-              "Acceso total por 15 días",
-              "CRM Especializado",
-              "Captura de datos ilimitada",
-              "Soporte por chat"
-            ]}
-            cta="Empezar Gratis"
-            isPopular={false}
-          />
-
-          {/* Plan 2: Pro */}
-          <PricingCard
-            icon={<Zap size={24} className="text-white" />}
-            title="Pro"
-            price={isAnnual ? "28" : "35"}
-            desc="Todo lo que necesitas para escalar tu cartera."
-            features={[
-              "Uso ilimitado de CRM",
-              "Mensajería Automatizada",
-              "Anuncios y Novedades",
-              "Asistente Virtual IA (Básico)",
-              "Soporte Prioritario"
-            ]}
-            cta="Elegir Pro"
-            isPopular={true}
-          />
-
-          {/* Plan 3: Ultimate */}
-          <PricingCard
-            icon={<Crown size={24} className="text-(--accents)" />}
-            title="Ultimate"
-            price={isAnnual ? "40" : "50"}
-            desc="Para asesores de élite basados en datos."
-            features={[
-              "Todo lo incluido en Pro",
-              "Análisis de Datos Avanzado",
-              "Recomendaciones de IA",
-              "Visualizaciones Personalizadas",
-              "Dashboard de Proyecciones"
-            ]}
-            cta="Elegir Ultimate"
-            isPopular={false}
-          />
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-end max-w-5xl mx-auto">
+          {plans.map((p) => (
+            <PricingCard
+              key={p.key}
+              icon={p.icon}
+              title={p.title}
+              price={billing === "annual" ? p.priceAnnualMonthlyEquivalent : p.priceMonthly}
+              desc={p.desc}
+              features={p.features}
+              cta={p.cta}
+              isPopular={!!p.highlight}
+              tag={p.tag}
+              billing={billing}
+            />
+          ))}
         </div>
 
         {/* FAQ Rápido / Trust */}
@@ -103,6 +133,9 @@ export default function PricingPage() {
             <span className="font-bold text-(--accents) text-xl">RGPD Compliant</span>
             <span className="font-bold text-(--accents) text-xl">Cloud Secured</span>
           </div>
+          <p className="text-xs text-gray-500 mt-8 max-w-3xl mx-auto leading-relaxed">
+            * “Ahorra 20%” aplica al seleccionar facturación anual. Los límites de envío y uso justo aplican para proteger la entregabilidad.
+          </p>
         </div>
 
       </div>
@@ -110,7 +143,27 @@ export default function PricingPage() {
   )
 }
 
-function PricingCard({ icon, title, price, desc, features, cta, isPopular }: any) {
+function PricingCard({
+  icon,
+  title,
+  price,
+  desc,
+  features,
+  cta,
+  isPopular,
+  tag,
+  billing,
+}: {
+  icon: React.ReactNode
+  title: string
+  price: number
+  desc: string
+  features: string[]
+  cta: string
+  isPopular: boolean
+  tag?: string
+  billing: BillingPeriod
+}) {
   return (
     <motion.div
       whileHover={{ y: -10 }}
@@ -121,7 +174,7 @@ function PricingCard({ icon, title, price, desc, features, cta, isPopular }: any
     >
       {isPopular && (
         <div className="absolute -top-5 left-1/2 -translate-x-1/2 bg-(--accents) text-white px-4 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest">
-          Más Popular
+          {tag || "Más popular"}
         </div>
       )}
 
@@ -135,6 +188,11 @@ function PricingCard({ icon, title, price, desc, features, cta, isPopular }: any
       <div className="mb-8">
         <span className="text-5xl font-bold tracking-tighter">${price}</span>
         <span className="text-sm opacity-50">/mes</span>
+        {billing === "annual" ? (
+          <div className={`mt-2 text-[11px] font-bold ${isPopular ? "text-gray-300" : "text-gray-500"}`}>
+            Facturado anual
+          </div>
+        ) : null}
       </div>
 
       <ul className="space-y-4 mb-10 flex-1">
