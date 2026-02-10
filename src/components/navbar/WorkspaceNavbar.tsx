@@ -84,7 +84,7 @@ export default function WorkspaceNavbar({ onMenuClick }: WorkspaceNavbarProps) {
                 <div className="fixed inset-0 z-[999]" onClick={() => setIsProfileOpen(false)} />
                 <motion.div 
                   initial={{ opacity: 0, y: 10, scale: 0.95 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                  className="absolute z-[999] right-0 mt-4 w-60 bg-white rounded-[2rem] shadow-2xl border border-black/5 p-6 z-50"
+                  className="absolute z-[999] right-0 mt-4 w-60 bg-white rounded-[2rem] shadow-2xl border border-black/5 p-6"
                 >
                   <div className="pb-4 mb-4 border-b border-gray-50">
                     <p className="text-[9px] font-black text-black/20 uppercase tracking-widest mb-1">Sesión activa</p>
