@@ -14,8 +14,6 @@ import {
   Megaphone // Nuevo icono para anuncios
 } from 'lucide-react'
 
-const transition = { duration: 0.8, ease: [0.76, 0, 0.24, 1] }
-
 export default function Services() {
   return (
     <section className="bg-white py-32 px-7 overflow-hidden">
@@ -28,67 +26,67 @@ export default function Services() {
             whileInView={{ opacity: 1 }}
             className="text-(--main) font-bold tracking-[0.2em] uppercase text-xs mb-4 block"
           >
-            Nuestras Capacidades
+            Lo que incluye el Workspace
           </motion.span>
           <h2 className="text-5xl md:text-7xl font-medium text-(--text) tracking-tight mb-8">
-            Poder de grado militar. <br />
-            <span className="text-(--main) italic">Simplicidad de juguete.</span>
+            Todo tu negocio, <br />
+            <span className="text-(--main) italic">en una sola herramienta.</span>
           </h2>
           <p className="text-xl text-gray-600 leading-relaxed">
-            Asygurare elimina la curva de aprendizaje. Si sabes usar un smartphone, sabes usar Asygurare. Diseñado para asesores, no para ingenieros.
+            Prospectos, clientes, pólizas, calendario, análisis y automatizaciones con correo electrónico. Diseñado para asesores: rápido, claro y listo para usar.
           </p>
         </div>
 
         {/* Grid de Servicios con Enfoque en Facilidad */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
           
-          {/* 1. CRM Especializado */}
+          {/* 1. Prospectos */}
           <ServiceCard 
             icon={<Database className="text-white" size={28} />}
-            title="CRM con Alma de Seguro"
-            description="Olvídate de configurar campos infinitos. Asygurare viene pre-cargado con la estructura de pólizas, ramos y renovaciones que ya usas. Solo entra y empieza a organizar."
-            tag="Cero Configuración"
+            title="Prospectos y Pipeline"
+            description="Gestiona tu lista de prospectos, etapas y estatus en un CRM pensado para seguros. Ordena, filtra y convierte sin fricción."
+            tag="CRM de seguros"
           />
 
-          {/* 2. Análisis de Datos */}
-          <ServiceCard 
-            icon={<BarChart className="text-white" size={28} />}
-            title="Análisis de Datos Automático"
-            description="Tus números se procesan solos. Identifica quién está a punto de cancelar o quién necesita un seguro de vida sin tocar una sola celda de Excel."
-            tag="Inteligencia Pasiva"
-          />
-
-          {/* 3. Visualizaciones y Reportes */}
-          <ServiceCard 
-            icon={<Zap className="text-white" size={28} />}
-            title="Reportes que se explican solos"
-            description="Gráficas elegantes y limpias que puedes entender en 3 segundos. Visualiza tu crecimiento y tus metas con un diseño que da gusto mirar."
-            tag="Diseño Intuitivo"
-          />
-
-          {/* 4. Asistente Virtual IA */}
-          <ServiceCard 
-            icon={<Sparkles className="text-white" size={28} />}
-            title="Copiloto de Cierre Personal"
-            description="Tu asistente redacta las respuestas, te recuerda cuándo llamar y prepara los argumentos de venta por ti. Es como tener un socio experto 24/7."
-            tag="Tu Aliado IA"
-          />
-
-          {/* NUEVO: 5. Mensajería Centralizada */}
-          <ServiceCard 
-            icon={<MessageSquareText className="text-white" size={28} />}
-            title="Comunicación sin Esfuerzo"
-            description="Desde recordatorios de renovación hasta felicitaciones de cumpleaños. Envía mensajes personalizados por SMS, email o WhatsApp desde tu CRM. Siempre conectado."
-            tag="Flujos Automáticos"
-            isPrimary={true} // Destacamos este como clave para la comunicación
-          />
-
-          {/* NUEVO: 6. Anuncios y Novedades */}
+          {/* 2. Clientes */}
           <ServiceCard 
             icon={<Megaphone className="text-white" size={28} />}
-            title="Centro de Anuncios y Novedades"
-            description="Mantente al día con las últimas funcionalidades de Asygurare, noticias del sector o comunicados internos. Información clave, siempre a tu alcance."
-            tag="Información Centralizada"
+            title="Clientes y Seguimiento"
+            description="Centraliza información clave de tus clientes y mantén un historial limpio para dar seguimiento oportuno. Menos búsqueda, más acción."
+            tag="Orden y control"
+          />
+
+          {/* 3. Pólizas + renovaciones */}
+          <ServiceCard 
+            icon={<Zap className="text-white" size={28} />}
+            title="Pólizas y Renovaciones"
+            description="Registra pólizas, primas y fechas de vencimiento para tener claridad de tu cartera. Mantén el control de renovaciones y oportunidades."
+            tag="Cartera clara"
+          />
+
+          {/* 4. Análisis */}
+          <ServiceCard 
+            icon={<BarChart className="text-white" size={28} />}
+            title="Análisis y KPIs"
+            description="Visualiza tu operación con indicadores y gráficas en tiempo real: crecimiento, conversiones y desempeño por fuente o etapa."
+            tag="Decisiones rápidas"
+          />
+
+          {/* 5. Automatizaciones */}
+          <ServiceCard 
+            icon={<MessageSquareText className="text-white" size={28} />}
+            title="Automatizaciones con Email"
+            description="Conecta tu Gmail vía OAuth y envía correos desde tu workspace a prospectos o clientes seleccionados. Incluye redactor y GUROS AI para crear mensajes listos para enviar."
+            tag="Gmail + GUROS AI"
+            isPrimary={true}
+          />
+
+          {/* 6. Asistente IA */}
+          <ServiceCard 
+            icon={<Sparkles className="text-white" size={28} />}
+            title="GUROS AI"
+            description="Tu copiloto. El asesor del asesor. Te ayuda a automatizar tu operación, comunicarte mejor y vender más, con borradores listos para enviar (tú decides el mensaje final)."
+            tag="Copiloto de ventas"
           />
 
         </div>
@@ -103,20 +101,20 @@ export default function Services() {
             <MousePointer2 size={48} className="text-white animate-bounce" />
           </div>
           <div className="flex-1 text-center md:text-left">
-            <h3 className="text-3xl font-bold mb-3 text-[#1a1a1a]">¿Sin experiencia en software? Perfecto.</h3>
+            <h3 className="text-3xl font-bold mb-3 text-[#1a1a1a]">Un workspace que sí se siente sencillo.</h3>
             <p className="text-lg text-gray-500">
-              Asygurare está hecho para que lo domines en 15 minutos. Sin manuales pesados, sin tutoriales eternos. Es la plataforma más sencilla jamás creada para el sector.
+              Entra, carga tu información y trabaja. Prospectos, clientes, pólizas, análisis y correos en un solo lugar, con una interfaz limpia y directa.
             </p>
           </div>
           <div className="flex flex-col gap-3 shrink-0">
             <div className="flex items-center gap-2 text-sm font-bold text-(--accents)">
-              <CheckCircle size={18} /> Configura en minutos
+              <CheckCircle size={18} /> Empieza en minutos
             </div>
             <div className="flex items-center gap-2 text-sm font-bold text-(--accents)">
-              <CheckCircle size={18} /> Interfaz Limpia
+              <CheckCircle size={18} /> Vista clara del negocio
             </div>
             <div className="flex items-center gap-2 text-sm font-bold text-(--accents)">
-              <CheckCircle size={18} /> Soporte Humano
+              <CheckCircle size={18} /> Automatiza comunicación
             </div>
           </div>
         </motion.div>

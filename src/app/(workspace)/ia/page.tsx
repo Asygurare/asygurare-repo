@@ -30,10 +30,10 @@ export default function IASectorPage() {
             <div className="p-3 bg-transparent rounded-2xl shadow-xl">
               <BrainCircuit className="text-(--accents)" size={28} />
             </div>
-            <h2 className="text-2xl sm:text-3xl lg:text-4xl font-black text-black tracking-tighter uppercase">Tu Asistente de IA.</h2>
+            <h2 className="text-2xl sm:text-3xl lg:text-4xl font-black text-black tracking-tighter uppercase">GUROS AI.</h2>
           </div>
           <p className="text-black/50 font-bold text-[10px] uppercase tracking-[0.4em] ml-1">
-            Potenciado por Datamara
+            Tu copiloto. El asesor del asesor.
           </p>
         </div>
 
@@ -52,7 +52,7 @@ export default function IASectorPage() {
             <div className="hidden md:flex gap-4">
             <div className="bg-white px-6 py-4 rounded-3xl border border-black/5 flex items-center gap-3">
                 <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
-                <span className="text-[10px] text-black font-black uppercase tracking-widest">Tu Copiloto de Seguros</span>
+                <span className="text-[10px] text-black font-black uppercase tracking-widest">Copiloto de operación y ventas</span>
             </div>
             </div>
         </div>
