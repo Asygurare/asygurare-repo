@@ -162,7 +162,7 @@ export default function WorkspaceLayout({ children }: { children: React.ReactNod
       <main className="flex-1 flex flex-col overflow-hidden min-w-0">
 
         {/* Renderizado del Navbar en la parte superior del contenido */}
-        <div className="px-4 pt-4 pb-0 sm:px-6 sm:pt-6 lg:px-10 lg:pt-10">
+        <div className="relative z-50 px-4 pt-4 pb-0 sm:px-6 sm:pt-6 lg:px-10 lg:pt-10">
           <WorkspaceNavbar onMenuClick={() => setIsMobileSidebarOpen(true)} />
         </div>
 

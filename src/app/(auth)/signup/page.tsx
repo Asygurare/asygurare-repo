@@ -37,12 +37,13 @@ export default function SignUpPage() {
       password,
       options: {
         // A dónde vuelve el usuario después de confirmar el correo
-        emailRedirectTo: `${window.location.origin}/login?message=Correo confirmado. Inicia sesión.`,
+        emailRedirectTo: `${window.location.origin}/login?code=email_confirmed`,
         // Estos datos son los que el trigger de SQL leerá para la tabla profiles
         data: {
           first_name: firstName,
           last_name: lastName,
           agency_name: agencyName,
+          email: email,         
         }
       }
     })
@@ -52,7 +53,7 @@ export default function SignUpPage() {
       setLoading(false)
     } else {
       // Éxito: Redirigir o mostrar mensaje de confirmación
-      router.push('/login?message=Revisa tu correo para confirmar tu cuenta.')
+      router.push('/login?code=confirm_email')
     }
   }
 
