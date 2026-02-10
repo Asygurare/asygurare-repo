@@ -5,6 +5,7 @@ import SidebarConversaciones from '@/src/components/workspace/chat/SidebarConver
 import ChatDatamara from '@/src/components/workspace/chat/ChatGuros'
 import { supabaseClient } from '@/src/lib/supabase/client'
 import { BrainCircuit, PanelLeft, X } from 'lucide-react'
+import Image from 'next/image'
 
 export default function IASectorPage() {
   const [activeChatId, setActiveChatId] = useState<string | null>(null)
@@ -30,7 +31,7 @@ export default function IASectorPage() {
             <div className="p-3 bg-transparent rounded-2xl shadow-xl">
               <BrainCircuit className="text-(--accents)" size={28} />
             </div>
-            <h2 className="text-2xl sm:text-3xl lg:text-4xl font-black text-black tracking-tighter uppercase">GUROS AI.</h2>
+            <h2 className="text-2xl sm:text-3xl lg:text-4xl font-black text-black tracking-tighter uppercase">GUROS IA.</h2>
           </div>
           <p className="text-black/50 font-bold text-[10px] uppercase tracking-[0.4em] ml-1">
             Tu copiloto. El asesor del asesor.
@@ -130,7 +131,7 @@ export default function IASectorPage() {
               <div className="relative mb-8">
                 <div className="absolute inset-0 bg-(--accents) blur-3xl opacity-50 animate-pulse" />
                 <div className="relative w-20 h-20 sm:w-24 sm:h-24 bg-transparent rounded-[2.5rem] flex items-center justify-center text-(--accents) shadow-2xl">
-                    <BrainCircuit size={40} fill="currentColor" />
+                    <Image src="/avatar/avatar.png" alt='' width={80} height={80}/>
                 </div>
               </div>
               <h3 className="text-xl sm:text-3xl font-black text-black uppercase tracking-tighter">¿Cómo puedo ayudarte hoy?</h3>

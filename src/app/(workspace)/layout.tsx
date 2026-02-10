@@ -11,7 +11,7 @@ import {
 import WorkspaceNavbar from '@/src/components/navbar/WorkspaceNavbar'
 import Image from 'next/image'
 
-
+const Avatar = <Image src="/avatar/avatar.png" alt='' width={80} height={80}/>
 const menuItems = [
   { icon: LayoutDashboard, label: 'Dashboard', href: '/dashboard' },
   { icon: Flag, label: 'Mis metas', href: '/metas', comingSoon: true },
@@ -20,7 +20,7 @@ const menuItems = [
   { icon: Shield, label: 'Pólizas', href: '/polizas' },
   { icon: CreditCard, label: 'Pagos', href: '/pagos', hidden: true }, // omitido por el momento
   { icon: CalendarDays, label: 'Calendario', href: '/calendario' },
-  { icon: BrainCircuit, label: 'Guros AI', href: '/ia' },
+  { icon: BrainCircuit, label: 'Guros IA', href: '/ia' },
   { icon: BarChart3, label: 'Análisis', href: '/analytics', comingSoon: false },
   { icon: Cpu, label: 'Automatización', href: '/automatizaciones', comingSoon: true}
 ]
