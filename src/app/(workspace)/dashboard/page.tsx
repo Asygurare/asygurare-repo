@@ -190,7 +190,7 @@ export default function DashboardPage() {
 
         <motion.div
           initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}
-          className="md:w-1/3 bg-[#1a1a1a] p-8 rounded-[2rem] text-white overflow-hidden flex flex-col justify-center"
+          className="md:w-1/3 bg-[#1a1a1a] p-8 rounded-[2rem] text-white relative overflow-hidden flex flex-col justify-center"
         >
           <div className="relative">
             <div className="flex items-center gap-2 text-(--accents) mb-4">
