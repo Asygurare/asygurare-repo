@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, Suspense } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import Link from 'next/link'
 import Image from 'next/image'
@@ -9,9 +9,25 @@ import { supabaseClient } from '@/src/lib/supabase/client'
 import { ArrowRight, Mail, Lock, Eye, EyeOff, Loader2, Info, MailCheck, X } from 'lucide-react'
 import { toast, Toaster } from 'sonner'
 
-const transition = { duration: 0.8, ease: [0.76, 0, 0.24, 1] }
+function LoginFallback() {
+  return (
+    <main className="min-h-screen bg-[#ece7e2] flex overflow-hidden">
+      <section className="w-full lg:w-[45%] flex flex-col justify-center py-10 px-8 md:px-20 bg-white z-10">
+        <div className="max-w-md w-full mx-auto animate-pulse">
+          <div className="h-10 w-32 bg-gray-200 rounded-xl mb-12" />
+          <div className="h-10 w-3/4 bg-gray-200 rounded mb-2" />
+          <div className="h-4 w-1/2 bg-gray-100 rounded mb-10" />
+          <div className="h-14 bg-gray-100 rounded-2xl mb-4" />
+          <div className="h-14 bg-gray-100 rounded-2xl mb-6" />
+          <div className="h-14 bg-gray-200 rounded-2xl" />
+        </div>
+      </section>
+      <section className="hidden lg:flex flex-1 bg-black" />
+    </main>
+  )
+}
 
-export default function LoginPage() {
+function LoginContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const codeParam = searchParams.get('code')
@@ -267,5 +283,13 @@ export default function LoginPage() {
         <div className="absolute -bottom-20 -right-20 w-96 h-96 bg-black/10 rounded-full blur-3xl" />
       </section>
     </main>
+  )
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<LoginFallback />}>
+      <LoginContent />
+    </Suspense>
   )
 }
