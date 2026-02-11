@@ -122,7 +122,7 @@ export async function POST(req: NextRequest) {
 
     const assistantText = result.text || 'No pude generar una respuesta. Reintenta.'
 
-    // 5. Persist both messages
+    // 5. Persist both 
     const now = new Date().toISOString()
     const { error: insertErr } = await supabase
       .from(DATABASE.TABLES.WS_IA_MESSAGES)
