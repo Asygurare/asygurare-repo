@@ -17,7 +17,7 @@ const calSans = { variable: "--font-cal-sans" };
 
 export const metadata: Metadata = {
   title: "Asygurare | El Copiloto del Asesor",
-  description: "Software especializado en seguros con IA, CRM y Funnels.",
+  description: "El ecosistema de seguros para el asesor moderno.",
 };
 
 export default function RootLayout({

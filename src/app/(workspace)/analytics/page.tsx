@@ -98,9 +98,6 @@ export default function AnalyticsPage() {
           {error ? (
             <div className="bg-red-50 border border-red-200 rounded-[2rem] p-6">
               <p className="text-sm font-black text-red-700">Error: {error}</p>
-              <p className="text-xs font-bold text-red-700/70 mt-1">
-                Si estás probando realtime, asegúrate de tener Realtime habilitado en Supabase para estas tablas.
-              </p>
             </div>
           ) : null}
 

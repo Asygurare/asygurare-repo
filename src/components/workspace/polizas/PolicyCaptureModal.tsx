@@ -81,7 +81,7 @@ export function PolicyCaptureModal({
                 {selectedPolicy ? 'Expediente Póliza' : 'Emisión Técnica'}
               </h3>
               <p className="text-[11px] font-bold text-black/50 uppercase tracking-widest mt-1">
-                Sincronización Supabase Cloud
+                Asygurare
               </p>
             </div>
             <button
