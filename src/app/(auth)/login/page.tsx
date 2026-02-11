@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState, useEffect, Suspense } from 'react'
+import React, { useState, useEffect, useRef, useCallback, Suspense } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import Link from 'next/link'
 import Image from 'next/image'
@@ -34,7 +34,9 @@ function LoginContent() {
   const [showConfirmModal, setShowConfirmModal] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [resendLoading, setResendLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const emailInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     if (codeParam === 'confirm_email') {
@@ -44,6 +46,11 @@ function LoginContent() {
     } else if (codeParam === 'email_confirmed') {
       toast.success('Cuenta verificada', {
         description: 'Tu correo ha sido confirmado. Ya puedes iniciar sesión.',
+      })
+      router.replace('/login', { scroll: false })
+    } else if (codeParam === 'password_updated') {
+      toast.success('Contraseña actualizada', {
+        description: 'Tu contraseña ha sido actualizada. Ya puedes iniciar sesión.',
       })
       router.replace('/login', { scroll: false })
     }
@@ -93,6 +100,36 @@ function LoginContent() {
       setLoading(false);
     }
   };
+
+  const handleResendConfirmation = useCallback(async () => {
+    const email = emailInputRef.current?.value?.trim().toLowerCase()
+    if (!email) {
+      toast.error('Introduce tu email arriba y vuelve a hacer clic para reenviar el correo.')
+      return
+    }
+    setResendLoading(true)
+    try {
+      const { error: resendError } = await supabaseClient.auth.resend({
+        type: 'signup',
+        email,
+        options: {
+          emailRedirectTo: `${process.env.NEXT_PUBLIC_APP_URL}/login?code=email_confirmed`,
+        },
+      })
+      if (resendError) {
+        toast.error(resendError.message)
+        return
+      }
+      toast.success('Correo de confirmación reenviado', {
+        description: 'Revisa tu bandeja de entrada (y spam) y haz clic en el enlace.',
+      })
+    } catch (err) {
+      console.error('Error al reenviar:', err)
+      toast.error('Error al reenviar el correo.')
+    } finally {
+      setResendLoading(false)
+    }
+  }, []);
 
   return (
     <main className="min-h-screen bg-[#ece7e2] flex overflow-hidden">
@@ -181,6 +218,7 @@ function LoginContent() {
               <div className="relative">
                 <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
                 <input
+                  ref={emailInputRef}
                   required
                   name="email"
                   type="email"
@@ -243,6 +281,23 @@ function LoginContent() {
             <Info className="shrink-0 text-[#4A7766] mt-0.5" size={18} />
             <p className="text-sm text-gray-700 leading-relaxed">
               Recuerda: Al crear tu cuenta por primera vez te enviaremos un correo para que la verifiques.
+              Si no te ha llegado este correo,{' '}
+              <button
+                type="button"
+                onClick={handleResendConfirmation}
+                disabled={resendLoading}
+                className="text-(--accents) font-bold hover:underline inline-flex items-center gap-1 disabled:opacity-70 disabled:cursor-not-allowed"
+              >
+                {resendLoading ? (
+                  <>
+                    <Loader2 className="animate-spin shrink-0" size={14} />
+                    Reenviando…
+                  </>
+                ) : (
+                  'haz clic aquí'
+                )}
+              </button>
+              .
             </p>
           </div>
           
