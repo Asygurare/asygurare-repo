@@ -180,6 +180,12 @@ export default function ProspectosFinalUltraPage() {
       return
     }
 
+    const nowIso = new Date().toISOString()
+    const baseExtra =
+      lead?.additional_fields && typeof lead.additional_fields === 'object'
+        ? lead.additional_fields
+        : {}
+
     // 1. Insertar en clientes (WS_CUSTOMERS_2, schema alineado con Prospectos)
     const { error: insertError } = await supabaseClient.from(DATABASE.TABLES.WS_CUSTOMERS_2).insert({
       user_id: user.id,
@@ -200,7 +206,8 @@ export default function ProspectosFinalUltraPage() {
       gender: lead?.gender || null,
       client_interests: lead?.client_interests || null,
       notes: lead?.notes || null,
-      additional_fields: lead?.additional_fields ?? null,
+      // Marker so Metas/Analytics can measure conversions lead -> customer
+      additional_fields: { ...baseExtra, converted_from_lead_id: String(lead?.id || ''), converted_at: nowIso },
     })
 
     if (insertError) {

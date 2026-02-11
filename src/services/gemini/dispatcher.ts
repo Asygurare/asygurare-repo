@@ -1,22 +1,117 @@
 import { SupabaseClient } from '@supabase/supabase-js';
 import * as analysis from '@/src/lib/utils/functions';
 
+type ToolContext = {
+  supabase: SupabaseClient;
+  archivoId?: string;
+  userId?: string;
+  conversationId?: string;
+  tz?: string;
+  nowIso?: string;
+};
+
 export async function executeAnalysis(
-  name: string, 
-  args: any, 
-  supabase: SupabaseClient, 
-  archivoId: string
+  name: string,
+  args: any,
+  ctx: ToolContext
 ) {
   
 
   // 1. Obtenemos los datos (Aprovechando el cache de functions.ts)
-  const datos = await analysis.obtenerDatosConCache(supabase, archivoId);
+  const { supabase, archivoId } = ctx;
+  const datos = archivoId ? await analysis.obtenerDatosConCache(supabase, archivoId) : null;
 
   let raw: any;
+  let isWorkspaceTool = false;
 
   // 2. El Switch Maestro: Mapeo de la IA a tu Código Local
   switch (name) {
+    // -------------------------
+    // Workspace tools (RAG/queries)
+    // -------------------------
+    case "describirTabla": {
+      raw = await analysis.describirTablaWorkspace(supabase, { table: String(args?.table || '') });
+      isWorkspaceTool = true;
+      break;
+    }
+
+    case "listarClientes": {
+      raw = await analysis.listarClientesWorkspace(supabase, { limit: args?.limit });
+      isWorkspaceTool = true;
+      break;
+    }
+
+    case "calcularEdadPromedioClientes": {
+      raw = await analysis.calcularEdadPromedioClientesWorkspace(supabase, { sampleLimit: args?.sampleLimit });
+      isWorkspaceTool = true;
+      break;
+    }
+
+    case "contarClientes": {
+      raw = await analysis.contarClientesWorkspace(supabase);
+      isWorkspaceTool = true;
+      break;
+    }
+
+    case "consultarTabla": {
+      raw = await analysis.consultarTablaWorkspace(supabase, {
+        table: String(args?.table || ''),
+        select: args?.select,
+        filters: args?.filters,
+        orderBy: args?.orderBy,
+        orderDir: args?.orderDir,
+        limit: args?.limit,
+      });
+      isWorkspaceTool = true;
+      break;
+    }
+
+    case "contarRegistros": {
+      raw = await analysis.contarRegistrosWorkspace(supabase, {
+        table: String(args?.table || ''),
+        filters: args?.filters,
+      });
+      isWorkspaceTool = true;
+      break;
+    }
+
+    case "obtenerContextoOperativo": {
+      const tz = typeof args?.tz === 'string' && args.tz.trim() ? args.tz.trim() : (ctx.tz || 'America/Mexico_City');
+      const nowIso = typeof args?.nowIso === 'string' && args.nowIso.trim() ? args.nowIso.trim() : (ctx.nowIso || new Date().toISOString());
+      raw = await analysis.obtenerContextoOperativoWorkspaceConCache(supabase, { tz, nowIso });
+      isWorkspaceTool = true;
+      break;
+    }
+
+    case "buscarProspectos": {
+      const query = String(args?.query || '').trim();
+      const limit = Number(args?.limit || 6);
+      raw = await analysis.buscarProspectosWorkspace(supabase, { query, limit });
+      isWorkspaceTool = true;
+      break;
+    }
+
+    case "buscarClientes": {
+      const query = String(args?.query || '').trim();
+      const limit = Number(args?.limit || 6);
+      raw = await analysis.buscarClientesWorkspace(supabase, { query, limit });
+      isWorkspaceTool = true;
+      break;
+    }
+
+    case "buscarPolizas": {
+      const query = String(args?.query || '').trim();
+      const limit = Number(args?.limit || 6);
+      raw = await analysis.buscarPolizasWorkspace(supabase, { query, limit });
+      isWorkspaceTool = true;
+      break;
+    }
+
+    // -------------------------
+    // Analysis tools (archivoId requerido)
+    // -------------------------
     case "calcularRanking":
+      if (!datos) throw new Error('Falta archivoId para ejecutar herramientas de análisis.');
       raw = analysis.calcularRanking(
         datos, 
         args.columnaAgrupar, 
@@ -26,6 +121,7 @@ export async function executeAnalysis(
       );
       break;
       case "agruparPorMultiplesColumnas":
+    if (!datos) throw new Error('Falta archivoId para ejecutar herramientas de análisis.');
     // Si no tienes esta función exacta, usa calcularRanking como fallback 
     // o mapea la lógica de agrupación múltiple.
     raw = analysis.calcularRanking(
@@ -37,6 +133,7 @@ export async function executeAnalysis(
     break;
 
     case "filtrarPorCondicion": {
+      if (!datos) throw new Error('Falta archivoId para ejecutar herramientas de análisis.');
       const { condicion, columnaMetrica } = args;
       // La IA suele enviar condiciones como "Sales > 1000" o "Category es Furniture"
       // Vamos a intentar parsear la intención o buscar palabras clave
@@ -74,6 +171,7 @@ export async function executeAnalysis(
   }
 
     case "calcularCorrelacion": {
+      if (!datos) throw new Error('Falta archivoId para ejecutar herramientas de análisis.');
       const { columna1, columna2 } = args;
   
       // 1. Definimos la interfaz para los pares de datos
@@ -117,6 +215,7 @@ export async function executeAnalysis(
   }
 
     case "encontrarOutliers": {
+      if (!datos) throw new Error('Falta archivoId para ejecutar herramientas de análisis.');
       const { columna } = args;
       // 1. Limpiar y obtener solo números de la columna
       const valores = datos
@@ -153,6 +252,7 @@ export async function executeAnalysis(
 
 
     case "calcularParticipacionCategoria":
+      if (!datos) throw new Error('Falta archivoId para ejecutar herramientas de análisis.');
       raw = analysis.calcularParticipacionCategoria(
         datos,
         args.columnaCategoria,
@@ -162,6 +262,7 @@ export async function executeAnalysis(
       break;
 
     case "calcularSumaTotal":
+      if (!datos) throw new Error('Falta archivoId para ejecutar herramientas de análisis.');
       raw = { 
         total: datos.reduce((acc: number, f: any) => acc + (Number(f[args.columna]) || 0), 0),
         columna: args.columna 
@@ -170,10 +271,12 @@ export async function executeAnalysis(
 
     case "calcularEstadisticas":
       // ESTA ERA LA QUE FALTABA
+      if (!datos) throw new Error('Falta archivoId para ejecutar herramientas de análisis.');
       raw = analysis.calcularEstadisticas(datos, args.columna);
       break;
 
     case "obtenerValoresUnicos":
+      if (!datos) throw new Error('Falta archivoId para ejecutar herramientas de análisis.');
       raw = {
         lista: [...new Set(datos.map((f: any) => f[args.columna]))].filter(Boolean),
         columna: args.columna
@@ -181,12 +284,16 @@ export async function executeAnalysis(
       break;
 
     case "calcularEstadisticasCategoricas":
+      if (!datos) throw new Error('Falta archivoId para ejecutar herramientas de análisis.');
       raw = analysis.calcularEstadisticasCategoricas(datos, args.columna);
       break;
 
     default:
       throw new Error(`La función técnica ${name} no ha sido vinculada en el servidor.`);
   }
+
+  // Workspace tools: devolvemos el resultado tal cual (sin normalizar para UI analítica).
+  if (isWorkspaceTool) return raw;
 
   // 3. NORMALIZACIÓN PARA LA UI (ResultadoData.tsx)
   return normalizarParaUI(raw, args, name);

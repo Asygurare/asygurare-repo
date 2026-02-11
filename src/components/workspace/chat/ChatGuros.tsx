@@ -182,8 +182,8 @@ export default function ChatDatamara({ conversationId, userId }: { conversationI
         <div className="flex items-center gap-4">
           <div className="relative">
             <div className="absolute inset-0 bg-(--accents) blur-lg opacity-40 animate-pulse" />
-            <div className="relative w-10 h-10 sm:w-12 sm:h-12 bg-(--accents) rounded-2xl flex items-center justify-center text-(--accents)">
-            <Image src="/logo/logo.png" alt="logo" width={24} height={24} />
+            <div className="relative w-10 h-10 sm:w-12 sm:h-12 bg-white rounded-2xl flex items-center justify-center text-(--accents)">
+            <Image src="/avatar/avatar.png" alt="logo" width={44} height={44} />
             </div>
           </div>
           <div>
@@ -218,8 +218,8 @@ export default function ChatDatamara({ conversationId, userId }: { conversationI
               className={`flex items-start gap-4 ${m.role === 'user' ? 'flex-row-reverse' : 'flex-row'}`}
             >
               {/* Avatar Icon */}
-              <div className={`w-7 h-7 sm:w-8 sm:h-8 rounded-lg sm:rounded-xl flex items-center justify-center shrink-0 mt-2 ${m.role === 'user' ? 'bg-black text-white' : 'bg-(--accents) text-black'}`}>
-                {m.role === 'user' ? <User size={14} /> : <Image src="/logo/logo.png" alt="logo" width={14} height={14} />}
+              <div className={`w-7 h-7 sm:w-8 sm:h-8 rounded-lg sm:rounded-xl flex items-center justify-center shrink-0 mt-2 ${m.role === 'user' ? 'bg-black text-white' : 'bg-white text-black'}`}>
+                {m.role === 'user' ? <User size={14} /> : <Image src="/avatar/avatar.png" alt="logo" width={44} height={44} />}
               </div>
 
               {/* Burbuja */}

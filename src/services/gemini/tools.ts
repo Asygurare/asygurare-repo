@@ -165,3 +165,201 @@ export const analysisTools: FunctionDeclaration[] = [
     },
   }
 ];
+
+// Tools orientadas al workspace (RAG + queries enfocadas).
+// Nota: son READ-ONLY por seguridad (no modifican datos).
+export const workspaceTools: FunctionDeclaration[] = [
+  {
+    name: "consultarTabla",
+    description:
+      "Consulta segura sobre tablas del workspace (clientes, leads, polizas, tareas). Permite filtros simples, orden y límite. Read-only.",
+    parameters: {
+      type: SchemaType.OBJECT,
+      properties: {
+        table: {
+          type: SchemaType.STRING,
+          description: "Tabla lógica: 'clientes' | 'leads' | 'polizas' | 'tareas'.",
+        },
+        select: {
+          type: SchemaType.ARRAY,
+          items: { type: SchemaType.STRING },
+          description:
+            "Lista de columnas a devolver. Si se omite, se usan columnas recomendadas.",
+        },
+        filters: {
+          type: SchemaType.ARRAY,
+          description:
+            "Filtros (AND). Cada filtro: { column, op, value }. op: eq|neq|ilike|gt|gte|lt|lte|isnull|notnull|in",
+          items: {
+            type: SchemaType.OBJECT,
+            properties: {
+              column: { type: SchemaType.STRING },
+              op: {
+                type: SchemaType.STRING,
+                enum: ["eq", "neq", "ilike", "gt", "gte", "lt", "lte", "isnull", "notnull", "in"],
+                format: "enum",
+              },
+              value: { type: SchemaType.STRING, description: "Valor del filtro (string). Para 'in' usa CSV." },
+            },
+            required: ["column", "op"],
+          },
+        },
+        orderBy: {
+          type: SchemaType.STRING,
+          description: "Columna para ordenar (si existe).",
+        },
+        orderDir: {
+          type: SchemaType.STRING,
+          enum: ["asc", "desc"],
+          format: "enum",
+          description: "Dirección de orden.",
+        },
+        limit: {
+          type: SchemaType.NUMBER,
+          description: "Máximo de filas (default 10, max 50).",
+        },
+      },
+      required: ["table"],
+    },
+  },
+  {
+    name: "contarRegistros",
+    description:
+      "Cuenta registros en una tabla del workspace con filtros simples (read-only).",
+    parameters: {
+      type: SchemaType.OBJECT,
+      properties: {
+        table: {
+          type: SchemaType.STRING,
+          description: "Tabla lógica: 'clientes' | 'leads' | 'polizas' | 'tareas'.",
+        },
+        filters: {
+          type: SchemaType.ARRAY,
+          description:
+            "Filtros (AND). Cada filtro: { column, op, value }. op: eq|neq|ilike|gt|gte|lt|lte|isnull|notnull|in",
+          items: {
+            type: SchemaType.OBJECT,
+            properties: {
+              column: { type: SchemaType.STRING },
+              op: {
+                type: SchemaType.STRING,
+                enum: ["eq", "neq", "ilike", "gt", "gte", "lt", "lte", "isnull", "notnull", "in"],
+                format: "enum",
+              },
+              value: { type: SchemaType.STRING, description: "Valor del filtro (string). Para 'in' usa CSV." },
+            },
+            required: ["column", "op"],
+          },
+        },
+      },
+      required: ["table"],
+    },
+  },
+  {
+    name: "describirTabla",
+    description:
+      "Devuelve columnas detectadas de una tabla (por ejemplo clientes, leads, pólizas, tareas) a partir de una muestra mínima. Útil para entender estructura sin que el usuario conozca el backend.",
+    parameters: {
+      type: SchemaType.OBJECT,
+      properties: {
+        table: {
+          type: SchemaType.STRING,
+          description:
+            "Nombre lógico de tabla: 'clientes' | 'leads' | 'polizas' | 'tareas'.",
+        },
+      },
+      required: ["table"],
+    },
+  },
+  {
+    name: "listarClientes",
+    description:
+      "Lista clientes (últimos registrados por defecto) con campos clave. No requiere criterio de búsqueda.",
+    parameters: {
+      type: SchemaType.OBJECT,
+      properties: {
+        limit: { type: SchemaType.NUMBER, description: "Máximo de clientes." },
+      },
+      required: [],
+    },
+  },
+  {
+    name: "calcularEdadPromedioClientes",
+    description:
+      "Calcula la edad promedio de tus clientes usando WS_CUSTOMERS_2.age o WS_CUSTOMERS_2.birthday. No requiere que el usuario conozca columnas.",
+    parameters: {
+      type: SchemaType.OBJECT,
+      properties: {
+        sampleLimit: {
+          type: SchemaType.NUMBER,
+          description:
+            "Cantidad de clientes a muestrear para el cálculo si no hay columna de edad directa (default 200).",
+        },
+      },
+      required: [],
+    },
+  },
+  {
+    name: "contarClientes",
+    description: "Devuelve el número total de clientes (count exact).",
+    parameters: {
+      type: SchemaType.OBJECT,
+      properties: {},
+      required: [],
+    },
+  },
+  {
+    name: "buscarProspectos",
+    description:
+      "Busca prospectos/leads por texto (nombre, teléfono, email, notas). Devuelve una lista corta con campos clave.",
+    parameters: {
+      type: SchemaType.OBJECT,
+      properties: {
+        query: { type: SchemaType.STRING, description: "Texto a buscar." },
+        limit: { type: SchemaType.NUMBER, description: "Máximo de resultados." },
+      },
+      required: ["query"],
+    },
+  },
+  {
+    name: "buscarClientes",
+    description:
+      "Busca clientes por texto (nombre, teléfono, email). Devuelve una lista corta con campos clave.",
+    parameters: {
+      type: SchemaType.OBJECT,
+      properties: {
+        query: { type: SchemaType.STRING, description: "Texto a buscar." },
+        limit: { type: SchemaType.NUMBER, description: "Máximo de resultados." },
+      },
+      required: ["query"],
+    },
+  },
+  {
+    name: "buscarPolizas",
+    description:
+      "Busca pólizas por texto (número de póliza, aseguradora, categoría/ramo). Devuelve una lista corta con campos clave.",
+    parameters: {
+      type: SchemaType.OBJECT,
+      properties: {
+        query: { type: SchemaType.STRING, description: "Texto a buscar." },
+        limit: { type: SchemaType.NUMBER, description: "Máximo de resultados." },
+      },
+      required: ["query"],
+    },
+  },
+  {
+    name: "obtenerContextoOperativo",
+    description:
+      "Obtiene un snapshot compacto del estado operativo (tareas próximas, leads recientes, pólizas recientes y próximas a vencer).",
+    parameters: {
+      type: SchemaType.OBJECT,
+      properties: {
+        tz: { type: SchemaType.STRING, description: "Timezone IANA del usuario." },
+        nowIso: { type: SchemaType.STRING, description: "Fecha/hora actual en ISO." },
+      },
+      required: ["tz", "nowIso"],
+    },
+  },
+];
+
+export const allGeminiTools: FunctionDeclaration[] = [...workspaceTools, ...analysisTools];

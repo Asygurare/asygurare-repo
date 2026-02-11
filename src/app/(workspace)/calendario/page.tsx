@@ -96,9 +96,34 @@ function dayKey(d: Date) {
 }
 
 function priorityPill(priority: TaskPriority) {
-  if (priority === "Alta") return "bg-red-50 text-red-600 border-red-100"
-  if (priority === "Media") return "bg-orange-50 text-orange-700 border-orange-100"
-  return "bg-gray-50 text-gray-600 border-gray-100"
+  // Higher contrast so it doesn't get lost.
+  if (priority === "Alta") return "bg-red-600 text-white border-red-700"
+  if (priority === "Media") return "bg-orange-500 text-white border-orange-600"
+  return "bg-gray-900 text-white border-black"
+}
+
+function kindPill(kind: TaskKind) {
+  if (kind === "Llamada") return "bg-(--accents) text-white border-(--accents)"
+  if (kind === "Cita") return "bg-blue-600 text-white border-blue-700"
+  if (kind === "Mensaje") return "bg-indigo-600 text-white border-indigo-700"
+  if (kind === "Seguimiento") return "bg-amber-500 text-black border-amber-600"
+  return "bg-gray-100 text-black border-gray-200"
+}
+
+function kindBar(kind: TaskKind) {
+  if (kind === "Llamada") return "bg-(--accents)"
+  if (kind === "Cita") return "bg-blue-600"
+  if (kind === "Mensaje") return "bg-indigo-600"
+  if (kind === "Seguimiento") return "bg-amber-500"
+  return "bg-black/10"
+}
+
+function kindIconWrap(kind: TaskKind) {
+  if (kind === "Llamada") return "bg-(--accents)/10 text-(--accents) border-(--accents)/20"
+  if (kind === "Cita") return "bg-blue-50 text-blue-700 border-blue-100"
+  if (kind === "Mensaje") return "bg-indigo-50 text-indigo-700 border-indigo-100"
+  if (kind === "Seguimiento") return "bg-amber-50 text-amber-800 border-amber-100"
+  return "bg-gray-50 text-black/60 border-black/5"
 }
 
 function kindIcon(kind: TaskKind) {
@@ -363,6 +388,28 @@ export default function CalendarioPage() {
 
     return filtered.sort((a, b) => new Date(a.due_at).getTime() - new Date(b.due_at).getTime())
   }, [customers, leads, priorityTab, searchTerm, selectedDate, showDone, tasksByDay])
+
+  // For "clear at a glance" UI: always know open vs done for the selected day.
+  const selectedDayAllTasks = useMemo(() => {
+    const key = dayKey(selectedDate)
+    return tasksByDay.get(key) || []
+  }, [selectedDate, tasksByDay])
+
+  const selectedDayPendingTasks = useMemo(
+    () => selectedDayTasks.filter((t) => t.status !== "done"),
+    [selectedDayTasks]
+  )
+
+  const selectedDayDoneTasks = useMemo(
+    () => selectedDayTasks.filter((t) => t.status === "done"),
+    [selectedDayTasks]
+  )
+
+  const selectedDayAllCounts = useMemo(() => {
+    const pending = selectedDayAllTasks.filter((t) => t.status !== "done").length
+    const done = selectedDayAllTasks.filter((t) => t.status === "done").length
+    return { pending, done, total: selectedDayAllTasks.length }
+  }, [selectedDayAllTasks])
 
   const monthGrid = useMemo(() => {
     const start = startOfMonth(monthCursor)
@@ -675,7 +722,20 @@ export default function CalendarioPage() {
                 {storageMode === "supabase" ? "Sync con Supabase" : "Modo local (este dispositivo)"}
               </p>
             </div>
-            <div className="flex items-center gap-2 w-full sm:w-auto justify-between sm:justify-start">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-3 w-full sm:w-auto justify-between sm:justify-start">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="inline-flex items-center gap-2 px-4 py-3 rounded-2xl bg-gray-50 border border-black/5 text-[10px] font-black uppercase tracking-widest text-black/60">
+                  <span className="w-2 h-2 rounded-full bg-(--accents)" /> Pendientes
+                </span>
+                <span className="inline-flex items-center gap-2 px-4 py-3 rounded-2xl bg-gray-50 border border-black/5 text-[10px] font-black uppercase tracking-widest text-black/60">
+                  <span className="w-2 h-2 rounded-full bg-green-600" /> Hechas
+                </span>
+                <span className="inline-flex items-center gap-2 px-4 py-3 rounded-2xl bg-gray-50 border border-black/5 text-[10px] font-black uppercase tracking-widest text-black/60">
+                  <span className="w-2 h-2 rounded-full bg-red-600" /> Alta
+                </span>
+              </div>
+
+              <div className="flex items-center gap-2 w-full sm:w-auto justify-between sm:justify-start">
               <button
                 onClick={() => setMonthCursor((d) => addMonths(d, -1))}
                 className="p-3 rounded-2xl bg-gray-50 text-black hover:bg-black hover:text-white transition-all shrink-0"
@@ -698,6 +758,7 @@ export default function CalendarioPage() {
                 <ChevronRight size={18} />
               </button>
             </div>
+            </div>
           </div>
 
           {/* Weekdays */}
@@ -716,16 +777,23 @@ export default function CalendarioPage() {
               const list = tasksByDay.get(key) || []
               const openCount = list.filter((t) => t.status !== "done").length
               const highCount = list.filter((t) => t.status !== "done" && t.priority === "Alta").length
+              const doneCount = list.filter((t) => t.status === "done").length
               const selected = sameDay(date, selectedDate)
+              const totalCount = openCount + doneCount
+              const hasAny = totalCount > 0
+              const stackOpenPct = hasAny ? Math.round((openCount / totalCount) * 100) : 0
+              const stackDonePct = hasAny ? 100 - stackOpenPct : 0
 
               return (
                 <button
                   key={key}
                   onClick={() => setSelectedDateAndSync(date)}
-                  className={`text-left p-2 sm:p-3 rounded-2xl border transition-all min-h-[56px] sm:min-h-[78px] ${
+                  className={`relative overflow-hidden text-left p-2 sm:p-3 rounded-2xl border transition-all h-[78px] sm:h-[92px] ${
                     selected
                       ? "bg-black text-white border-black shadow-lg"
-                      : "bg-white border-black/5 hover:bg-[#ece7e2]/30"
+                      : hasAny
+                        ? "bg-white border-black/5 hover:bg-[#ece7e2]/30"
+                        : "bg-white border-black/5 hover:bg-[#ece7e2]/20"
                   }`}
                 >
                   <div className="flex items-start justify-between gap-2">
@@ -741,21 +809,44 @@ export default function CalendarioPage() {
                     ) : null}
                   </div>
 
-                  <div className="mt-3 flex items-center gap-2">
-                    {openCount > 0 ? (
+                  <div className="mt-2.5 space-y-2">
+                    {hasAny ? (
                       <>
-                        <span className={`text-[9px] sm:text-[10px] font-black uppercase tracking-widest leading-none ${
-                          selected ? "text-white/70" : "text-black/40"
-                        }`}>
-                          {openCount} tarea{openCount === 1 ? "" : "s"}
-                        </span>
-                        {highCount > 0 ? (
-                          <span className={`text-[9px] sm:text-[10px] font-black uppercase tracking-widest leading-none ${
-                            selected ? "text-red-200" : "text-red-600"
-                          }`}>
-                            · {highCount} alta
-                          </span>
-                        ) : null}
+                        <div
+                          className={`text-[10px] font-black uppercase tracking-widest leading-none whitespace-nowrap ${
+                            selected ? "text-white/80" : "text-black/50"
+                          }`}
+                          title={`Pendientes: ${openCount} · Hechas: ${doneCount} · Alta: ${highCount}`}
+                        >
+                          {openCount > 0 ? (
+                            <span className={selected ? "text-white" : "text-(--accents)"}>
+                              P{openCount}
+                            </span>
+                          ) : (
+                            <span className={selected ? "text-white/30" : "text-black/20"}>P0</span>
+                          )}
+                          <span className={selected ? "text-white/30" : "text-black/20"}> · </span>
+                          {doneCount > 0 ? (
+                            <span className={selected ? "text-green-200" : "text-green-700"}>
+                              H{doneCount}
+                            </span>
+                          ) : (
+                            <span className={selected ? "text-white/30" : "text-black/20"}>H0</span>
+                          )}
+                          {highCount > 0 ? (
+                            <>
+                              <span className={selected ? "text-white/30" : "text-black/20"}> · </span>
+                              <span className={selected ? "text-red-200" : "text-red-700"}>A{highCount}</span>
+                            </>
+                          ) : null}
+                        </div>
+
+                        <div className={`h-2 rounded-full overflow-hidden ${selected ? "bg-white/10" : "bg-black/5"}`}>
+                          <div className="h-full flex">
+                            <div className={`${selected ? "bg-white/60" : "bg-(--accents)"} h-full`} style={{ width: `${stackOpenPct}%` }} />
+                            <div className={`${selected ? "bg-green-300" : "bg-green-600"} h-full`} style={{ width: `${stackDonePct}%` }} />
+                          </div>
+                        </div>
                       </>
                     ) : (
                       <span className={`text-[9px] sm:text-[10px] font-bold uppercase tracking-widest leading-none ${
@@ -783,6 +874,11 @@ export default function CalendarioPage() {
               <div className="flex-1 flex flex-col items-center justify-center text-center opacity-40 py-14">
                 <CalendarDays size={44} className="text-gray-100 mb-4" />
                 <p className="font-bold text-black">Sin tareas para este día</p>
+                {!showDone && selectedDayAllCounts.done > 0 ? (
+                  <p className="text-[11px] font-black text-black/40 mt-2">
+                    Hay <span className="text-green-700">{selectedDayAllCounts.done}</span> hecha{selectedDayAllCounts.done === 1 ? "" : "s"} (activa “Mostrar hechas”).
+                  </p>
+                ) : null}
                 <button
                   onClick={openNewTask}
                   className="mt-6 px-6 py-3 rounded-2xl bg-black text-white font-black text-[10px] uppercase tracking-widest hover:bg-(--accents) transition-all"
@@ -791,7 +887,19 @@ export default function CalendarioPage() {
                 </button>
               </div>
             ) : (
-              selectedDayTasks.map((t) => {
+              <>
+                {selectedDayPendingTasks.length > 0 ? (
+                  <div className="flex items-center justify-between px-1">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-black/40">
+                      Pendientes ({selectedDayPendingTasks.length})
+                    </p>
+                    <span className="inline-flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-black/40">
+                      <span className="w-2 h-2 rounded-full bg-(--accents)" /> Acción
+                    </span>
+                  </div>
+                ) : null}
+
+                {selectedDayPendingTasks.map((t) => {
                 const Icon = kindIcon(t.kind)
                 const dt = new Date(t.due_at)
                 const time = `${pad2(dt.getHours())}:${pad2(dt.getMinutes())}`
@@ -807,25 +915,30 @@ export default function CalendarioPage() {
                 return (
                   <div
                     key={t.id}
-                    className={`p-4 sm:p-6 rounded-[2rem] border transition-all group ${
+                    className={`relative overflow-hidden p-4 sm:p-6 rounded-[2rem] border transition-all group ${
                       t.status === "done" ? "bg-gray-50/60 border-gray-100 opacity-70" : "bg-white border-black/5 hover:border-(--accents)/30"
                     }`}
                   >
+                    <div className={`absolute left-0 top-0 h-full w-1.5 ${kindBar(t.kind)} ${t.status === "done" ? "opacity-40" : ""}`} />
                     <div className="flex items-start justify-between gap-4">
                       <div className="flex items-start gap-4 min-w-0">
                         <button
                           onClick={() => toggleDone(t)}
-                          className={`mt-1 w-9 h-9 sm:w-10 sm:h-10 rounded-2xl flex items-center justify-center transition-all shrink-0 ${
-                            t.status === "done" ? "bg-green-600 text-white" : "bg-gray-50 text-black hover:bg-black hover:text-white"
+                          className={`mt-1 inline-flex items-center gap-2 px-4 py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all shrink-0 shadow-sm ${
+                            t.status === "done"
+                              ? "bg-green-600 text-white hover:bg-green-700"
+                              : "bg-(--accents) text-white hover:bg-black ring-2 ring-(--accents)/20"
                           }`}
                           title={t.status === "done" ? "Marcar como pendiente" : "Marcar como hecha"}
+                          aria-label={t.status === "done" ? "Marcar como pendiente" : "Completar tarea"}
                         >
                           <CheckCircle2 size={18} />
+                          <span className="hidden sm:inline">{t.status === "done" ? "Hecha" : "Completar"}</span>
                         </button>
 
                         <div className="min-w-0">
                           <div className="flex items-center gap-2 flex-wrap">
-                            <div className="p-2 bg-gray-50 rounded-xl text-black">
+                            <div className={`p-2 rounded-xl border ${kindIconWrap(t.kind)}`}>
                               <Icon size={16} />
                             </div>
                             <p className={`font-black text-black uppercase tracking-tighter truncate ${t.status === "done" ? "line-through" : ""}`}>
@@ -836,6 +949,9 @@ export default function CalendarioPage() {
                           <div className="flex items-center gap-3 mt-2 flex-wrap">
                             <span className="text-[10px] font-black uppercase tracking-widest text-black/40 flex items-center gap-2">
                               <Clock size={12} className="opacity-40" /> {time}
+                            </span>
+                            <span className={`text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full border ${kindPill(t.kind)}`}>
+                              {t.kind}
                             </span>
                             <span className={`text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full border ${priorityPill(t.priority)}`}>
                               {t.priority}
@@ -866,7 +982,97 @@ export default function CalendarioPage() {
                     </div>
                   </div>
                 )
-              })
+                })}
+
+                {showDone && selectedDayDoneTasks.length > 0 ? (
+                  <div className="pt-4 mt-2 border-t border-black/5">
+                    <div className="flex items-center justify-between px-1 mb-3">
+                      <p className="text-[10px] font-black uppercase tracking-widest text-black/40">
+                        Hechas ({selectedDayDoneTasks.length})
+                      </p>
+                      <span className="inline-flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-black/40">
+                        <span className="w-2 h-2 rounded-full bg-green-600" /> Completado
+                      </span>
+                    </div>
+                    <div className="space-y-4">
+                      {selectedDayDoneTasks.map((t) => {
+                        const Icon = kindIcon(t.kind)
+                        const dt = new Date(t.due_at)
+                        const time = `${pad2(dt.getHours())}:${pad2(dt.getMinutes())}`
+                        const related =
+                          t.entity_type === "customer"
+                            ? customers.find((c) => c.id === t.entity_id)
+                            : t.entity_type === "lead"
+                              ? leads.find((l) => l.id === t.entity_id)
+                              : null
+                        const relatedLabel =
+                          t.entity_type === "customer" ? "Cliente" : t.entity_type === "lead" ? "Prospecto" : null
+
+                        return (
+                          <div
+                            key={t.id}
+                            className={`relative overflow-hidden p-4 sm:p-6 rounded-[2rem] border transition-all group ${
+                              "bg-gray-50/60 border-gray-100 opacity-80"
+                            }`}
+                          >
+                            <div className={`absolute left-0 top-0 h-full w-1.5 ${kindBar(t.kind)} opacity-40`} />
+                            <div className="flex items-start justify-between gap-4">
+                              <div className="flex items-start gap-4 min-w-0">
+                                <button
+                                  onClick={() => toggleDone(t)}
+                                  className="mt-1 inline-flex items-center gap-2 px-4 py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all shrink-0 shadow-sm bg-green-600 text-white hover:bg-green-700"
+                                  title="Marcar como pendiente"
+                                  aria-label="Marcar como pendiente"
+                                >
+                                  <CheckCircle2 size={18} />
+                                  <span className="hidden sm:inline">Hecha</span>
+                                </button>
+
+                                <div className="min-w-0">
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <div className={`p-2 rounded-xl border ${kindIconWrap(t.kind)}`}>
+                                      <Icon size={16} />
+                                    </div>
+                                    <p className="font-black text-black uppercase tracking-tighter truncate line-through">
+                                      {t.title}
+                                    </p>
+                                  </div>
+
+                                  <div className="flex items-center gap-3 mt-2 flex-wrap">
+                                    <span className="text-[10px] font-black uppercase tracking-widest text-black/40 flex items-center gap-2">
+                                      <Clock size={12} className="opacity-40" /> {time}
+                                    </span>
+                                    <span className={`text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full border ${kindPill(t.kind)}`}>
+                                      {t.kind}
+                                    </span>
+                                    <span className={`text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full border ${priorityPill(t.priority)}`}>
+                                      {t.priority}
+                                    </span>
+                                    {related && relatedLabel ? (
+                                      <span className="text-[10px] font-black uppercase tracking-widest text-black/40 flex items-center gap-2">
+                                        {t.entity_type === "customer" ? <Users size={12} className="opacity-40" /> : <Target size={12} className="opacity-40" />}
+                                        {relatedLabel}: <span className="text-black/70">{related.full_name}</span>
+                                      </span>
+                                    ) : null}
+                                  </div>
+                                </div>
+                              </div>
+
+                              <button
+                                onClick={() => openEditTask(t)}
+                                className="p-3 rounded-2xl text-black/20 hover:text-black hover:bg-gray-50 transition-all"
+                                title="Editar"
+                              >
+                                <ChevronRight size={20} />
+                              </button>
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                ) : null}
+              </>
             )}
           </div>
 
@@ -938,6 +1144,11 @@ export default function CalendarioPage() {
                 <div className="flex-1 flex flex-col items-center justify-center text-center opacity-40 py-14">
                   <CalendarDays size={44} className="text-gray-100 mb-4" />
                   <p className="font-bold text-black">Sin tareas para este día</p>
+                  {!showDone && selectedDayAllCounts.done > 0 ? (
+                    <p className="text-[11px] font-black text-black/40 mt-2">
+                      Hay <span className="text-green-700">{selectedDayAllCounts.done}</span> hecha{selectedDayAllCounts.done === 1 ? "" : "s"} (activa “Mostrar hechas”).
+                    </p>
+                  ) : null}
                   <button
                     onClick={openNewTask}
                     className="mt-6 px-6 py-3 rounded-2xl bg-black text-white font-black text-[10px] uppercase tracking-widest hover:bg-(--accents) transition-all"
@@ -946,7 +1157,19 @@ export default function CalendarioPage() {
                   </button>
                 </div>
               ) : (
-                selectedDayTasks.map((t) => {
+                <>
+                  {selectedDayPendingTasks.length > 0 ? (
+                    <div className="flex items-center justify-between px-1">
+                      <p className="text-[10px] font-black uppercase tracking-widest text-black/40">
+                        Pendientes ({selectedDayPendingTasks.length})
+                      </p>
+                      <span className="inline-flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-black/40">
+                        <span className="w-2 h-2 rounded-full bg-(--accents)" /> Acción
+                      </span>
+                    </div>
+                  ) : null}
+
+                  {selectedDayPendingTasks.map((t) => {
                   const Icon = kindIcon(t.kind)
                   const dt = new Date(t.due_at)
                   const time = `${pad2(dt.getHours())}:${pad2(dt.getMinutes())}`
@@ -962,27 +1185,32 @@ export default function CalendarioPage() {
                   return (
                     <div
                       key={t.id}
-                      className={`p-4 sm:p-6 rounded-[2rem] border transition-all group ${
+                      className={`relative overflow-hidden p-4 sm:p-6 rounded-[2rem] border transition-all group ${
                         t.status === "done"
                           ? "bg-gray-50/60 border-gray-100 opacity-70"
                           : "bg-white border-black/5 hover:border-(--accents)/30"
                       }`}
                     >
+                      <div className={`absolute left-0 top-0 h-full w-1.5 ${kindBar(t.kind)} ${t.status === "done" ? "opacity-40" : ""}`} />
                       <div className="flex items-start justify-between gap-4">
                         <div className="flex items-start gap-4 min-w-0">
                           <button
                             onClick={() => toggleDone(t)}
-                            className={`mt-1 w-9 h-9 sm:w-10 sm:h-10 rounded-2xl flex items-center justify-center transition-all shrink-0 ${
-                              t.status === "done" ? "bg-green-600 text-white" : "bg-gray-50 text-black hover:bg-black hover:text-white"
+                            className={`mt-1 inline-flex items-center gap-2 px-4 py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all shrink-0 shadow-sm ${
+                              t.status === "done"
+                                ? "bg-green-600 text-white hover:bg-green-700"
+                                : "bg-(--accents) text-white hover:bg-black ring-2 ring-(--accents)/20"
                             }`}
                             title={t.status === "done" ? "Marcar como pendiente" : "Marcar como hecha"}
+                            aria-label={t.status === "done" ? "Marcar como pendiente" : "Completar tarea"}
                           >
                             <CheckCircle2 size={18} />
+                            <span className="hidden sm:inline">{t.status === "done" ? "Hecha" : "Completar"}</span>
                           </button>
 
                           <div className="min-w-0">
                             <div className="flex items-center gap-2 flex-wrap">
-                              <div className="p-2 bg-gray-50 rounded-xl text-black">
+                              <div className={`p-2 rounded-xl border ${kindIconWrap(t.kind)}`}>
                                 <Icon size={16} />
                               </div>
                               <p
@@ -997,6 +1225,9 @@ export default function CalendarioPage() {
                             <div className="flex items-center gap-3 mt-2 flex-wrap">
                               <span className="text-[10px] font-black uppercase tracking-widest text-black/40 flex items-center gap-2">
                                 <Clock size={12} className="opacity-40" /> {time}
+                              </span>
+                              <span className={`text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full border ${kindPill(t.kind)}`}>
+                                {t.kind}
                               </span>
                               <span
                                 className={`text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full border ${priorityPill(
@@ -1035,7 +1266,95 @@ export default function CalendarioPage() {
                       </div>
                     </div>
                   )
-                })
+                  })}
+
+                  {showDone && selectedDayDoneTasks.length > 0 ? (
+                    <div className="pt-4 mt-2 border-t border-black/5">
+                      <div className="flex items-center justify-between px-1 mb-3">
+                        <p className="text-[10px] font-black uppercase tracking-widest text-black/40">
+                          Hechas ({selectedDayDoneTasks.length})
+                        </p>
+                        <span className="inline-flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-black/40">
+                          <span className="w-2 h-2 rounded-full bg-green-600" /> Completado
+                        </span>
+                      </div>
+                      <div className="space-y-4">
+                        {selectedDayDoneTasks.map((t) => {
+                          const Icon = kindIcon(t.kind)
+                          const dt = new Date(t.due_at)
+                          const time = `${pad2(dt.getHours())}:${pad2(dt.getMinutes())}`
+                          const related =
+                            t.entity_type === "customer"
+                              ? customers.find((c) => c.id === t.entity_id)
+                              : t.entity_type === "lead"
+                                ? leads.find((l) => l.id === t.entity_id)
+                                : null
+                          const relatedLabel =
+                            t.entity_type === "customer" ? "Cliente" : t.entity_type === "lead" ? "Prospecto" : null
+
+                          return (
+                            <div
+                              key={t.id}
+                              className="relative overflow-hidden p-4 sm:p-6 rounded-[2rem] border transition-all group bg-gray-50/60 border-gray-100 opacity-80"
+                            >
+                              <div className={`absolute left-0 top-0 h-full w-1.5 ${kindBar(t.kind)} opacity-40`} />
+                              <div className="flex items-start justify-between gap-4">
+                                <div className="flex items-start gap-4 min-w-0">
+                                  <button
+                                    onClick={() => toggleDone(t)}
+                                    className="mt-1 inline-flex items-center gap-2 px-4 py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all shrink-0 shadow-sm bg-green-600 text-white hover:bg-green-700"
+                                    title="Marcar como pendiente"
+                                    aria-label="Marcar como pendiente"
+                                  >
+                                    <CheckCircle2 size={18} />
+                                    <span className="hidden sm:inline">Hecha</span>
+                                  </button>
+
+                                  <div className="min-w-0">
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                      <div className={`p-2 rounded-xl border ${kindIconWrap(t.kind)}`}>
+                                        <Icon size={16} />
+                                      </div>
+                                      <p className="font-black text-black uppercase tracking-tighter truncate line-through">
+                                        {t.title}
+                                      </p>
+                                    </div>
+
+                                    <div className="flex items-center gap-3 mt-2 flex-wrap">
+                                      <span className="text-[10px] font-black uppercase tracking-widest text-black/40 flex items-center gap-2">
+                                        <Clock size={12} className="opacity-40" /> {time}
+                                      </span>
+                                      <span className={`text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full border ${kindPill(t.kind)}`}>
+                                        {t.kind}
+                                      </span>
+                                      <span className={`text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full border ${priorityPill(t.priority)}`}>
+                                        {t.priority}
+                                      </span>
+                                      {related && relatedLabel ? (
+                                        <span className="text-[10px] font-black uppercase tracking-widest text-black/40 flex items-center gap-2">
+                                          {t.entity_type === "customer" ? <Users size={12} className="opacity-40" /> : <Target size={12} className="opacity-40" />}
+                                          {relatedLabel}: <span className="text-black/70">{related.full_name}</span>
+                                        </span>
+                                      ) : null}
+                                    </div>
+                                  </div>
+                                </div>
+
+                                <button
+                                  onClick={() => openEditTask(t)}
+                                  className="p-3 rounded-2xl text-black/20 hover:text-black hover:bg-gray-50 transition-all"
+                                  title="Editar"
+                                >
+                                  <ChevronRight size={20} />
+                                </button>
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  ) : null}
+                </>
               )}
             </div>
           </div>
@@ -1073,16 +1392,20 @@ export default function CalendarioPage() {
                         setSelectedDateAndSync(new Date(dt.getFullYear(), dt.getMonth(), dt.getDate()))
                         openEditTask(t)
                       }}
-                      className="w-full text-left p-5 rounded-[2rem] border border-black/5 hover:border-(--accents)/30 hover:bg-[#ece7e2]/30 transition-all"
+                      className="relative overflow-hidden w-full text-left p-5 rounded-[2rem] border border-black/5 hover:border-(--accents)/30 hover:bg-[#ece7e2]/30 transition-all"
                     >
+                      <div className={`absolute left-0 top-0 h-full w-1.5 ${kindBar(t.kind)}`} />
                       <div className="flex items-start gap-4">
-                        <div className="p-3 bg-gray-50 rounded-2xl text-black">
+                        <div className={`p-3 rounded-2xl border ${kindIconWrap(t.kind)}`}>
                           <Icon size={16} />
                         </div>
                         <div className="min-w-0 flex-1">
                           <p className="font-black text-black uppercase tracking-tighter truncate">{t.title}</p>
                           <div className="flex items-center gap-3 mt-2">
                             <span className="text-[10px] font-black uppercase tracking-widest text-black/40">{when}</span>
+                            <span className={`text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full border ${kindPill(t.kind)}`}>
+                              {t.kind}
+                            </span>
                             <span className={`text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full border ${priorityPill(t.priority)}`}>
                               {t.priority}
                             </span>
