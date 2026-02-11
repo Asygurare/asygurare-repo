@@ -37,7 +37,7 @@ export default function SignUpPage() {
       password,
       options: {
         // A dónde vuelve el usuario después de confirmar el correo
-        emailRedirectTo: `${window.location.origin}/login?code=email_confirmed`,
+        emailRedirectTo: `${process.env.NEXT_PUBLIC_APP_URL}/login?code=email_confirmed`,
         // Estos datos son los que el trigger de SQL leerá para la tabla profiles
         data: {
           first_name: firstName,

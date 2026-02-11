@@ -48,6 +48,11 @@ function LoginContent() {
         description: 'Tu correo ha sido confirmado. Ya puedes iniciar sesión.',
       })
       router.replace('/login', { scroll: false })
+    } else if (codeParam === 'password_updated') {
+      toast.success('Contraseña actualizada', {
+        description: 'Tu contraseña ha sido actualizada. Ya puedes iniciar sesión.',
+      })
+      router.replace('/login', { scroll: false })
     }
   }, [codeParam, router])
 
@@ -108,7 +113,7 @@ function LoginContent() {
         type: 'signup',
         email,
         options: {
-          emailRedirectTo: typeof window !== 'undefined' ? `${window.location.origin}/login?code=email_confirmed` : undefined,
+          emailRedirectTo: `${process.env.NEXT_PUBLIC_APP_URL}/login?code=email_confirmed`,
         },
       })
       if (resendError) {

@@ -12,11 +12,6 @@ export default function ForgetPasswordPage() {
   const [error, setError] = useState<string | null>(null)
   const [sent, setSent] = useState(false)
 
-  const redirectTo = useMemo(() => {
-    if (typeof window === "undefined") return undefined
-    return `${window.location.origin}/update-password`
-  }, [])
-
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     setLoading(true)
@@ -33,7 +28,7 @@ export default function ForgetPasswordPage() {
       }
 
       const { error: resetError } = await supabaseClient.auth.resetPasswordForEmail(email, {
-        redirectTo,
+        redirectTo: `${process.env.NEXT_PUBLIC_APP_URL}/update-password`,
       })
 
       if (resetError) {
