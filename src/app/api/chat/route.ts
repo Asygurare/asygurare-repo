@@ -1,299 +1,149 @@
-import { DATABASE } from "@/src/config";
-import { GoogleGenerativeAI } from "@google/generative-ai";
-import { NextResponse } from "next/server";
-import { createClient as createServerClient } from "@/src/lib/supabase/server";
+import { NextRequest, NextResponse } from 'next/server'
+import { generateText, stepCountIs } from 'ai'
+import { google } from '@ai-sdk/google'
+import { createClient } from '@/src/lib/supabase/server'
+import { DATABASE } from '@/src/config'
+import { buildChatTools } from '@/src/services/chat/tools'
 
-const genAI = new GoogleGenerativeAI(process.env.GOOGLE_GENERATIVE_AI_API_KEY!)
+export const runtime = 'nodejs'
 
-export async function POST(request: Request) {
-    const supabase = await createServerClient();
+// ─── System prompt: role + schema knowledge ───
+const SYSTEM = `Eres el copiloto estratégico de un agente de seguros mexicano dentro de la plataforma Asygurare.
+No eres solo un buscador de datos: eres un asesor experto en ventas de seguros, retención de clientes y estrategia comercial.
 
-    try {
-        const requestData = await request.json();
-        const { message, user_id, conversation_id, profile, client_now, client_tz } = requestData;
+TU ROL:
+- Consultar y analizar los datos del negocio del agente (clientes, prospectos, pólizas, tareas).
+- Generar estrategias accionables de captación, retención y cross-selling basadas en los datos reales.
+- Aconsejar sobre cómo comunicarse con cada cliente/prospecto según su perfil.
+- Proponer acciones concretas y priorizadas que el agente pueda ejecutar hoy.
+- Ser proactivo: si ves oportunidades en los datos (pólizas por vencer, leads sin seguimiento, clientes sin renovación), señálalas sin que te lo pidan.
 
-        if (!message) {
-            return NextResponse.json({ error: "El mensaje es requerido" }, { status: 400 });
-        }
+CONOCIMIENTO DE INDUSTRIA DE SEGUROS:
+- La comunicación varía drásticamente según la edad del cliente:
+  · Jóvenes (18-30): tono cercano, digital, enfocado en protección básica y ahorro. Canales: WhatsApp, redes sociales.
+  · Adultos (31-50): tono profesional, enfocado en protección familiar, educación de hijos, patrimonio. Canales: llamada, WhatsApp, email.
+  · Seniors (51+): tono cálido y respetuoso, enfocado en salud, retiro, herencia. Canales: llamada telefónica, presencial.
+- Tipos de seguro comunes: vida, gastos médicos, auto, hogar, ahorro/inversión, empresarial.
+- El cross-selling es clave: un cliente con seguro de auto puede necesitar seguro de hogar o vida.
+- La renovación es más rentable que la captación nueva; prioriza siempre la retención.
+- Las pólizas próximas a vencer son oportunidades urgentes de contacto.
 
-        // --- 1. DATA EXTRACTION (EL CONTEXTO REAL) ---
-        // Extraemos datos de TODAS las tablas para que la IA no improvise
-        const tableEntries = Object.entries(DATABASE.TABLES);
-        const allTablesData: Record<string, any[]> = {};
-        const allTablesErrors: Record<string, string> = {};
-        await Promise.all(
-            tableEntries.map(async ([tableKey, tableName]) => {
-                const { data, error } = await supabase.from(tableName).select('*');
-                if (error) {
-                    allTablesErrors[tableKey] = error.message;
-                    allTablesData[tableKey] = [];
-                    return;
-                }
-                allTablesData[tableKey] = (data as any[]) || [];
-            })
-        );
+ESQUEMA DE BASE DE DATOS (tablas lógicas que puedes consultar):
 
-        // Mantenemos estas variables para el prompt actual
-        const stats = allTablesData.WS_POLICIES;
-        const leads = allTablesData.WS_LEADS;
-        const customers = allTablesData.WS_CUSTOMERS_2;
-        const tasks = allTablesData.WS_TASKS;
-        const recentPolicies =
-            (stats ?? [])
-                .slice()
-                .sort((a: any, b: any) => {
-                    const at = a?.created_at ? new Date(a.created_at).getTime() : 0;
-                    const bt = b?.created_at ? new Date(b.created_at).getTime() : 0;
-                    return bt - at;
-                })
-                .slice(0, 3) ?? [];
+1. **clientes** (WS_CUSTOMERS_2)
+   Columnas: id, name, last_name, full_name, email, phone, age, birthday, status, insurance_type, ocupation, notes, created_at, updated_at
 
-        const upcomingTasks =
-            (tasks ?? [])
-                .filter((t: any) => String(t?.status || 'open') !== 'done')
-                .slice()
-                .sort((a: any, b: any) => {
-                    const at = a?.due_at ? new Date(a.due_at).getTime() : Number.POSITIVE_INFINITY;
-                    const bt = b?.due_at ? new Date(b.due_at).getTime() : Number.POSITIVE_INFINITY;
-                    return at - bt;
-                })
-                .slice(0, 8) ?? [];
+2. **leads / prospectos** (WS_LEADS)
+   Columnas: id, name, last_name, full_name, email, phone, stage, status, insurance_type, estimated_value, notes, created_at, updated_at
 
-        const recentLeads =
-            (leads ?? [])
-                .slice()
-                .sort((a: any, b: any) => {
-                    const at = a?.updated_at ? new Date(a.updated_at).getTime() : 0;
-                    const bt = b?.updated_at ? new Date(b.updated_at).getTime() : 0;
-                    return bt - at;
-                })
-                .slice(0, 8) ?? [];
+3. **polizas** (WS_POLICIES)
+   Columnas: id, policy_number, insurance_company, category, status, total_premium, frecuencia_pago, effective_date, expiry_date, customer_id, created_at
+   Relación: customer_id → clientes.id
 
-        const recentCustomers =
-            (customers ?? [])
-                .slice()
-                .sort((a: any, b: any) => {
-                    const at = a?.created_at ? new Date(a.created_at).getTime() : 0;
-                    const bt = b?.created_at ? new Date(b.created_at).getTime() : 0;
-                    return bt - at;
-                })
-                .slice(0, 8) ?? [];
+4. **tareas** (WS_TASKS)
+   Columnas: id, title, due_at, status, kind, priority, entity_type, entity_id, created_at, updated_at
 
-        const policiesExpiringSoon =
-            (stats ?? [])
-                .filter((p: any) => !!p?.expiry_date)
-                .slice()
-                .sort((a: any, b: any) => {
-                    const at = a?.expiry_date ? new Date(a.expiry_date).getTime() : Number.POSITIVE_INFINITY;
-                    const bt = b?.expiry_date ? new Date(b.expiry_date).getTime() : Number.POSITIVE_INFINITY;
-                    return at - bt;
-                })
-                .slice(0, 8) ?? [];
+REGLAS DE USO DE HERRAMIENTAS:
+- Para buscar un contacto por nombre/teléfono/email: usa buscarClientes o buscarProspectos.
+- Para consultar datos con filtros específicos (status, fechas, etc.): usa consultarTabla.
+- Para contar registros con filtros: usa contarRegistros.
+- Para un resumen general del negocio: usa obtenerContextoOperativo.
+- Puedes encadenar herramientas: primero buscar un cliente, luego consultar sus pólizas con filtro customer_id.
+- Cuando el usuario pida una estrategia o consejo, PRIMERO consulta los datos relevantes con las herramientas, LUEGO genera la estrategia basada en datos reales (no inventes números).
 
-        // Fecha/hora actual (la IA NO la conoce si no se la damos)
-        const tz =
-            (typeof client_tz === 'string' && client_tz.trim()) ||
-            (typeof profile?.timezone === 'string' && profile.timezone.trim()) ||
-            (typeof profile?.time_zone === 'string' && profile.time_zone.trim()) ||
-            'America/Mexico_City';
+CÓMO GENERAR ESTRATEGIAS:
+1. Consulta los datos primero (contexto operativo, clientes, leads, pólizas).
+2. Identifica patrones y oportunidades (segmentos de edad, tipos de seguro, leads estancados, pólizas por vencer).
+3. Propón acciones concretas con prioridad (alta/media/baja).
+4. Para cada acción, sugiere el canal y tono de comunicación adecuado según el perfil del contacto.
+5. Si es posible, incluye un ejemplo de mensaje o guion que el agente pueda usar directamente.
 
-        const now = (() => {
-            const d = typeof client_now === 'string' ? new Date(client_now) : new Date();
-            return Number.isNaN(d.getTime()) ? new Date() : d;
-        })();
+FORMATO DE RESPUESTA:
+- Responde siempre en español.
+- Sé conciso y directo. Usa markdown (negritas, listas, tablas) para organizar datos.
+- Nunca muestres JSON crudo al usuario; transforma los datos en texto legible.
+- Si no encuentras resultados, dilo claramente y sugiere alternativas.
+- Si el usuario pide algo que realmente no puedes hacer (modificar datos directamente, enviar correos), explícalo y sugiere cómo hacerlo manualmente.
+- Cuando des estrategias, usa estructura clara: Objetivo → Datos → Acciones → Ejemplo de comunicación.`
 
-        const nowMs = now.getTime();
-        const weekHorizonMs = 7 * 24 * 60 * 60 * 1000;
-
-        const safeDueMs = (row: any) => {
-            const raw = row?.due_at;
-            if (!raw) return null;
-            const ms = new Date(raw).getTime();
-            return Number.isNaN(ms) ? null : ms;
-        };
-
-        const tasksToday =
-            (tasks ?? [])
-                .filter((t: any) => String(t?.status || 'open') !== 'done')
-                .filter((t: any) => {
-                    const dueMs = safeDueMs(t);
-                    if (dueMs == null) return false;
-                    const dueKey = new Intl.DateTimeFormat('en-CA', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(dueMs));
-                    const todayKey = new Intl.DateTimeFormat('en-CA', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit' }).format(now);
-                    return dueKey === todayKey;
-                })
-                .slice()
-                .sort((a: any, b: any) => (safeDueMs(a) ?? Number.POSITIVE_INFINITY) - (safeDueMs(b) ?? Number.POSITIVE_INFINITY))
-                .slice(0, 8) ?? [];
-
-        const tasksNext7Days =
-            (tasks ?? [])
-                .filter((t: any) => String(t?.status || 'open') !== 'done')
-                .filter((t: any) => {
-                    const dueMs = safeDueMs(t);
-                    if (dueMs == null) return false;
-                    return dueMs >= nowMs && dueMs < nowMs + weekHorizonMs;
-                })
-                .slice()
-                .sort((a: any, b: any) => (safeDueMs(a) ?? Number.POSITIVE_INFINITY) - (safeDueMs(b) ?? Number.POSITIVE_INFINITY))
-                .slice(0, 12) ?? [];
-
-        // Incluimos todas las columnas de Leads/Clientes (pero con compactación para no reventar tokens)
-        const collectColumns = (rows: any[], maxScan = 200) => {
-            const set = new Set<string>();
-            for (const r of (rows || []).slice(0, maxScan)) {
-                if (r && typeof r === 'object') {
-                    for (const k of Object.keys(r)) set.add(k);
-                }
-            }
-            return Array.from(set).sort();
-        };
-
-        const safeJson = (value: any, maxChars = 9000) => {
-            const seen = new WeakSet<object>();
-            const json = JSON.stringify(
-                value,
-                (_k, v) => {
-                    if (typeof v === 'string') {
-                        return v.length > 500 ? `${v.slice(0, 500)}…(trunc)` : v;
-                    }
-                    if (Array.isArray(v)) {
-                        return v.length > 50 ? [...v.slice(0, 50), `…(${v.length - 50} more)`] : v;
-                    }
-                    if (v && typeof v === 'object') {
-                        if (seen.has(v)) return '[Circular]';
-                        seen.add(v);
-                    }
-                    return v;
-                },
-                2
-            );
-            if (!json) return 'null';
-            return json.length > maxChars ? `${json.slice(0, maxChars)}\n…(truncated ${json.length - maxChars} chars)` : json;
-        };
-
-        const leadsColumns = collectColumns(leads ?? []);
-        const customersColumns = collectColumns(customers ?? []);
-        const leadsRawContext = safeJson(recentLeads);
-        const customersRawContext = safeJson(recentCustomers);
-
-        const totalCartera = stats?.reduce((acc, p) => acc + (p.total_premium || 0), 0) || 0;
-        const totalLeads = leads?.length || 0;
-        const totalPolizas = stats?.length || 0;
-
-        const iaNombre = "Gubot";
-        
-        // --- 2. SYSTEM PROMPT EVOLUCIONADO ---
-        const systemPrompt = `
-        Soy tu asistente virtual, tu Copiloto de Alto Rendimiento. No soy un chatbot, soy tu Director de Estrategia y Maestro en Riesgos.
-
-        🕒 FECHA ACTUAL (REFERENCIA OPERATIVA):
-        - Ahora: ${new Intl.DateTimeFormat('es-MX', { timeZone: tz, dateStyle: 'full', timeStyle: 'short' }).format(now)}
-        - TZ: ${tz}
-        - ISO: ${now.toISOString()}
-    
-        📊 CONTEXTO ACTUAL DE LA AGENCIA (DATOS REALES):
-        - Cartera Total: $${totalCartera.toLocaleString()}
-        - Pólizas Activas: ${totalPolizas}
-        - Prospectos (Leads) en Seguimiento: ${totalLeads}
-        - Últimas Pólizas Emitidas: ${recentPolicies?.map(p => `${p.policy_number} (${p.insurance_company})`).join(', ') || 'Ninguna reciente'}
-
-        🗓️ CALENDARIO (TAREAS HOY):
-        ${tasksToday.length
-            ? tasksToday
-                .map((t: any) => `- ${t.due_at || 'sin fecha'} · ${t.kind || 'Otro'} · ${t.priority || 'Media'} · ${t.title || 'Sin título'}${t.entity_type && t.entity_id ? ` · ${t.entity_type}:${t.entity_id}` : ''}`)
-                .join('\n')
-            : '- No hay tareas para HOY en el radar'}
-
-        🗓️ CALENDARIO (PRÓXIMOS 7 DÍAS):
-        ${tasksNext7Days.length
-            ? tasksNext7Days
-                .map((t: any) => `- ${t.due_at || 'sin fecha'} · ${t.kind || 'Otro'} · ${t.priority || 'Media'} · ${t.title || 'Sin título'}${t.entity_type && t.entity_id ? ` · ${t.entity_type}:${t.entity_id}` : ''}`)
-                .join('\n')
-            : '- No hay tareas en los próximos 7 días'}
-
-        🎯 PROSPECTOS (ÚLTIMOS ACTUALIZADOS):
-        ${recentLeads.length
-            ? recentLeads
-                .map((l: any) => `- ${[l.name, l.last_name].filter(Boolean).join(' ') || l.full_name || 'Sin nombre'} · ${l.stage || 'Sin etapa'} · ${l.status || 'Sin estatus'} · ${l.insurance_type || 'Sin ramo'} · ${l.phone || 'sin teléfono'}`)
-                .join('\n')
-            : '- Sin prospectos recientes'}
-
-        🧾 LEADS (COLUMNAS DISPONIBLES):
-        ${leadsColumns.length ? `- ${leadsColumns.join(', ')}` : '- (sin columnas detectadas)'}
-
-        🧾 LEADS (DATOS CRUDOS CON TODAS LAS COLUMNAS · MUESTRA):
-        ${leadsRawContext}
-
-        👥 CLIENTES (ÚLTIMOS REGISTRADOS):
-        ${recentCustomers.length
-            ? recentCustomers
-                .map((c: any) => `- ${[c.name, c.last_name].filter(Boolean).join(' ') || 'Sin nombre'} · ${c.status || 'sin estatus'} · ${c.insurance_type || 'sin ramo'} · ${c.phone || 'sin teléfono'}`)
-                .join('\n')
-            : '- Sin clientes recientes'}
-
-        🧾 CLIENTES (COLUMNAS DISPONIBLES):
-        ${customersColumns.length ? `- ${customersColumns.join(', ')}` : '- (sin columnas detectadas)'}
-
-        🧾 CLIENTES (DATOS CRUDOS CON TODAS LAS COLUMNAS · MUESTRA):
-        ${customersRawContext}
-
-        📄 PÓLIZAS (PRÓXIMAS A VENCER):
-        ${policiesExpiringSoon.length
-            ? policiesExpiringSoon
-                .map((p: any) => `- Vence ${p.expiry_date} · ${p.policy_number || 'sin número'} · ${p.insurance_company || 'sin aseguradora'} · ${p.category || 'sin ramo'} · $${Number(p.total_premium || 0).toLocaleString()}`)
-                .join('\n')
-            : '- Sin pólizas con vencimiento en el radar'}
-
-        🧠 TU PERSONALIDAD (COPILOTO MAESTRO):
-        1. **Mente de Underwriter**: Analizas cada riesgo con precisión técnica. Conoces de ramos (Autos, GMM, Vida, Daños).
-        2. **Visión de Ventas**: Tu prioridad es que el asesor cierre más. Si detectas un lead abandonado, ¡exígele acción!
-        3. **Estilo Directo**: Hablas como un socio de negocios. Si los números bajan, eres honesto. Si hay oportunidad, eres audaz.
-        4. **ENFOQUE**: Es muy importante hacerle entender al usuario que no todos los clientes son iguales. Debemos de actuar diferente según la edad del cliente.
-
-        ⚡ REGLAS DE ORO:
-        - Si te preguntan por un cliente o póliza específica y no está en los datos de arriba, di: "No visualizo ese dato en el radar inmediato, dame el número de póliza o búscalo en la sección de Clientes para profundizar".
-        - Tienes acceso operativo a estas tablas: Calendario (${DATABASE.TABLES.WS_TASKS}), Prospectos (${DATABASE.TABLES.WS_LEADS}), Clientes (${DATABASE.TABLES.WS_CUSTOMERS_2}), Pólizas (${DATABASE.TABLES.WS_POLICIES}).
-        - Usa terminología de seguros: Prima neta, siniestralidad, endosos, renovaciones, carencias.
-        - Sé proactivo: Si te preguntan "Hola", responde con un breve insight, ej: "Hola. Tenemos $${totalCartera} en cartera, pero veo ${totalLeads} leads que necesitan cierre hoy. ¿En qué atacamos?"
-
-        🗣️ ESTILO: Técnico pero motivador. Elegante, minimalista y ultra-eficiente.`;
-
-        const model = genAI.getGenerativeModel({
-            model: "gemini-2.5-pro",
-            systemInstruction: systemPrompt
-        });
-
-        // --- 3. PROCESAMIENTO DE TOKENS Y MENSAJE ---
-        const countResponse = await model.countTokens(message);
-        const userTokens = countResponse.totalTokens;
-
-        await supabase.from(DATABASE.TABLES.WS_IA_MESSAGES).insert([
-            { user_id, conversation_id, role: 'user', content: message, tokens_input: userTokens }
-        ]);
-
-        const result = await model.generateContent(message);
-        const responseText = result.response.text();
-        const aiTokens = result.response.usageMetadata?.candidatesTokenCount || 0;
-
-        await supabase.from(DATABASE.TABLES.WS_IA_MESSAGES).insert([
-            {
-                user_id,
-                conversation_id,
-                role: 'assistant',
-                content: responseText,
-                tokens_output: aiTokens,
-                tokens_totales: userTokens + aiTokens
-            }
-        ]);
-
-        return NextResponse.json({
-            response: responseText,
-            success: true,
-            tokens: { user: userTokens, ai: aiTokens }
-        });
-    } catch (error) {
-        console.error("Error en el chat:", error);
-        return NextResponse.json({ error: 'Hubo un error al procesar' }, { status: 500 });
+// ─── POST handler ───
+export async function POST(req: NextRequest) {
+  try {
+    // 1. Parse body
+    const body = await req.json()
+    const { message, user_id, conversation_id, client_now, client_tz } = body as {
+      message?: string
+      user_id?: string
+      conversation_id?: string
+      client_now?: string
+      client_tz?: string
     }
+
+    if (!message?.trim() || !user_id || !conversation_id) {
+      return NextResponse.json(
+        { error: 'Faltan campos requeridos (message, user_id, conversation_id).' },
+        { status: 400 },
+      )
+    }
+
+    // 2. Auth
+    const supabase = await createClient()
+    const { data: { user }, error: authErr } = await supabase.auth.getUser()
+
+    if (authErr || !user || user.id !== user_id) {
+      return NextResponse.json({ error: 'No autorizado.' }, { status: 401 })
+    }
+
+    // 3. Load conversation history (last 30 messages)
+    const { data: history } = await supabase
+      .from(DATABASE.TABLES.WS_IA_MESSAGES)
+      .select('role, content')
+      .eq('conversation_id', conversation_id)
+      .order('created_at', { ascending: true })
+      .limit(30)
+
+    const messages: Array<{ role: 'user' | 'assistant'; content: string }> = [
+      ...((history as Array<{ role: 'user' | 'assistant'; content: string }>) ?? []),
+      { role: 'user', content: message.trim() },
+    ]
+
+    // 4. Build tools & call Gemini
+    const tz = client_tz || 'America/Mexico_City'
+    const nowIso = client_now || new Date().toISOString()
+    const tools = buildChatTools({ supabase, tz, nowIso })
+
+    const result = await generateText({
+      model: google('gemini-2.5-flash'),
+      system: SYSTEM,
+      messages,
+      tools,
+      stopWhen: stepCountIs(5),
+    })
+
+    const assistantText = result.text || 'No pude generar una respuesta. Reintenta.'
+
+    // 5. Persist both messages
+    const now = new Date().toISOString()
+    await supabase.from(DATABASE.TABLES.WS_IA_MESSAGES).insert([
+      {
+        conversation_id,
+        role: 'user',
+        content: message.trim(),
+        created_at: now,
+      },
+      {
+        conversation_id,
+        role: 'assistant',
+        content: assistantText,
+        created_at: new Date(Date.now() + 1).toISOString(), // +1ms to keep order
+      },
+    ])
+
+    // 6. Return response
+    return NextResponse.json({ response: assistantText })
+  } catch (err: unknown) {
+    console.error('[/api/chat] Error:', err)
+    const msg = err instanceof Error ? err.message : 'Error interno del servidor.'
+    return NextResponse.json({ error: msg }, { status: 500 })
+  }
 }

@@ -14,7 +14,7 @@ import Image from 'next/image'
 const Avatar = <Image src="/avatar/avatar.png" alt='' width={80} height={80}/>
 const menuItems = [
   { icon: LayoutDashboard, label: 'Dashboard', href: '/dashboard' },
-  { icon: Flag, label: 'Mis metas', href: '/metas', comingSoon: true },
+  { icon: Flag, label: 'Mis metas', href: '/metas', comingSoon: false },
   { icon: Target, label: 'Prospectos', href: '/prospectos' },
   { icon: Users, label: 'Clientes', href: '/clientes' },
   { icon: Shield, label: 'Pólizas', href: '/polizas' },
