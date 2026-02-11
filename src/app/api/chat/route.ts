@@ -122,22 +122,30 @@ export async function POST(req: NextRequest) {
 
     const assistantText = result.text || 'No pude generar una respuesta. Reintenta.'
 
-    // 5. Persist both messages
+    // 5. Persist both 
     const now = new Date().toISOString()
-    await supabase.from(DATABASE.TABLES.WS_IA_MESSAGES).insert([
-      {
-        conversation_id,
-        role: 'user',
-        content: message.trim(),
-        created_at: now,
-      },
-      {
-        conversation_id,
-        role: 'assistant',
-        content: assistantText,
-        created_at: new Date(Date.now() + 1).toISOString(), // +1ms to keep order
-      },
-    ])
+    const { error: insertErr } = await supabase
+      .from(DATABASE.TABLES.WS_IA_MESSAGES)
+      .insert([
+        {
+          conversation_id,
+          user_id,
+          role: 'user',
+          content: message.trim(),
+          created_at: now,
+        },
+        {
+          conversation_id,
+          user_id,
+          role: 'assistant',
+          content: assistantText,
+          created_at: new Date(Date.now() + 1).toISOString(), // +1ms to keep order
+        },
+      ])
+
+    if (insertErr) {
+      console.error('[/api/chat] Error guardando mensajes:', insertErr.message)
+    }
 
     // 6. Return response
     return NextResponse.json({ response: assistantText })
