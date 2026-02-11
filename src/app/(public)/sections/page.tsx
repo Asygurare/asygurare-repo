@@ -44,8 +44,8 @@ export default function Services() {
           <ServiceCard 
             icon={<Database className="text-white" size={28} />}
             title="Prospectos y Pipeline"
-            description="Gestiona tu lista de prospectos, etapas y estatus en un CRM pensado para seguros. Ordena, filtra y convierte sin fricción."
-            tag="CRM de seguros"
+            description="Gestiona tu lista de prospectos, etapas y estatus en una plataforma pensado para seguros. Ordena, filtra y convierte sin fricción."
+            tag="Plataforma de seguros"
           />
 
           {/* 2. Clientes */}

@@ -14,7 +14,7 @@ export default function UpdatePasswordPage() {
   const [error, setError] = useState<string | null>(null)
   const [done, setDone] = useState(false)
 
-  const redirectToLogin = useMemo(() => "/login?message=Contraseña actualizada. Inicia sesión.", [])
+  const redirectToLogin = useMemo(() => `${process.env.NEXT_PUBLIC_APP_URL}/login?code=password_updated`, [])
 
   useEffect(() => {
     let mounted = true
