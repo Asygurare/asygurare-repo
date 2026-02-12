@@ -84,6 +84,12 @@ export async function changeUserPassword(
     });
 
     if (updateError) {
+      if(updateError.code === 'same_password') {
+        return {
+          success: false,
+          error: 'La nueva contraseña no puede ser la misma que la actual'
+        };
+      }
       return {
         success: false,
         error: updateError.message
@@ -188,10 +194,10 @@ export function validatePassword(password: string): {
   isValid: boolean; 
   message?: string 
 } {
-  if (password.length < 6) {
+  if (password.length < 8) {
     return {
       isValid: false,
-      message: 'La contraseña debe tener al menos 6 caracteres'
+      message: 'La contraseña debe tener al menos 8 caracteres'
     };
   }
 

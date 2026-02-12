@@ -5,6 +5,8 @@ import { motion } from "framer-motion"
 import {
   Bell,
   CheckCircle2,
+  Eye,
+  EyeOff,
   KeyRound,
   Loader2,
   Save,
@@ -15,7 +17,8 @@ import {
 import { toast, Toaster } from "sonner"
 import { supabaseClient } from "@/src/lib/supabase/client"
 import { useRouter } from "next/navigation"
-import { deleteUserAccount } from "@/src/lib/utils/auth/auth-service"
+import { changeUserPassword, deleteUserAccount, validatePassword } from "@/src/lib/utils/auth/auth-service"
+import { SITE_CONFIG } from "@/src/config/site"
 
 type Preferences = {
   language: "es-MX" | "en-US"
@@ -72,14 +75,12 @@ function Toggle({
         aria-pressed={checked}
         disabled={disabled}
         onClick={() => !disabled && onChange(!checked)}
-        className={`shrink-0 w-14 h-8 rounded-full border transition-all relative ${
-          disabled ? "cursor-not-allowed" : ""
-        } ${checked ? "bg-(--accents) border-(--accents)" : "bg-black/5 border-black/10"}`}
+        className={`shrink-0 w-14 h-8 rounded-full border transition-all relative ${disabled ? "cursor-not-allowed" : ""
+          } ${checked ? "bg-(--accents) border-(--accents)" : "bg-black/5 border-black/10"}`}
       >
         <span
-          className={`absolute top-1 left-1 w-6 h-6 rounded-full bg-white shadow-sm transition-transform ${
-            checked ? "translate-x-6" : "translate-x-0"
-          }`}
+          className={`absolute top-1 left-1 w-6 h-6 rounded-full bg-white shadow-sm transition-transform ${checked ? "translate-x-6" : "translate-x-0"
+            }`}
         />
       </button>
     </div>
@@ -112,8 +113,12 @@ export default function SettingsPage() {
     },
   })
 
-  const [password, setPassword] = useState("")
-  const [password2, setPassword2] = useState("")
+  const [currentPassword, setCurrentPassword] = useState("")
+  const [newPassword, setPassword] = useState("")
+  const [confirmNewPassword, setPassword2] = useState("")
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false)
+  const [showNewPassword, setShowNewPassword] = useState(false)
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
 
   useEffect(() => {
     const load = async () => {
@@ -258,7 +263,7 @@ export default function SettingsPage() {
       toast.error("Hubo un error al guardar los cambios. Por favor verifica la información e intenta nuevamente")
       try {
         persistLocal(state)
-      } catch {}
+      } catch { }
     } finally {
       setSaving(false)
     }
@@ -266,22 +271,31 @@ export default function SettingsPage() {
 
   const handleChangePassword = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!password || password.length < 8) {
-      toast.error("La contraseña debe tener al menos 8 caracteres")
+    if (!currentPassword?.trim()) {
+      toast.error("Ingresa tu contraseña actual")
       return
     }
-    if (password !== password2) {
+    if (newPassword !== confirmNewPassword) {
       toast.error("Las contraseñas no coinciden")
+      return
+    }
+    const validation = validatePassword(newPassword)
+    if (!validation.isValid) {
+      toast.error(validation.message ?? "Contraseña no válida")
       return
     }
 
     setSavingPassword(true)
     try {
-      const { error } = await supabaseClient.auth.updateUser({ password })
-      if (error) throw error
-      setPassword("")
-      setPassword2("")
-      toast.success("Contraseña actualizada")
+      const result = await changeUserPassword(currentPassword, newPassword)
+      if (result.success) {
+        setCurrentPassword("")
+        setPassword("")
+        setPassword2("")
+        toast.success("Contraseña actualizada")
+      } else {
+        toast.error(result.error ?? "No se pudo actualizar la contraseña")
+      }
     } catch (e: any) {
       toast.error("No se pudo actualizar la contraseña: " + (e?.message || "Error desconocido"))
     } finally {
@@ -289,22 +303,23 @@ export default function SettingsPage() {
     }
   }
 
-    // Handle account deletion
-    const handleDeleteAccount = async () => {
-      try {
-        console.log('Starting account deletion process...');
-        const result = await deleteUserAccount();
-        
-        if (result.success) {
-          console.log('Account deletion completed successfully');
-          // Redirect to home page after successful deletion
-          router.push(`/login?code=account_deleted`);
-        } else {
-          console.error('Account deletion failed:', result.error);
-        }
-      } catch (error) {
-        console.error('Unexpected error during account deletion:', error);      }
-    };
+  // Handle account deletion
+  const handleDeleteAccount = async () => {
+    try {
+      console.log('Starting account deletion process...');
+      const result = await deleteUserAccount();
+
+      if (result.success) {
+        console.log('Account deletion completed successfully');
+        // Redirect to home page after successful deletion
+        router.push(`/login?code=account_deleted`);
+      } else {
+        console.error('Account deletion failed:', result.error);
+      }
+    } catch (error) {
+      console.error('Unexpected error during account deletion:', error);
+    }
+  };
 
   if (loading) {
     return (
@@ -565,31 +580,71 @@ export default function SettingsPage() {
 
           <form onSubmit={handleChangePassword} className="space-y-6">
             <div className="space-y-2">
+              <label className="text-sm font-black text-black/40 uppercase tracking-widest block">Contraseña actual</label>
+              <div className="relative">
+                <KeyRound className="absolute left-5 top-1/2 -translate-y-1/2 text-black/30" size={18} />
+                <input
+                  type={showCurrentPassword ? "text" : "password"}
+                  value={currentPassword}
+                  onChange={(e) => setCurrentPassword(e.target.value)}
+                  placeholder="••••••••"
+                  className="w-full bg-[#ece7e2]/50 text-black font-black py-4 pl-14 pr-12 rounded-2xl outline-none border-2 border-transparent focus:border-(--accents)/30 transition-all"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowCurrentPassword((s) => !s)}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-black/40 hover:text-black transition-colors cursor-pointer"
+                  aria-label={showCurrentPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
+                >
+                  {showCurrentPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
+              </div>
+            </div>
+
+            <div className="space-y-2">
               <label className="text-sm font-black text-black/40 uppercase tracking-widest block">Nueva contraseña</label>
               <div className="relative">
                 <KeyRound className="absolute left-5 top-1/2 -translate-y-1/2 text-black/30" size={18} />
                 <input
-                  type="password"
-                  value={password}
+                  type={showNewPassword ? "text" : "password"}
+                  value={newPassword}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
-                  className="w-full bg-[#ece7e2]/50 text-black font-black py-4 pl-14 pr-6 rounded-2xl outline-none border-2 border-transparent focus:border-(--accents)/30 transition-all"
+                  className="w-full bg-[#ece7e2]/50 text-black font-black py-4 pl-14 pr-12 rounded-2xl outline-none border-2 border-transparent focus:border-(--accents)/30 transition-all"
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowNewPassword((s) => !s)}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-black/40 hover:text-black transition-colors cursor-pointer"
+                  aria-label={showNewPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
+                >
+                  {showNewPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
               </div>
-              <p className="text-[11px] font-bold text-black/40 leading-relaxed">
-                Mínimo 8 caracteres. Recomendado: 12+ con mayúsculas y símbolos.
+              <p className="text-sm font-bold text-black/40 leading-relaxed">
+                {SITE_CONFIG.PASSWORD_RULES_TEXT}
               </p>
             </div>
 
             <div className="space-y-2">
               <label className="text-sm font-black text-black/40 uppercase tracking-widest block">Confirmar contraseña</label>
-              <input
-                type="password"
-                value={password2}
-                onChange={(e) => setPassword2(e.target.value)}
-                placeholder="••••••••"
-                className="w-full bg-[#ece7e2]/50 text-black font-black py-4 px-6 rounded-2xl outline-none border-2 border-transparent focus:border-(--accents)/30 transition-all"
-              />
+              <div className="relative">
+                <input
+                  type={showConfirmPassword ? "text" : "password"}
+                  value={confirmNewPassword}
+                  onChange={(e) => setPassword2(e.target.value)}
+                  placeholder="••••••••"
+                  className="w-full bg-[#ece7e2]/50 text-black font-black py-4 pl-6 pr-12 rounded-2xl outline-none border-2 border-transparent focus:border-(--accents)/30 transition-all"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmPassword((s) => !s)}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-black/40 hover:text-black transition-colors cursor-pointer"
+                  aria-label={showConfirmPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
+                >
+                  {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
+              </div>
             </div>
 
             <button

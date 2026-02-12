@@ -7,5 +7,6 @@ export const SITE_CONFIG = {
         FACEBOOK: '', 
         INSTAGRAM: '',
     },
-    IDIOMA: 'ES'
+    IDIOMA: 'ES',
+    PASSWORD_RULES_TEXT: "La contraseña debe tener al menos 8 caracteres, un número, una letra mayúscula y una letra minúscula"
 }
