@@ -11,6 +11,7 @@ export default function IASectorPage() {
   const [activeChatId, setActiveChatId] = useState<string | null>(null)
   const [user, setUser] = useState<any>(null)
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false)
+  const [isDesktopSidebarHidden, setIsDesktopSidebarHidden] = useState(false)
 
   useEffect(() => {
     const getUser = async () => {
@@ -50,6 +51,16 @@ export default function IASectorPage() {
               Historial
             </button>
 
+            <button
+              type="button"
+              onClick={() => setIsDesktopSidebarHidden((prev) => !prev)}
+              className="hidden lg:flex bg-white px-4 py-3 rounded-2xl border border-black/5 items-center gap-2 shadow-sm text-[10px] font-black uppercase tracking-widest text-black/70 hover:text-black transition-colors"
+              aria-label={isDesktopSidebarHidden ? 'Mostrar historial de conversaciones' : 'Ocultar historial de conversaciones'}
+            >
+              <PanelLeft size={16} className="text-(--accents)" />
+              {isDesktopSidebarHidden ? 'Mostrar historial' : 'Ocultar historial'}
+            </button>
+
             <div className="hidden md:flex gap-4">
             <div className="bg-white px-6 py-4 rounded-3xl border border-black/5 flex items-center gap-3">
                 <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
@@ -63,13 +74,15 @@ export default function IASectorPage() {
       <div className="flex flex-col lg:flex-row gap-6 lg:h-[calc(100dvh-250px)] lg:min-h-[600px] min-h-0">
 
         {/* Sidebar (Desktop) */}
-        <div className="hidden lg:block w-full lg:w-80 flex-shrink-0">
-          <SidebarConversaciones
-            userId={user.id}
-            activeChatId={activeChatId}
-            onSelectChat={(id) => setActiveChatId(id)}
-          />
-        </div>
+        {!isDesktopSidebarHidden && (
+          <div className="hidden lg:block w-full lg:w-80 flex-shrink-0">
+            <SidebarConversaciones
+              userId={user.id}
+              activeChatId={activeChatId}
+              onSelectChat={(id) => setActiveChatId(id)}
+            />
+          </div>
+        )}
 
         {/* Sidebar (Mobile Drawer) */}
         <div

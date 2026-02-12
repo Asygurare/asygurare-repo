@@ -6,7 +6,9 @@ import { useEffect, useState } from 'react'
 import {
   LayoutDashboard, Users, Target, Shield,
   CreditCard, Settings, BrainCircuit, CalendarDays, BarChart3,
-  Cpu, Flag, X
+  Cpu, Flag, X,
+  User2Icon,
+  CpuIcon
 } from 'lucide-react'
 import WorkspaceNavbar from '@/src/components/navbar/WorkspaceNavbar'
 import Image from 'next/image'
@@ -22,7 +24,10 @@ const menuItems = [
   { icon: CalendarDays, label: 'Calendario', href: '/calendario' },
   { icon: BrainCircuit, label: 'Guros IA', href: '/ia' },
   { icon: BarChart3, label: 'Análisis', href: '/analytics', comingSoon: false },
-  { icon: Cpu, label: 'Automatización', href: '/automatizaciones', comingSoon: true}
+  { icon: User2Icon, label: 'Soporte', href: '/soporte', comingSoon: false},
+  { icon: CpuIcon, label: 'Automatización', href: '/automatizaciones', comingSoon: true},
+
+
 ]
 
 export default function WorkspaceLayout({ children }: { children: React.ReactNode }) {
@@ -128,7 +133,7 @@ export default function WorkspaceLayout({ children }: { children: React.ReactNod
       {/* Sidebar (Mobile Drawer) */}
       <div
         className={[
-          'fixed inset-0 z-50 md:hidden',
+          'fixed inset-0 z-[70] md:hidden',
           isMobileSidebarOpen ? 'pointer-events-auto' : 'pointer-events-none'
         ].join(' ')}
         aria-hidden={!isMobileSidebarOpen}
@@ -163,7 +168,7 @@ export default function WorkspaceLayout({ children }: { children: React.ReactNod
       <main className="flex-1 flex flex-col overflow-hidden min-w-0">
 
         {/* Renderizado del Navbar en la parte superior del contenido */}
-        <div className="relative z-50 px-4 pt-4 pb-0 sm:px-6 sm:pt-6 lg:px-10 lg:pt-10">
+        <div className="relative z-40 px-4 pt-4 pb-0 sm:px-6 sm:pt-6 lg:px-10 lg:pt-10">
           <WorkspaceNavbar onMenuClick={() => setIsMobileSidebarOpen(true)} />
         </div>
 

@@ -1,6 +1,6 @@
 "use client"
 import React, { useEffect, useState } from 'react'
-import { Bell, Search, User, LogOut, ChevronDown, Menu } from 'lucide-react'
+import { User, LogOut, ChevronDown, Menu } from 'lucide-react'
 import { supabaseClient } from '@/src/lib/supabase/client'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useRouter } from 'next/navigation'
@@ -13,6 +13,16 @@ export default function WorkspaceNavbar({ onMenuClick }: WorkspaceNavbarProps) {
   const [user, setUser] = useState<any>(null)
   const [isProfileOpen, setIsProfileOpen] = useState(false)
   const router = useRouter()
+  const firstName = String(user?.user_metadata?.first_name || '').trim()
+  const lastName = String(user?.user_metadata?.last_name || '').trim()
+  const fullName = [firstName, lastName].filter(Boolean).join(' ')
+  const userName = fullName || String(user?.user_metadata?.name || '').trim() || 'Usuario'
+  const formattedDate = new Intl.DateTimeFormat('es-MX', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  }).format(new Date())
 
   useEffect(() => {
     const getUser = async () => {
@@ -29,7 +39,7 @@ export default function WorkspaceNavbar({ onMenuClick }: WorkspaceNavbarProps) {
 
   return (
     <header className="bg-white/70 backdrop-blur-xl border border-white rounded-[2.5rem] p-4 flex items-center justify-between shadow-sm mb-10">
-      {/* BUSCADOR */}
+      {/* SALUDO */}
       <div className="flex items-center gap-2">
         {onMenuClick && (
           <button
@@ -42,25 +52,18 @@ export default function WorkspaceNavbar({ onMenuClick }: WorkspaceNavbarProps) {
           </button>
         )}
 
-        <div className="relative w-96 hidden md:block ml-4">
-          <Search className="absolute left-5 top-1/2 -translate-y-1/2 text-black/20" size={18} />
-          <input 
-            type="text" 
-            placeholder="BUSCAR CLIENTE O PÓLIZA..."
-            className="w-full bg-transparent py-3 pl-14 pr-6 rounded-2xl text-[10px] font-black uppercase tracking-widest text-black outline-none placeholder:text-black/20"
-          />
+        <div className="ml-2 sm:ml-4">
+          <p className="text-xs sm:text-sm font-black text-black tracking-tight">
+            Hola, {userName}
+          </p>
+          <p className="text-[10px] sm:text-xs font-black text-black/40 uppercase tracking-widest">
+            {formattedDate}
+          </p>
         </div>
       </div>
 
       {/* ACCIONES */}
       <div className="flex items-center gap-4 pr-2">
-        <button className="relative p-4 text-black/30 hover:text-black transition-all group">
-          <Bell size={20} />
-          <span className="absolute top-4 right-4 w-2 h-2 bg-(--accents) rounded-full border-2 border-white"></span>
-        </button>
-
-        <div className="h-8 w-[1px] bg-black/5 mx-2" />
-
         <div className="relative">
           <button 
             onClick={() => setIsProfileOpen(!isProfileOpen)}

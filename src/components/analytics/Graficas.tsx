@@ -5,6 +5,7 @@ import {
   Bar,
   BarChart,
   Cell,
+  LabelList,
   Pie,
   PieChart,
   ResponsiveContainer,
@@ -15,6 +16,15 @@ import {
 import type { AnalyticsChart } from "@/src/services/analytics/types";
 
 const PIE_COLORS = ["#111827", "#6D28D9", "#0EA5E9", "#22C55E", "#F97316", "#EF4444", "#A3A3A3"];
+const BAR_BLUE_PALETTE = [
+  "var(--accennts, var(--accents))",
+  "#1D4ED8",
+  "#2563EB",
+  "#3B82F6",
+  "#60A5FA",
+  "#93C5FD",
+  "#0EA5E9",
+];
 
 function fmtNumber(value: unknown) {
   const n = typeof value === "number" ? value : Number(value);
@@ -116,11 +126,33 @@ export function Graficas({
                     height={60}
                   />
                   <YAxis tick={{ fontSize: 11, fontWeight: 800, fill: "rgba(0,0,0,0.35)" }} />
-                  <Bar dataKey="value" radius={[12, 12, 12, 12]} fill="var(--accents)" />
+                  <Bar dataKey="value" radius={[12, 12, 12, 12]}>
+                    {chart.data.map((_, i) => (
+                      <Cell key={i} fill={BAR_BLUE_PALETTE[i % BAR_BLUE_PALETTE.length]} />
+                    ))}
+                    <LabelList dataKey="value" position="insideTop" offset={12} fill="#FFFFFF" fontSize={11} fontWeight={800} formatter={(v: unknown) => fmtNumber(v)} />
+                  </Bar>
                 </BarChart>
               )}
             </ResponsiveContainer>
           </div>
+          {chart.kind === "pie" ? (
+            <div className="mt-6 rounded-2xl border border-black/5 bg-gray-50/60 p-4">
+              <p className="mb-3 text-[10px] font-black uppercase tracking-widest text-black/45">Indice</p>
+              <div className="flex flex-wrap gap-x-4 gap-y-2">
+                {chart.data.map((item, i) => (
+                  <div key={`${chart.id}-${item.name}-${i}`} className="inline-flex items-center gap-2 text-xs font-bold text-black/70">
+                    <span
+                      className="h-2.5 w-2.5 rounded-full"
+                      style={{ backgroundColor: PIE_COLORS[i % PIE_COLORS.length] }}
+                    />
+                    <span>{item.name}:</span>
+                    <span className="text-black">{fmtNumber(item.value)}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : null}
         </Card>
       ))}
     </div>

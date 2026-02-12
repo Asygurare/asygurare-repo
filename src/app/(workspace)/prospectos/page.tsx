@@ -17,6 +17,11 @@ export default function ProspectosFinalUltraPage() {
   const [fetching, setFetching] = useState(true)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [selectedLead, setSelectedLead] = useState<any>(null)
+  const [activeTab, setActiveTab] = useState<'activos' | 'descartados'>('activos')
+  const [discardModalLead, setDiscardModalLead] = useState<any>(null)
+  const [discardReason, setDiscardReason] = useState('')
+  const [discardStage, setDiscardStage] = useState('Primer contacto')
+  const [discardReasonFilter, setDiscardReasonFilter] = useState('__all__')
   const [monthlyGoal, setMonthlyGoal] = useState(0)
   const [searchTerm, setSearchTerm] = useState('')
   const [loading, setLoading] = useState(false)
@@ -44,6 +49,16 @@ export default function ProspectosFinalUltraPage() {
   const STAGES = ['Primer contacto', 'Cita agendada', 'Propuesta enviada', 'En negociación', 'Otro']
   const SOURCES = ['Referido', 'Redes Sociales', 'Llamada en Frío', 'Campaña Web', 'Cartera Antigua', 'Otro']
   const STATUSES = ['Nuevo', 'En seguimiento', 'Descartado', 'Ganado', 'Otro']
+  const PIPELINE_OPTIONS = ['Primer contacto', 'Cita agendada', 'Propuesta enviada', 'En negociación', 'Ganado', 'Descartado']
+  const PIPELINE_COLOR_MAP: Record<string, { border: string; bg: string; text: string; badge: string }> = {
+    'Nuevo': { border: '#cbd5e1', bg: '#f8fafc', text: '#334155', badge: '#e2e8f0' },
+    'Primer contacto': { border: '#86efac', bg: '#f0fdf4', text: '#166534', badge: '#dcfce7' },
+    'Cita agendada': { border: '#60a5fa', bg: '#eff6ff', text: '#1d4ed8', badge: '#dbeafe' },
+    'Propuesta enviada': { border: '#a78bfa', bg: '#f5f3ff', text: '#5b21b6', badge: '#ede9fe' },
+    'En negociación': { border: '#f59e0b', bg: '#fffbeb', text: '#92400e', badge: '#fef3c7' },
+    'Ganado': { border: '#14b8a6', bg: '#f0fdfa', text: '#0f766e', badge: '#ccfbf1' },
+    'Descartado': { border: '#ef4444', bg: '#fef2f2', text: '#991b1b', badge: '#fee2e2' },
+  }
   const MARITAL_STATUSES = Object.values(MaritalStatus)
   const GENDERS = Object.values(Gender)
   const INSURANCE_TYPES = Object.values(InsuranceType)
@@ -78,6 +93,36 @@ export default function ProspectosFinalUltraPage() {
     if (s === 'yes') return true
     if (s === 'no') return false
     return null
+  }, [])
+
+  const normalizeText = useCallback((value: unknown) => String(value || '').trim().toLowerCase(), [])
+
+  const isDiscardedLead = useCallback((lead: any) => normalizeText(lead?.status) === 'descartado', [normalizeText])
+
+  const resolveVisualStatus = useCallback((lead: any) => {
+    if (isDiscardedLead(lead)) return 'Descartado'
+
+    const stage = String(lead?.stage || '').trim()
+    if (PIPELINE_OPTIONS.includes(stage)) return stage
+
+    const normalizedStatus = normalizeText(lead?.status)
+    if (normalizedStatus === 'ganado') return 'Ganado'
+    if (normalizedStatus === 'nuevo') return 'Nuevo'
+    return 'Primer contacto'
+  }, [isDiscardedLead, normalizeText, PIPELINE_OPTIONS])
+
+  const getDiscardReason = useCallback((lead: any) => {
+    const extra = lead?.additional_fields && typeof lead.additional_fields === 'object'
+      ? lead.additional_fields
+      : {}
+    return String(extra?.discard_reason || '').trim()
+  }, [])
+
+  const getDiscardStage = useCallback((lead: any) => {
+    const extra = lead?.additional_fields && typeof lead.additional_fields === 'object'
+      ? lead.additional_fields
+      : {}
+    return String(extra?.discard_stage || lead?.stage || '').trim()
   }, [])
 
   useEffect(() => {
@@ -142,17 +187,117 @@ export default function ProspectosFinalUltraPage() {
 
   // --- ACCIONES REALES ---
 
-  const updateStage = async (id: string, newStage: string) => {
-    const { error } = await supabaseClient.from(DATABASE.TABLES.WS_LEADS).update({ 
-      stage: newStage, 
-      updated_at: new Date().toISOString() 
-    }).eq('id', id)
-
-    if (error) toast.error("Error al mover etapa")
-    else {
-      toast.info(`Estatus: ${newStage}`)
-      setLeads(leads.map(l => l.id === id ? { ...l, stage: newStage } : l))
+  const updateLeadVisualStatus = async (lead: any, newStatus: string) => {
+    if (newStatus === 'Descartado') {
+      setDiscardModalLead(lead)
+      setDiscardReason('')
+      setDiscardStage(STAGES.includes(lead?.stage) ? lead.stage : 'Primer contacto')
+      return
     }
+
+    const nextRawStatus = newStatus === 'Ganado' ? 'Ganado' : 'En seguimiento'
+    const { error } = await supabaseClient
+      .from(DATABASE.TABLES.WS_LEADS)
+      .update({
+        stage: newStatus,
+        status: nextRawStatus,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', lead.id)
+
+    if (error) {
+      toast.error("Error al mover etapa")
+      return
+    }
+
+    toast.success(`Estatus actualizado: ${newStatus}`)
+    setLeads((prev) =>
+      prev.map((l) =>
+        l.id === lead.id ? { ...l, stage: newStatus, status: nextRawStatus } : l
+      )
+    )
+  }
+
+  const confirmDiscardLead = async () => {
+    if (!discardModalLead?.id) return
+    if (!discardReason.trim()) {
+      toast.error('Comparte el motivo del descarte.')
+      return
+    }
+
+    const prevExtra =
+      discardModalLead?.additional_fields && typeof discardModalLead.additional_fields === 'object'
+        ? discardModalLead.additional_fields
+        : {}
+    const nextExtra = {
+      ...prevExtra,
+      discard_reason: discardReason.trim(),
+      discard_stage: discardStage,
+      discarded_at: new Date().toISOString(),
+    }
+
+    const { error } = await supabaseClient
+      .from(DATABASE.TABLES.WS_LEADS)
+      .update({
+        status: 'Descartado',
+        stage: discardStage,
+        additional_fields: nextExtra,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', discardModalLead.id)
+
+    if (error) {
+      toast.error('No se pudo descartar el prospecto.')
+      return
+    }
+
+    setLeads((prev) =>
+      prev.map((l) =>
+        l.id === discardModalLead.id
+          ? { ...l, status: 'Descartado', stage: discardStage, additional_fields: nextExtra }
+          : l
+      )
+    )
+    setDiscardModalLead(null)
+    setDiscardReason('')
+    setDiscardStage('Primer contacto')
+    toast.success('Prospecto movido a descartados.')
+  }
+
+  const reactivateLead = async (lead: any) => {
+    const prevExtra =
+      lead?.additional_fields && typeof lead.additional_fields === 'object'
+        ? lead.additional_fields
+        : {}
+    const nextExtra = {
+      ...prevExtra,
+      reactivated_at: new Date().toISOString(),
+    }
+
+    const fallbackStage = STAGES.includes(lead?.stage) ? lead.stage : 'Primer contacto'
+    const { error } = await supabaseClient
+      .from(DATABASE.TABLES.WS_LEADS)
+      .update({
+        status: 'En seguimiento',
+        stage: fallbackStage,
+        additional_fields: nextExtra,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', lead.id)
+
+    if (error) {
+      toast.error('No se pudo reactivar el prospecto.')
+      return
+    }
+
+    setLeads((prev) =>
+      prev.map((l) =>
+        l.id === lead.id
+          ? { ...l, status: 'En seguimiento', stage: fallbackStage, additional_fields: nextExtra }
+          : l
+      )
+    )
+    toast.success('Prospecto reactivado y movido a activos.')
   }
 
   const handleDelete = async (id: string) => {
@@ -369,7 +514,26 @@ export default function ProspectosFinalUltraPage() {
 
   const totalValue = useMemo(() => leads.reduce((acc, l) => acc + (Number(l.estimated_value) || 0), 0), [leads])
   const totalProspectos = useMemo(() => leads.length, [leads])
-  const leadsFiltrados = leads.filter(l => leadDisplayName(l).toLowerCase().includes(searchTerm.toLowerCase()))
+  const leadsFiltrados = useMemo(
+    () => leads.filter((l) => leadDisplayName(l).toLowerCase().includes(searchTerm.toLowerCase())),
+    [leads, searchTerm, leadDisplayName]
+  )
+  const activeLeads = useMemo(() => leadsFiltrados.filter((l) => !isDiscardedLead(l)), [leadsFiltrados, isDiscardedLead])
+  const discardedLeads = useMemo(() => leadsFiltrados.filter((l) => isDiscardedLead(l)), [leadsFiltrados, isDiscardedLead])
+  const discardReasonOptions = useMemo(() => {
+    const set = new Set<string>()
+    discardedLeads.forEach((lead) => {
+      const reason = getDiscardReason(lead)
+      if (reason) set.add(reason)
+    })
+    return Array.from(set).sort((a, b) => a.localeCompare(b))
+  }, [discardedLeads, getDiscardReason])
+  const discardedLeadsFilteredByReason = useMemo(() => {
+    if (discardReasonFilter === '__all__') return discardedLeads
+    if (discardReasonFilter === '__none__') return discardedLeads.filter((l) => !getDiscardReason(l))
+    return discardedLeads.filter((l) => getDiscardReason(l) === discardReasonFilter)
+  }, [discardedLeads, discardReasonFilter, getDiscardReason])
+  const visibleLeads = activeTab === 'activos' ? activeLeads : discardedLeadsFilteredByReason
 
   return (
     <div className="space-y-10 pb-20 p-6 max-w-[1400px] mx-auto bg- min-h-screen">
@@ -395,16 +559,19 @@ export default function ProspectosFinalUltraPage() {
         </div> */}
       </section>
 
-      {/* GUIA DE ETAPAS */}
+      {/* GUIA DE ESTATUS */}
       <div className="bg-white/70 backdrop-blur-sm p-6 rounded-[2rem] flex flex-wrap gap-8 items-center border border-black/5">
         <div className="flex items-center gap-2 border-r border-black/10 pr-6">
             <Info size={18} className="text-black" />
-            <span className="text-[12px] font-black text-black uppercase italic">Significado Bolitas:</span>
+            <span className="text-[12px] font-black text-black uppercase italic">Estatus del pipeline:</span>
         </div>
-        {STAGES.map((s, i) => (
+        {PIPELINE_OPTIONS.map((s) => (
             <div key={s} className="flex items-center gap-2">
-                <div className={`w-5 h-5 rounded-full border-2 ${i === 3 ? 'bg-(--accents) border-[#3a5f52]' : 'bg-white border-black/10'}`} />
-                <span className="text-[11px] font-black text-black uppercase tracking-tighter">{i + 1}. {s}</span>
+                <div
+                  className="w-5 h-5 rounded-full border-2"
+                  style={{ backgroundColor: PIPELINE_COLOR_MAP[s]?.badge, borderColor: PIPELINE_COLOR_MAP[s]?.border }}
+                />
+                <span className="text-[11px] font-black text-black uppercase tracking-tighter">{s}</span>
             </div>
         ))}
       </div>
@@ -424,30 +591,87 @@ export default function ProspectosFinalUltraPage() {
         </button>
       </div>
 
+      <div className="bg-white p-2 rounded-[1.5rem] inline-flex items-center gap-2 border border-black/5 shadow-sm">
+        <button
+          type="button"
+          onClick={() => setActiveTab('activos')}
+          className={`px-6 py-3 rounded-[1rem] text-[11px] font-black uppercase tracking-widest transition-all ${
+            activeTab === 'activos' ? 'bg-black text-white' : 'text-black/60 hover:bg-black/5'
+          }`}
+        >
+          Prospectos activos ({activeLeads.length})
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab('descartados')}
+          className={`px-6 py-3 rounded-[1rem] text-[11px] font-black uppercase tracking-widest transition-all ${
+            activeTab === 'descartados' ? 'bg-red-600 text-white' : 'text-black/60 hover:bg-black/5'
+          }`}
+        >
+          Prospectos descartados ({discardedLeads.length})
+        </button>
+      </div>
+
+      {activeTab === 'descartados' && (
+        <div className="bg-white p-4 rounded-[1.5rem] border border-red-100 shadow-sm flex flex-col md:flex-row md:items-center gap-3">
+          <label className="text-[11px] font-black uppercase tracking-widest text-red-700">Filtrar por motivo</label>
+          <select
+            value={discardReasonFilter}
+            onChange={(e) => setDiscardReasonFilter(e.target.value)}
+            className="bg-[#fff7f7] border border-red-100 rounded-xl px-4 py-3 text-[11px] font-black uppercase tracking-widest text-black outline-none min-w-[260px]"
+          >
+            <option value="__all__">Todos los motivos</option>
+            <option value="__none__">Sin motivo registrado</option>
+            {discardReasonOptions.map((reason) => (
+              <option key={reason} value={reason}>{reason}</option>
+            ))}
+          </select>
+        </div>
+      )}
+
       {/* LISTA */}
       <div className="grid grid-cols-1 gap-5">
         {fetching ? <div className="py-20 flex justify-center"><Loader2 className="animate-spin text-(--accents)" size={40}/></div> : 
-        leadsFiltrados.map((lead) => (
-          <div key={lead.id} className="bg-white p-8 rounded-[3rem] border-2 border-transparent hover:border-(--accents)/30 flex flex-wrap items-center gap-8 group transition-all shadow-md">
+        visibleLeads.map((lead) => {
+          const visualStatus = resolveVisualStatus(lead)
+          const tone = PIPELINE_COLOR_MAP[visualStatus] || PIPELINE_COLOR_MAP['Nuevo']
+          return (
+          <div key={lead.id} className="bg-white p-8 rounded-[3rem] border-2 flex flex-wrap items-center gap-8 group transition-all shadow-md" style={{ borderColor: tone.border, backgroundColor: tone.bg }}>
             <div className="flex-1 min-w-[300px] cursor-pointer" onClick={() => {setSelectedLead(lead); setIsModalOpen(true)}}>
-              <h4 className="font-black text-black text-2xl uppercase italic group-hover:text-(--accents) transition-colors tracking-tighter">{leadDisplayName(lead)}</h4>
+              <h4 className="font-black text-black text-2xl uppercase italic transition-colors tracking-tighter" style={{ color: tone.text }}>{leadDisplayName(lead)}</h4>
               <div className="flex flex-wrap gap-4 mt-2">
                 <span className="flex items-center gap-1 text-[11px] font-black text-black/40 uppercase italic tracking-wider"><Share2 size={12}/> {lead.source || 'Sin Fuente'}</span>
                 <span className="flex items-center gap-1 text-[11px] font-black text-black/40 uppercase italic tracking-wider"><Mail size={12}/> {lead.email || 'Sin Email'}</span>
                 <span className="flex items-center gap-1 text-[11px] font-black text-(--accents) uppercase italic tracking-wider"><Phone size={12}/> {lead.phone || 'Sin Tel.'}</span>
+                <span className="px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest" style={{ backgroundColor: tone.badge, color: tone.text }}>
+                  {visualStatus}
+                </span>
               </div>
+              {activeTab === 'descartados' && (
+                <div className="mt-4 bg-[#fff7f7] border border-red-100 rounded-2xl p-4 space-y-1">
+                  <p className="text-[10px] font-black uppercase tracking-widest text-red-700">
+                    Motivo: {getDiscardReason(lead) || 'Sin motivo registrado'}
+                  </p>
+                  <p className="text-[10px] font-black uppercase tracking-widest text-red-700/80">
+                    Etapa: {getDiscardStage(lead) || 'Sin etapa'}
+                  </p>
+                </div>
+              )}
             </div>
 
-            <div className="bg-[#ece7e2] p-5 rounded-[2rem] border border-black/5 min-w-[260px]">
-              <div className="flex gap-4 items-center">
-                {STAGES.map((s) => (
-                  <button
-                    key={s} onClick={() => updateStage(lead.id, s)}
-                    className={`w-7 h-7 rounded-full transition-all border-2 ${lead.stage === s ? 'bg-(--accents) border-(--accents) shadow-lg scale-125' : 'bg-white border-black/10'}`}
-                  />
-                ))}
+            <div className="bg-white p-5 rounded-[2rem] border border-black/10 min-w-[280px]">
+              <p className="text-[10px] font-black text-black/50 uppercase tracking-widest mb-2">Estatus</p>
+              <div>
+                <select
+                  value={visualStatus}
+                  onChange={(e) => updateLeadVisualStatus(lead, e.target.value)}
+                  className="w-full bg-[#ece7e2] p-4 rounded-2xl font-black text-black text-sm uppercase tracking-wide outline-none appearance-none cursor-pointer border-2 border-transparent focus:border-(--accents)"
+                >
+                  {PIPELINE_OPTIONS.map((option) => (
+                    <option key={option} value={option}>{option}</option>
+                  ))}
+                </select>
               </div>
-              <p className="text-[11px] font-black text-black uppercase mt-3 tracking-widest">{lead.stage}</p>
             </div>
 
             <div className="flex items-center gap-8">
@@ -455,10 +679,24 @@ export default function ProspectosFinalUltraPage() {
                 <p className="text-[10px] font-black text-black/40 uppercase italic">Monto Estimado</p>
                 <p className="font-black text-black text-3xl tracking-tighter">${Number(lead.estimated_value).toLocaleString()}</p>
               </div>
+              {activeTab === 'descartados' && (
+                <button
+                  type="button"
+                  onClick={() => reactivateLead(lead)}
+                  className="px-5 py-3 rounded-2xl bg-emerald-600 text-white font-black text-[10px] uppercase tracking-widest hover:bg-emerald-700 transition-all"
+                >
+                  Reactivar
+                </button>
+              )}
               <button onClick={() => handleDelete(lead.id)} className="p-4 text-black/20 hover:text-red-500 hover:bg-red-50 rounded-2xl transition-all"><Trash2 size={24}/></button>
             </div>
           </div>
-        ))}
+        )})}
+        {!fetching && visibleLeads.length === 0 && (
+          <div className="bg-white border border-black/5 rounded-[2rem] p-8 text-center text-black/60 font-black uppercase tracking-widest">
+            No hay prospectos en esta pestaña.
+          </div>
+        )}
       </div>
 
       {/* MODAL (antes panel lateral) */}
@@ -996,6 +1234,85 @@ export default function ProspectosFinalUltraPage() {
                   {loading ? <Loader2 className="animate-spin mx-auto"/> : selectedLead ? "ACTUALIZAR PIPELINE" : "REGISTRAR EN PIPELINE"}
                 </button>
                 </form>
+              </motion.div>
+            </div>
+          </>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {discardModalLead && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setDiscardModalLead(null)}
+              className="fixed inset-0 bg-black/60 backdrop-blur-md z-[80]"
+            />
+            <div className="fixed inset-0 z-[90] flex items-center justify-center p-4">
+              <motion.div
+                role="dialog"
+                aria-modal="true"
+                initial={{ opacity: 0, scale: 0.97, y: 10 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.98, y: 10 }}
+                transition={{ type: 'spring', damping: 25 }}
+                className="w-full max-w-2xl bg-white shadow-2xl rounded-[2rem] overflow-hidden border border-white/20"
+              >
+                <div className="p-6 bg-[#fef2f2] border-b border-red-100 flex items-center justify-between">
+                  <div>
+                    <h3 className="text-2xl font-black italic text-red-700 uppercase tracking-tighter">Descartar prospecto</h3>
+                    <p className="text-[11px] font-bold text-red-700/70 uppercase tracking-widest mt-1">
+                      {leadDisplayName(discardModalLead)}
+                    </p>
+                  </div>
+                  <button onClick={() => setDiscardModalLead(null)} className="p-2 hover:bg-red-100 rounded-full text-red-700 transition-all">
+                    <X size={24} />
+                  </button>
+                </div>
+
+                <div className="p-6 space-y-5">
+                  <div className="space-y-2">
+                    <label className="text-[11px] font-black uppercase text-black italic">¿Cuál fue el motivo por el cual no continuó?</label>
+                    <textarea
+                      value={discardReason}
+                      onChange={(e) => setDiscardReason(e.target.value)}
+                      rows={4}
+                      placeholder="Ej. Presupuesto insuficiente, no respondió, eligió otra aseguradora..."
+                      className="w-full bg-[#fff7f7] p-4 rounded-2xl font-black text-black text-sm outline-none border border-red-100 resize-none"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[11px] font-black uppercase text-black italic">¿En qué etapa se quedó?</label>
+                    <select
+                      value={discardStage}
+                      onChange={(e) => setDiscardStage(e.target.value)}
+                      className="w-full bg-[#fff7f7] p-4 rounded-2xl font-black text-black text-sm outline-none border border-red-100 appearance-none cursor-pointer"
+                    >
+                      {STAGES.filter((stage) => stage !== 'Otro').map((stage) => (
+                        <option key={stage} value={stage}>{stage}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="flex justify-end gap-3 pt-2">
+                    <button
+                      type="button"
+                      onClick={() => setDiscardModalLead(null)}
+                      className="px-5 py-3 rounded-2xl border border-black/10 text-black/70 font-black text-xs uppercase tracking-widest hover:bg-black/5 transition-all"
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      type="button"
+                      onClick={confirmDiscardLead}
+                      className="px-6 py-3 rounded-2xl bg-red-600 text-white font-black text-xs uppercase tracking-widest hover:bg-red-700 transition-all"
+                    >
+                      Confirmar descarte
+                    </button>
+                  </div>
+                </div>
               </motion.div>
             </div>
           </>
