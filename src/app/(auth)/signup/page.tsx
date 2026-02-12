@@ -5,6 +5,8 @@ import { motion } from 'framer-motion'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { supabaseClient } from '@/src/lib/supabase/client'
+import { validatePassword } from '@/src/lib/utils/auth/auth-service'
+import { SITE_CONFIG } from '@/src/config/site'
 import { ArrowRight, Mail, Lock, Building2, Loader2 } from 'lucide-react'
 import Image from 'next/image'
 
@@ -23,11 +25,17 @@ export default function SignUpPage() {
       return
     }
 
-    setLoading(true)
-
     const formData = new FormData(e.currentTarget)
     const email = formData.get('email') as string
     const password = formData.get('password') as string
+
+    const validation = validatePassword(password ?? "")
+    if (!validation.isValid) {
+      setError(validation.message ?? "Contraseña no válida")
+      return
+    }
+
+    setLoading(true)
     const firstName = formData.get('firstName') as string
     const lastName = formData.get('lastName') as string
     const agencyName = formData.get('agencyName') as string
@@ -126,6 +134,7 @@ export default function SignUpPage() {
                 <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
                 <input name="password" required type="password" placeholder="••••••••" className="text-black  w-full bg-white border border-black/5 rounded-2xl py-3 pl-11 pr-4 outline-none focus:ring-2 focus:ring-[#4A7766]/20 transition-all text-sm" />
               </div>
+              <p className="text-[11px] font-bold text-black/40 leading-relaxed mt-1">{SITE_CONFIG.PASSWORD_RULES_TEXT}</p>
             </div>
 
             <label className="flex items-start gap-3 pt-2 select-none">

@@ -8,6 +8,8 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { supabaseClient } from '@/src/lib/supabase/client'
 import { ArrowRight, Mail, Lock, Eye, EyeOff, Loader2, Info, MailCheck, X } from 'lucide-react'
 import { toast, Toaster } from 'sonner'
+import { validatePassword } from '@/src/lib/utils/auth/auth-service'
+import { SITE_CONFIG } from '@/src/config/site'
 
 function LoginFallback() {
   return (
@@ -70,6 +72,12 @@ function LoginContent() {
       const formData = new FormData(e.currentTarget);
       const email = formData.get('email') as string;
       const password = formData.get('password') as string;
+
+      if (!validatePassword(password).isValid) {
+        setError(validatePassword(password).message ?? SITE_CONFIG.PASSWORD_RULES_TEXT)
+        setLoading(false)
+        return
+      }
 
       // 1. Una sola llamada a Supabase
       const { data, error: authError } = await supabaseClient.auth.signInWithPassword({

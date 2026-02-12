@@ -5,6 +5,8 @@ import { motion } from "framer-motion"
 import Link from "next/link"
 import Image from "next/image"
 import { supabaseClient } from "@/src/lib/supabase/client"
+import { validatePassword } from "@/src/lib/utils/auth/auth-service"
+import { SITE_CONFIG } from "@/src/config/site"
 import { ArrowRight, Lock, Loader2, CheckCircle2, AlertTriangle } from "lucide-react"
 
 export default function UpdatePasswordPage() {
@@ -51,24 +53,32 @@ export default function UpdatePasswordPage() {
     try {
       const formData = new FormData(e.currentTarget)
       const password = String(formData.get("password") ?? "")
-      const confirm = String(formData.get("confirm") ?? "")
-
-      if (password.length < 8) {
-        setError("Tu contraseña debe tener al menos 8 caracteres.")
-        setLoading(false)
-        return
-      }
-      if (password !== confirm) {
+      const confirmPassword = String(formData.get("confirmPassword") ?? "")
+      
+      if (password !== confirmPassword) {
         setError("Las contraseñas no coinciden.")
         setLoading(false)
         return
       }
-
-      const { error: updateError } = await supabaseClient.auth.updateUser({ password })
-      if (updateError) {
-        setError(updateError.message)
+      const validation = validatePassword(password)
+      if (!validation.isValid) {
+        setError(validation.message ?? "Contraseña no válida")
         setLoading(false)
         return
+      }
+      // Update password. Aquí no se usa el auth-service porque es una página de reset de contraseña.
+      const { error: updateError } = await supabaseClient.auth.updateUser({ password })
+      if (updateError) {
+        if(updateError.code === 'same_password') {
+          setError('La nueva contraseña no puede ser la misma que la actual')
+          setLoading(false)
+          return
+        }
+        else {
+          setError(updateError.message)
+          setLoading(false)
+          return
+        }
       }
 
       // Buen practice: cerrar la sesión temporal del reset.
@@ -168,7 +178,7 @@ export default function UpdatePasswordPage() {
                     className="w-full bg-white text-black border border-black/5 rounded-2xl py-4 pl-12 pr-4 outline-none focus:ring-2 focus:ring-[#4A7766]/20 focus:border-[#4A7766] transition-all"
                   />
                 </div>
-                <p className="text-xs text-gray-500 ml-1">Mínimo 8 caracteres.</p>
+                <p className="text-xs text-gray-500 ml-1">{SITE_CONFIG.PASSWORD_RULES_TEXT}</p>
               </div>
 
               <div className="space-y-2">
@@ -177,7 +187,7 @@ export default function UpdatePasswordPage() {
                   <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
                   <input
                     required
-                    name="confirm"
+                    name="confirmPassword"
                     type="password"
                     placeholder="••••••••"
                     className="w-full bg-white text-black border border-black/5 rounded-2xl py-4 pl-12 pr-4 outline-none focus:ring-2 focus:ring-[#4A7766]/20 focus:border-[#4A7766] transition-all"
