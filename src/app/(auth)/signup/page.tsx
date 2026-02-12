@@ -5,6 +5,8 @@ import { motion } from 'framer-motion'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { supabaseClient } from '@/src/lib/supabase/client'
+import { validatePassword } from '@/src/lib/utils/auth/auth-service'
+import { SITE_CONFIG } from '@/src/config/site'
 import { ArrowRight, Mail, Lock, Building2, Loader2 } from 'lucide-react'
 import Image from 'next/image'
 
@@ -23,14 +25,22 @@ export default function SignUpPage() {
       return
     }
 
-    setLoading(true)
-
     const formData = new FormData(e.currentTarget)
     const email = formData.get('email') as string
     const password = formData.get('password') as string
+
+    const validation = validatePassword(password ?? "")
+    if (!validation.isValid) {
+      setError(validation.message ?? "Contraseña no válida")
+      return
+    }
+
+    setLoading(true)
     const firstName = formData.get('firstName') as string
     const lastName = formData.get('lastName') as string
     const agencyName = formData.get('agencyName') as string
+    const city = formData.get('city') as string
+    const country = formData.get('country') as string
 
     const { error: signUpError } = await supabaseClient.auth.signUp({
       email,
@@ -43,6 +53,8 @@ export default function SignUpPage() {
           first_name: firstName,
           last_name: lastName,
           agency_name: agencyName,
+          city:city,
+          country:country,
           email: email,         
         }
       }
@@ -97,6 +109,17 @@ export default function SignUpPage() {
               </div>
             </div>
 
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold text-gray-500 uppercase ml-1">Ciudad</label>
+                <input name="city" required type="text" placeholder="Ciudad de México" className="w-full text-black bg-white border border-black/5 rounded-2xl py-3 px-4 outline-none focus:ring-2 focus:ring-[#4A7766]/20 transition-all text-sm" />
+              </div>
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold text-gray-500 uppercase ml-1">País</label>
+                <input name="country" required type="text" placeholder="México" className="w-full text-black bg-white border border-black/5 rounded-2xl py-3 px-4 outline-none focus:ring-2 focus:ring-[#4A7766]/20 transition-all text-sm" />
+              </div>
+            </div>
+
             <div className="space-y-1">
               <label className="text-[10px] font-bold text-gray-500 uppercase ml-1">Email</label>
               <div className="relative">
@@ -111,12 +134,14 @@ export default function SignUpPage() {
                 <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
                 <input name="password" required type="password" placeholder="••••••••" className="text-black  w-full bg-white border border-black/5 rounded-2xl py-3 pl-11 pr-4 outline-none focus:ring-2 focus:ring-[#4A7766]/20 transition-all text-sm" />
               </div>
+              <p className="text-[11px] font-bold text-black/40 leading-relaxed mt-1">{SITE_CONFIG.PASSWORD_RULES_TEXT}</p>
             </div>
 
             <label className="flex items-start gap-3 pt-2 select-none">
               <input
                 name="acceptTerms"
                 type="checkbox"
+                required
                 checked={acceptedTerms}
                 onChange={(e) => setAcceptedTerms(e.target.checked)}
                 className="mt-1 h-4 w-4 rounded border-black/20 accent-[#4A7766]"

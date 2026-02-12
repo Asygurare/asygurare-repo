@@ -5,6 +5,8 @@ import { motion } from "framer-motion"
 import {
   Bell,
   CheckCircle2,
+  Eye,
+  EyeOff,
   KeyRound,
   Loader2,
   Save,
@@ -14,6 +16,9 @@ import {
 } from "lucide-react"
 import { toast, Toaster } from "sonner"
 import { supabaseClient } from "@/src/lib/supabase/client"
+import { useRouter } from "next/navigation"
+import { changeUserPassword, deleteUserAccount, validatePassword } from "@/src/lib/utils/auth/auth-service"
+import { SITE_CONFIG } from "@/src/config/site"
 
 type Preferences = {
   language: "es-MX" | "en-US"
@@ -32,6 +37,8 @@ type SettingsState = {
   firstName: string
   lastName: string
   agencyName: string
+  city: string
+  country: string
   preferences: Preferences
   notifications: Notifications
 }
@@ -47,32 +54,33 @@ function Toggle({
   onChange,
   label,
   description,
+  disabled = false,
 }: {
   checked: boolean
   onChange: (next: boolean) => void
   label: string
   description?: string
+  disabled?: boolean
 }) {
   return (
-    <div className="flex items-start justify-between gap-6 py-4">
+    <div className={`flex items-start justify-between gap-6 py-4 ${disabled ? "opacity-60" : ""}`}>
       <div className="min-w-0">
-        <p className="text-[11px] font-black text-black uppercase tracking-widest">{label}</p>
+        <p className="text-sm font-black text-black uppercase tracking-widest">{label}</p>
         {description ? (
-          <p className="text-[11px] font-bold text-black/40 leading-relaxed mt-1">{description}</p>
+          <p className="text-sm font-bold text-black/40 leading-relaxed mt-1">{description}</p>
         ) : null}
       </div>
       <button
         type="button"
         aria-pressed={checked}
-        onClick={() => onChange(!checked)}
-        className={`shrink-0 w-14 h-8 rounded-full border transition-all relative ${
-          checked ? "bg-(--accents) border-(--accents)" : "bg-black/5 border-black/10"
-        }`}
+        disabled={disabled}
+        onClick={() => !disabled && onChange(!checked)}
+        className={`shrink-0 w-14 h-8 rounded-full border transition-all relative ${disabled ? "cursor-not-allowed" : ""
+          } ${checked ? "bg-(--accents) border-(--accents)" : "bg-black/5 border-black/10"}`}
       >
         <span
-          className={`absolute top-1 left-1 w-6 h-6 rounded-full bg-white shadow-sm transition-transform ${
-            checked ? "translate-x-6" : "translate-x-0"
-          }`}
+          className={`absolute top-1 left-1 w-6 h-6 rounded-full bg-white shadow-sm transition-transform ${checked ? "translate-x-6" : "translate-x-0"
+            }`}
         />
       </button>
     </div>
@@ -80,6 +88,7 @@ function Toggle({
 }
 
 export default function SettingsPage() {
+  const router = useRouter()
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [savingPassword, setSavingPassword] = useState(false)
@@ -89,6 +98,8 @@ export default function SettingsPage() {
     firstName: "",
     lastName: "",
     agencyName: "",
+    city: "",
+    country: "",
     preferences: {
       language: "es-MX",
       timezone: "America/Mexico_City",
@@ -102,17 +113,21 @@ export default function SettingsPage() {
     },
   })
 
-  const [password, setPassword] = useState("")
-  const [password2, setPassword2] = useState("")
+  const [currentPassword, setCurrentPassword] = useState("")
+  const [newPassword, setPassword] = useState("")
+  const [confirmNewPassword, setPassword2] = useState("")
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false)
+  const [showNewPassword, setShowNewPassword] = useState(false)
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
 
   useEffect(() => {
     const load = async () => {
       setLoading(true)
       try {
         const tz = Intl.DateTimeFormat().resolvedOptions().timeZone
-        const { data, error } = await supabaseClient.auth.getUser()
-        if (error) throw error
-        const user = data.user
+        const { data: authData, error: authError } = await supabaseClient.auth.getUser()
+        if (authError) throw authError
+        const user = authData.user
         if (!user) {
           setLoading(false)
           return
@@ -128,11 +143,33 @@ export default function SettingsPage() {
         const lsRaw = typeof window !== "undefined" ? window.localStorage.getItem(LS_KEY) : null
         const ls = lsRaw ? (JSON.parse(lsRaw) as Partial<SettingsState>) : null
 
+        let firstName = (meta.first_name ?? ls?.firstName ?? "") as string
+        let lastName = (meta.last_name ?? ls?.lastName ?? "") as string
+        let agencyName = (meta.agency_name ?? ls?.agencyName ?? "") as string
+        let city = (meta.city ?? ls?.city ?? "") as string
+        let country = (meta.country ?? ls?.country ?? "") as string
+
+        const { data: profile, error: profileError } = await supabaseClient
+          .from("PROFILES")
+          .select("first_name, last_name, agency_name, city, country")
+          .eq("id", user.id)
+          .maybeSingle()
+
+        if (!profileError && profile) {
+          firstName = profile.first_name ?? firstName
+          lastName = profile.last_name ?? lastName
+          agencyName = profile.agency_name ?? agencyName
+          city = (profile.city ?? "") || city
+          country = (profile.country ?? "") || country
+        }
+
         setState((prev) => ({
           ...prev,
-          firstName: (meta.first_name ?? ls?.firstName ?? prev.firstName) as string,
-          lastName: (meta.last_name ?? ls?.lastName ?? prev.lastName) as string,
-          agencyName: (meta.agency_name ?? ls?.agencyName ?? prev.agencyName) as string,
+          firstName,
+          lastName,
+          agencyName,
+          city,
+          country,
           preferences: {
             language:
               (metaPrefs.language ?? ls?.preferences?.language ?? prev.preferences.language) === "en-US"
@@ -179,13 +216,13 @@ export default function SettingsPage() {
   const handleSaveAll = async () => {
     setSaving(true)
     try {
-      const { data, error } = await supabaseClient.auth.getUser()
-      if (error) throw error
-      if (!data.user) throw new Error("Sesión expirada")
+      const { data: authData, error: authError } = await supabaseClient.auth.getUser()
+      if (authError) throw authError
+      if (!authData.user) throw new Error("Sesión expirada")
+      const userId = authData.user.id
 
-      const existing = (data.user.user_metadata || {}) as Record<string, any>
+      const existing = (authData.user.user_metadata || {}) as Record<string, any>
       const existingSettings = isPlainObject(existing.settings) ? existing.settings : {}
-
       const nextSettings = {
         ...existingSettings,
         preferences: { ...(isPlainObject(existingSettings.preferences) ? existingSettings.preferences : {}), ...state.preferences },
@@ -194,26 +231,39 @@ export default function SettingsPage() {
           ...state.notifications,
         },
       }
-
       const nextMeta = {
         ...existing,
         first_name: state.firstName,
         last_name: state.lastName,
         agency_name: state.agencyName,
+        city: state.city.trim() || undefined,
+        country: state.country.trim() || undefined,
         settings: nextSettings,
       }
 
-      const { error: updateError } = await supabaseClient.auth.updateUser({ data: nextMeta })
-      if (updateError) throw updateError
+      const { error: updateMetaError } = await supabaseClient.auth.updateUser({ data: nextMeta })
+      if (updateMetaError) throw updateMetaError
+
+      const { error: profileError } = await supabaseClient
+        .from("PROFILES")
+        .update({
+          first_name: state.firstName,
+          last_name: state.lastName,
+          agency_name: state.agencyName,
+          city: state.city.trim() || null,
+          country: state.country.trim() || null,
+        })
+        .eq("id", userId)
+
+      if (profileError) throw profileError
 
       persistLocal(state)
-      toast.success("Ajustes guardados correctamente")
+      toast.success("Cambios guardados correctamente")
     } catch (e: any) {
-      toast.error("No se pudieron guardar los ajustes: " + (e?.message || "Error desconocido"))
-      // aun así dejamos respaldo local para no perder cambios del usuario
+      toast.error("Hubo un error al guardar los cambios. Por favor verifica la información e intenta nuevamente")
       try {
         persistLocal(state)
-      } catch {}
+      } catch { }
     } finally {
       setSaving(false)
     }
@@ -221,28 +271,55 @@ export default function SettingsPage() {
 
   const handleChangePassword = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!password || password.length < 8) {
-      toast.error("La contraseña debe tener al menos 8 caracteres")
+    if (!currentPassword?.trim()) {
+      toast.error("Ingresa tu contraseña actual")
       return
     }
-    if (password !== password2) {
+    if (newPassword !== confirmNewPassword) {
       toast.error("Las contraseñas no coinciden")
+      return
+    }
+    const validation = validatePassword(newPassword)
+    if (!validation.isValid) {
+      toast.error(validation.message ?? "Contraseña no válida")
       return
     }
 
     setSavingPassword(true)
     try {
-      const { error } = await supabaseClient.auth.updateUser({ password })
-      if (error) throw error
-      setPassword("")
-      setPassword2("")
-      toast.success("Contraseña actualizada")
+      const result = await changeUserPassword(currentPassword, newPassword)
+      if (result.success) {
+        setCurrentPassword("")
+        setPassword("")
+        setPassword2("")
+        toast.success("Contraseña actualizada")
+      } else {
+        toast.error(result.error ?? "No se pudo actualizar la contraseña")
+      }
     } catch (e: any) {
       toast.error("No se pudo actualizar la contraseña: " + (e?.message || "Error desconocido"))
     } finally {
       setSavingPassword(false)
     }
   }
+
+  // Handle account deletion
+  const handleDeleteAccount = async () => {
+    try {
+      console.log('Starting account deletion process...');
+      const result = await deleteUserAccount();
+
+      if (result.success) {
+        console.log('Account deletion completed successfully');
+        // Redirect to home page after successful deletion
+        router.push(`/login?code=account_deleted`);
+      } else {
+        console.error('Account deletion failed:', result.error);
+      }
+    } catch (error) {
+      console.error('Unexpected error during account deletion:', error);
+    }
+  };
 
   if (loading) {
     return (
@@ -265,7 +342,7 @@ export default function SettingsPage() {
             </div>
             <h2 className="text-4xl font-black text-black tracking-tighter italic uppercase">Configuración.</h2>
           </div>
-          <p className="text-black/50 font-bold text-[10px] uppercase tracking-[0.4em] ml-1">
+          <p className="text-black/50 font-bold text-lg uppercase tracking-[0.4em] ml-1">
             Preferencias del workspace y perfil del agente
           </p>
         </div>
@@ -273,7 +350,7 @@ export default function SettingsPage() {
         <button
           onClick={handleSaveAll}
           disabled={saving}
-          className="bg-black text-white px-10 py-5 rounded-[2rem] font-black text-sm flex items-center gap-3 hover:bg-(--accents) transition-all shadow-2xl active:scale-95 disabled:opacity-60"
+          className="bg-black text-white px-10 py-5 rounded-[2rem] font-black text-sm flex items-center gap-3 hover:bg-(--accents) transition-all shadow-2xl active:scale-95 disabled:opacity-60 cursor-pointer"
         >
           {saving ? <Loader2 className="animate-spin" size={18} /> : <Save size={18} />}
           {saving ? "GUARDANDO" : "GUARDAR CAMBIOS"}
@@ -290,11 +367,11 @@ export default function SettingsPage() {
           {email?.charAt(0).toUpperCase() || <UserIcon size={18} />}
         </div>
         <div className="flex-1 min-w-0">
-          <p className="text-[10px] font-black text-black/30 uppercase tracking-[0.3em]">Agente activo</p>
+          <p className="text-sm font-black text-black/30 uppercase tracking-[0.3em]">Agente activo</p>
           <p className="text-xl font-black text-black uppercase tracking-tighter truncate">
             {state.firstName || state.lastName ? `${state.firstName} ${state.lastName}`.trim() : agentLabel}
           </p>
-          <p className="text-[11px] font-bold text-black/40 truncate mt-1">{email || "—"}</p>
+          <p className="text-base font-bold text-black/40 truncate mt-1">{email || "—"}</p>
         </div>
         <div className="bg-black/5 rounded-3xl px-6 py-4 border border-black/5">
           <p className="text-[10px] font-black uppercase tracking-widest text-black/30">Agencia</p>
@@ -312,7 +389,7 @@ export default function SettingsPage() {
                 <UserIcon size={20} />
               </div>
               <div>
-                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Perfil</p>
+                <p className="text-base font-black text-gray-400 uppercase tracking-widest">Perfil</p>
                 <p className="text-xl font-black text-black italic">Datos del agente</p>
               </div>
             </div>
@@ -324,7 +401,7 @@ export default function SettingsPage() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-2">
-              <label className="text-[10px] font-black text-black/40 uppercase tracking-widest block">Nombre</label>
+              <label className="text-sm font-black text-black/40 uppercase tracking-widest block">Nombre</label>
               <input
                 value={state.firstName}
                 onChange={(e) => setState((s) => ({ ...s, firstName: e.target.value }))}
@@ -333,7 +410,7 @@ export default function SettingsPage() {
               />
             </div>
             <div className="space-y-2">
-              <label className="text-[10px] font-black text-black/40 uppercase tracking-widest block">Apellido</label>
+              <label className="text-sm font-black text-black/40 uppercase tracking-widest block">Apellido</label>
               <input
                 value={state.lastName}
                 onChange={(e) => setState((s) => ({ ...s, lastName: e.target.value }))}
@@ -342,14 +419,34 @@ export default function SettingsPage() {
               />
             </div>
             <div className="space-y-2 md:col-span-2">
-              <label className="text-[10px] font-black text-black/40 uppercase tracking-widest block">Agencia</label>
+              <label className="text-sm font-black text-black/40 uppercase tracking-widest block">Agencia</label>
               <input
                 value={state.agencyName}
                 onChange={(e) => setState((s) => ({ ...s, agencyName: e.target.value }))}
                 placeholder="ASYGURARE"
                 className="w-full bg-[#ece7e2]/50 text-black font-black py-4 px-6 rounded-2xl outline-none border-2 border-transparent focus:border-(--accents)/30 transition-all uppercase"
               />
-              <p className="text-[11px] font-bold text-black/40 leading-relaxed mt-2">
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-black text-black/40 uppercase tracking-widest block">Ciudad</label>
+              <input
+                value={state.city}
+                onChange={(e) => setState((s) => ({ ...s, city: e.target.value }))}
+                placeholder="Ciudad de México"
+                className="w-full bg-[#ece7e2]/50 text-black font-black py-4 px-6 rounded-2xl outline-none border-2 border-transparent focus:border-(--accents)/30 transition-all uppercase"
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-black text-black/40 uppercase tracking-widest block">País</label>
+              <input
+                value={state.country}
+                onChange={(e) => setState((s) => ({ ...s, country: e.target.value }))}
+                placeholder="México"
+                className="w-full bg-[#ece7e2]/50 text-black font-black py-4 px-6 rounded-2xl outline-none border-2 border-transparent focus:border-(--accents)/30 transition-all uppercase"
+              />
+            </div>
+            <div className="md:col-span-2">
+              <p className="text-[11px] font-bold text-black/40 leading-relaxed">
                 Tu email se administra desde el sistema de autenticación. Para cambiarlo se requiere confirmación por correo.
               </p>
             </div>
@@ -363,15 +460,16 @@ export default function SettingsPage() {
               <Settings2 size={20} />
             </div>
             <div>
-              <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Preferencias</p>
-              <p className="text-xl font-black text-black italic">Experiencia</p>
+              <p className="text-base font-black text-gray-400 uppercase tracking-widest">Preferencias</p>
+              <p className="text-xl font-black text-[rgb(170,170,170)] italic">Experiencia</p>
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 opacity-60">
             <div className="space-y-2">
-              <label className="text-[10px] font-black text-black/40 uppercase tracking-widest block">Idioma</label>
+              <label className="text-sm font-black text-black/40 uppercase tracking-widest block">Idioma</label>
               <select
+                disabled
                 value={state.preferences.language}
                 onChange={(e) =>
                   setState((s) => ({
@@ -379,7 +477,7 @@ export default function SettingsPage() {
                     preferences: { ...s.preferences, language: e.target.value === "en-US" ? "en-US" : "es-MX" },
                   }))
                 }
-                className="w-full bg-[#ece7e2]/50 text-black font-black py-4 px-6 rounded-2xl outline-none border-2 border-transparent focus:border-(--accents)/30 transition-all uppercase cursor-pointer"
+                className="w-full bg-[#ece7e2]/50 text-black font-black py-4 px-6 rounded-2xl outline-none border-2 border-transparent focus:border-(--accents)/30 transition-all uppercase cursor-not-allowed"
               >
                 <option value="es-MX">ESPAÑOL (MX)</option>
                 <option value="en-US">ENGLISH (US)</option>
@@ -387,8 +485,9 @@ export default function SettingsPage() {
             </div>
 
             <div className="space-y-2">
-              <label className="text-[10px] font-black text-black/40 uppercase tracking-widest block">Densidad</label>
+              <label className="text-sm font-black text-black/40 uppercase tracking-widest block">Densidad</label>
               <select
+                disabled
                 value={state.preferences.density}
                 onChange={(e) =>
                   setState((s) => ({
@@ -396,7 +495,7 @@ export default function SettingsPage() {
                     preferences: { ...s.preferences, density: e.target.value === "compact" ? "compact" : "normal" },
                   }))
                 }
-                className="w-full bg-[#ece7e2]/50 text-black font-black py-4 px-6 rounded-2xl outline-none border-2 border-transparent focus:border-(--accents)/30 transition-all uppercase cursor-pointer"
+                className="w-full bg-[#ece7e2]/50 text-black font-black py-4 px-6 rounded-2xl outline-none border-2 border-transparent focus:border-(--accents)/30 transition-all uppercase cursor-not-allowed"
               >
                 <option value="normal">NORMAL</option>
                 <option value="compact">COMPACTO</option>
@@ -404,12 +503,13 @@ export default function SettingsPage() {
             </div>
 
             <div className="space-y-2 md:col-span-2">
-              <label className="text-[10px] font-black text-black/40 uppercase tracking-widest block">Zona horaria</label>
+              <label className="text-sm font-black text-black/40 uppercase tracking-widest block">Zona horaria</label>
               <input
+                disabled
                 value={state.preferences.timezone}
                 onChange={(e) => setState((s) => ({ ...s, preferences: { ...s.preferences, timezone: e.target.value } }))}
                 placeholder="America/Mexico_City"
-                className="w-full bg-[#ece7e2]/50 text-black font-black py-4 px-6 rounded-2xl outline-none border-2 border-transparent focus:border-(--accents)/30 transition-all"
+                className="w-full bg-[#ece7e2]/50 text-black font-black py-4 px-6 rounded-2xl outline-none border-2 border-transparent focus:border-(--accents)/30 transition-all cursor-not-allowed"
               />
               <p className="text-[11px] font-bold text-black/40 leading-relaxed mt-2">
                 Esto se guarda para futuras automatizaciones (renovaciones, recordatorios, pagos).
@@ -417,14 +517,14 @@ export default function SettingsPage() {
             </div>
           </div>
 
-          <div className="border-t border-black/5 pt-4">
+          {/* <div className="border-t border-black/5 pt-4">
             <Toggle
               checked={state.preferences.reduceMotion}
               onChange={(next) => setState((s) => ({ ...s, preferences: { ...s.preferences, reduceMotion: next } }))}
               label="Reducir animaciones"
               description="Ideal si quieres una interfaz más sobria o si tu equipo es lento."
             />
-          </div>
+          </div> */}
         </div>
 
         {/* NOTIFICACIONES */}
@@ -434,25 +534,28 @@ export default function SettingsPage() {
               <Bell size={20} />
             </div>
             <div>
-              <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Notificaciones</p>
-              <p className="text-xl font-black text-black italic">Alertas del negocio</p>
+              <p className="text-base font-black text-gray-400 uppercase tracking-widest">Notificaciones</p>
+              <p className="text-xl font-black text-[rgb(170,170,170)] italic">Alertas del negocio</p>
             </div>
           </div>
 
           <div className="divide-y divide-black/5">
             <Toggle
+              disabled
               checked={state.notifications.renewals}
               onChange={(next) => setState((s) => ({ ...s, notifications: { ...s.notifications, renewals: next } }))}
               label="Renovaciones"
               description="Avisos de pólizas por vencer y acciones de retención."
             />
             <Toggle
+              disabled
               checked={state.notifications.payments}
               onChange={(next) => setState((s) => ({ ...s, notifications: { ...s.notifications, payments: next } }))}
               label="Pagos"
               description="Recordatorios de cobranza y confirmación de pagos."
             />
             <Toggle
+              disabled
               checked={state.notifications.productUpdates}
               onChange={(next) =>
                 setState((s) => ({ ...s, notifications: { ...s.notifications, productUpdates: next } }))
@@ -464,65 +567,113 @@ export default function SettingsPage() {
         </div>
 
         {/* SEGURIDAD */}
-        <div className="bg-black rounded-[2.5rem] shadow-2xl p-10 text-white space-y-8 relative overflow-hidden">
-          <div className="absolute -right-10 -bottom-10 w-40 h-40 bg-(--accents) blur-[90px] opacity-25" />
-
-          <div className="relative flex items-center gap-3">
-            <div className="p-4 bg-white/10 rounded-2xl text-(--accents)">
+        <div className="bg-white rounded-[2.5rem] border-2 border-red-200 shadow-sm p-10 space-y-8">
+          <div className="flex items-center gap-3">
+            <div className="p-4 bg-red-50 rounded-2xl text-red-600">
               <ShieldCheck size={20} />
             </div>
             <div>
-              <p className="text-[10px] font-black text-white/40 uppercase tracking-widest">Seguridad</p>
-              <p className="text-xl font-black text-white italic">Credenciales</p>
+              <p className="text-base font-black text-red-600 uppercase tracking-widest">Seguridad</p>
+              <p className="text-xl font-black text-black italic">Credenciales</p>
             </div>
           </div>
 
-          <form onSubmit={handleChangePassword} className="relative space-y-6">
+          <form onSubmit={handleChangePassword} className="space-y-6">
             <div className="space-y-2">
-              <label className="text-[10px] font-black text-white/40 uppercase tracking-widest block">Nueva contraseña</label>
+              <label className="text-sm font-black text-black/40 uppercase tracking-widest block">Contraseña actual</label>
               <div className="relative">
-                <KeyRound className="absolute left-5 top-1/2 -translate-y-1/2 text-white/30" size={18} />
+                <KeyRound className="absolute left-5 top-1/2 -translate-y-1/2 text-black/30" size={18} />
                 <input
-                  type="password"
-                  value={password}
+                  type={showCurrentPassword ? "text" : "password"}
+                  value={currentPassword}
+                  onChange={(e) => setCurrentPassword(e.target.value)}
+                  placeholder="••••••••"
+                  className="w-full bg-[#ece7e2]/50 text-black font-black py-4 pl-14 pr-12 rounded-2xl outline-none border-2 border-transparent focus:border-(--accents)/30 transition-all"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowCurrentPassword((s) => !s)}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-black/40 hover:text-black transition-colors cursor-pointer"
+                  aria-label={showCurrentPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
+                >
+                  {showCurrentPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-black text-black/40 uppercase tracking-widest block">Nueva contraseña</label>
+              <div className="relative">
+                <KeyRound className="absolute left-5 top-1/2 -translate-y-1/2 text-black/30" size={18} />
+                <input
+                  type={showNewPassword ? "text" : "password"}
+                  value={newPassword}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
-                  className="w-full bg-white/10 text-white font-black py-4 pl-14 pr-6 rounded-2xl outline-none border-2 border-white/10 focus:border-white/30 transition-all"
+                  className="w-full bg-[#ece7e2]/50 text-black font-black py-4 pl-14 pr-12 rounded-2xl outline-none border-2 border-transparent focus:border-(--accents)/30 transition-all"
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowNewPassword((s) => !s)}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-black/40 hover:text-black transition-colors cursor-pointer"
+                  aria-label={showNewPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
+                >
+                  {showNewPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
               </div>
-              <p className="text-[11px] font-bold text-white/40 leading-relaxed">
-                Mínimo 8 caracteres. Recomendado: 12+ con mayúsculas y símbolos.
+              <p className="text-sm font-bold text-black/40 leading-relaxed">
+                {SITE_CONFIG.PASSWORD_RULES_TEXT}
               </p>
             </div>
 
             <div className="space-y-2">
-              <label className="text-[10px] font-black text-white/40 uppercase tracking-widest block">Confirmar contraseña</label>
-              <input
-                type="password"
-                value={password2}
-                onChange={(e) => setPassword2(e.target.value)}
-                placeholder="••••••••"
-                className="w-full bg-white/10 text-white font-black py-4 px-6 rounded-2xl outline-none border-2 border-white/10 focus:border-white/30 transition-all"
-              />
+              <label className="text-sm font-black text-black/40 uppercase tracking-widest block">Confirmar contraseña</label>
+              <div className="relative">
+                <input
+                  type={showConfirmPassword ? "text" : "password"}
+                  value={confirmNewPassword}
+                  onChange={(e) => setPassword2(e.target.value)}
+                  placeholder="••••••••"
+                  className="w-full bg-[#ece7e2]/50 text-black font-black py-4 pl-6 pr-12 rounded-2xl outline-none border-2 border-transparent focus:border-(--accents)/30 transition-all"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmPassword((s) => !s)}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-black/40 hover:text-black transition-colors cursor-pointer"
+                  aria-label={showConfirmPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
+                >
+                  {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
+              </div>
             </div>
 
             <button
               type="submit"
               disabled={savingPassword}
-              className="w-full bg-(--accents) text-white py-5 rounded-[2rem] font-black text-sm flex items-center justify-center gap-3 hover:bg-blue-500 transition-all shadow-xl active:scale-95 disabled:opacity-60"
+              className="w-full bg-(--accents) text-white py-5 rounded-[2rem] font-black text-sm flex items-center justify-center gap-3 hover:bg-blue-500 transition-all shadow-xl active:scale-95 disabled:opacity-60 cursor-pointer"
             >
               {savingPassword ? <Loader2 className="animate-spin" size={18} /> : <ShieldCheck size={18} />}
               {savingPassword ? "ACTUALIZANDO" : "ACTUALIZAR CONTRASEÑA"}
             </button>
           </form>
-        </div>
-      </div>
 
-      {/* GUARDADO (RESPALDO LOCAL) */}
-      <div className="text-center">
-        <p className="text-[10px] font-black text-black/30 uppercase tracking-[0.35em]">
-          Los ajustes se guardan en tu cuenta y como respaldo local.
-        </p>
+          {/* Eliminar cuenta - Danger zone */}
+          <div className="pt-6 border-t border-red-200">
+            <div className="bg-red-50/80 rounded-2xl border border-red-200 p-6 space-y-4">
+              <p className="text-sm font-black text-black uppercase tracking-widest">Eliminar cuenta</p>
+              <p className="text-sm font-bold text-red-600/80 leading-relaxed">
+                Esta acción es permanente. Se borrarán todos tus datos, pólizas y historial asociado a esta cuenta. No podrás recuperar el acceso ni la información.
+              </p>
+              <button
+                type="button"
+                className="w-full py-3.5 rounded-2xl font-black text-xs uppercase tracking-widest border-2 border-red-200 text-red-600 hover:bg-red-50 transition-all active:scale-[0.98] cursor-pointer"
+                onClick={handleDeleteAccount}
+              >
+                Eliminar cuenta
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   )
