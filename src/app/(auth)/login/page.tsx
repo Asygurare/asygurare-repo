@@ -53,6 +53,11 @@ function LoginContent() {
         description: 'Tu contraseña ha sido actualizada. Ya puedes iniciar sesión.',
       })
       router.replace('/login', { scroll: false })
+    } else if (codeParam === 'account_deleted') {
+      toast.success('Cuenta eliminada', {
+        description: 'Tu cuenta ha sido eliminada correctamente',
+      })
+      router.replace('/login', { scroll: false })
     }
   }, [codeParam, router])
 

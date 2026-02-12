@@ -87,10 +87,16 @@ export default function WorkspaceNavbar({ onMenuClick }: WorkspaceNavbarProps) {
                   className="absolute z-[999] right-0 mt-4 w-60 bg-white rounded-[2rem] shadow-2xl border border-black/5 p-6"
                 >
                   <div className="pb-4 mb-4 border-b border-gray-50">
-                    <p className="text-[9px] font-black text-black/20 uppercase tracking-widest mb-1">Sesión activa</p>
-                    <p className="text-xs font-black truncate text-black">{user?.email}</p>
+                    <p className="text-xs font-black text-black/20 uppercase tracking-widest mb-1">Sesión activa</p>
+                    <p className="text-sm font-black truncate text-black">{user?.email}</p>
                   </div>
-                  <button onClick={handleLogout} className="w-full flex items-center gap-3 py-3 text-[10px] font-black uppercase tracking-widest text-red-500 hover:bg-red-50 rounded-xl transition-all">
+                  <button
+                    onClick={() => { setIsProfileOpen(false); router.push('/settings') }}
+                    className="w-full flex items-center gap-3 py-3 text-sm font-black uppercase tracking-widest text-black hover:bg-gray-50 rounded-xl transition-all cursor-pointer"
+                  >
+                    <User size={16} /> Mi perfil
+                  </button>
+                  <button onClick={handleLogout} className="w-full flex items-center gap-3 py-3 text-sm font-black uppercase tracking-widest text-red-500 hover:bg-red-50 rounded-xl transition-all cursor-pointer">
                     <LogOut size={16} /> Cerrar Sesión
                   </button>
                 </motion.div>

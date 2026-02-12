@@ -31,6 +31,8 @@ export default function SignUpPage() {
     const firstName = formData.get('firstName') as string
     const lastName = formData.get('lastName') as string
     const agencyName = formData.get('agencyName') as string
+    const city = formData.get('city') as string
+    const country = formData.get('country') as string
 
     const { error: signUpError } = await supabaseClient.auth.signUp({
       email,
@@ -43,6 +45,8 @@ export default function SignUpPage() {
           first_name: firstName,
           last_name: lastName,
           agency_name: agencyName,
+          city:city,
+          country:country,
           email: email,         
         }
       }
@@ -97,6 +101,17 @@ export default function SignUpPage() {
               </div>
             </div>
 
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold text-gray-500 uppercase ml-1">Ciudad</label>
+                <input name="city" required type="text" placeholder="Ciudad de México" className="w-full text-black bg-white border border-black/5 rounded-2xl py-3 px-4 outline-none focus:ring-2 focus:ring-[#4A7766]/20 transition-all text-sm" />
+              </div>
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold text-gray-500 uppercase ml-1">País</label>
+                <input name="country" required type="text" placeholder="México" className="w-full text-black bg-white border border-black/5 rounded-2xl py-3 px-4 outline-none focus:ring-2 focus:ring-[#4A7766]/20 transition-all text-sm" />
+              </div>
+            </div>
+
             <div className="space-y-1">
               <label className="text-[10px] font-bold text-gray-500 uppercase ml-1">Email</label>
               <div className="relative">
@@ -117,6 +132,7 @@ export default function SignUpPage() {
               <input
                 name="acceptTerms"
                 type="checkbox"
+                required
                 checked={acceptedTerms}
                 onChange={(e) => setAcceptedTerms(e.target.checked)}
                 className="mt-1 h-4 w-4 rounded border-black/20 accent-[#4A7766]"
