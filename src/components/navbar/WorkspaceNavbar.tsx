@@ -38,36 +38,36 @@ export default function WorkspaceNavbar({ onMenuClick }: WorkspaceNavbarProps) {
   }
 
   return (
-    <header className="bg-white/70 backdrop-blur-xl border border-white rounded-[2.5rem] p-4 flex items-center justify-between shadow-sm mb-10">
+    <header className="bg-white/70 backdrop-blur-xl border border-white rounded-3xl sm:rounded-[2.5rem] p-3 sm:p-4 flex items-center justify-between shadow-sm mb-8 sm:mb-10">
       {/* SALUDO */}
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-1 sm:gap-2 min-w-0">
         {onMenuClick && (
           <button
             type="button"
             onClick={onMenuClick}
-            className="md:hidden p-4 text-black/30 hover:text-black transition-all"
+            className="md:hidden p-2 sm:p-3 text-black/30 hover:text-black transition-all"
             aria-label="Abrir menú"
           >
             <Menu size={20} />
           </button>
         )}
 
-        <div className="ml-2 sm:ml-4">
-          <p className="text-xs sm:text-sm font-black text-black tracking-tight">
+        <div className="ml-1 sm:ml-4 min-w-0">
+          <p className="text-xs sm:text-sm font-black text-black tracking-tight truncate">
             Hola, {userName}
           </p>
-          <p className="text-[10px] sm:text-xs font-black text-black/40 uppercase tracking-widest">
+          <p className="hidden sm:block text-xs font-black text-black/40 uppercase tracking-widest">
             {formattedDate}
           </p>
         </div>
       </div>
 
       {/* ACCIONES */}
-      <div className="flex items-center gap-4 pr-2">
+      <div className="flex items-center gap-2 sm:gap-4 pr-0 sm:pr-2 shrink-0">
         <div className="relative">
           <button 
             onClick={() => setIsProfileOpen(!isProfileOpen)}
-            className="flex items-center gap-3 bg-black hover:bg-(--accents) transition-all p-1.5 pr-6 rounded-2xl group"
+            className="flex items-center gap-2 sm:gap-3 bg-black hover:bg-(--accents) transition-all p-1.5 pr-2 sm:pr-6 rounded-2xl group"
           >
             <div className="w-10 h-10 bg-(--accents) rounded-xl flex items-center justify-center text-white border border-white/10 overflow-hidden font-black">
               {user?.email?.charAt(0).toUpperCase() || <User size={18} />}
@@ -78,7 +78,7 @@ export default function WorkspaceNavbar({ onMenuClick }: WorkspaceNavbarProps) {
                 {user?.email?.split('@')[0]}
               </p>
             </div>
-            <ChevronDown size={14} className={`text-white/40 transition-transform ${isProfileOpen ? 'rotate-180' : ''}`} />
+            <ChevronDown size={14} className={`hidden sm:block text-white/40 transition-transform ${isProfileOpen ? 'rotate-180' : ''}`} />
           </button>
 
           <AnimatePresence>

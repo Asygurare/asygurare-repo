@@ -235,103 +235,133 @@ export default function ClientesPage() {
         </div>
       </div>
 
-      <div className="bg-white rounded-[3rem] border border-black/5 shadow-sm overflow-hidden min-h-[400px]">
+      <div className="bg-white rounded-[2rem] sm:rounded-[3rem] border border-black/5 shadow-sm overflow-hidden min-h-[400px] min-w-0">
         {fetching ? (
           <div className="flex flex-col items-center justify-center h-[400px] gap-4">
             <Loader2 className="animate-spin text-black" size={40} />
           </div>
         ) : filteredCustomers.length > 0 ? (
-          <table className="w-full text-left">
-            <thead>
-              <tr className="bg-gray-50 border-b border-black/5">
-                <th className="p-8 text-[10px] font-black text-black/40 uppercase tracking-widest">Nombre completo</th>
-                <th className="p-8 text-[10px] font-black text-black/40 uppercase tracking-widest">Contacto</th>
-                <th className="p-8 text-[10px] font-black text-black/40 uppercase tracking-widest">Fecha de nacimiento</th>
-                <th className="p-8 text-[10px] font-black text-black/40 uppercase tracking-widest">Ocupación</th>
-                <th className="p-8 text-[10px] font-black text-black/40 uppercase tracking-widest">Tipo de seguro</th>
-                <th className="p-8 w-16"></th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-50">
+          <>
+            <div className="md:hidden divide-y divide-gray-50">
               {filteredCustomers.map((c) => (
-                <tr
+                <button
                   key={c.id}
+                  type="button"
                   onClick={() => openEdit(c)}
-                  className="hover:bg-[#ece7e2]/30 transition-all group cursor-pointer"
+                  className="w-full text-left p-4 active:bg-[#ece7e2]/40 transition-all"
                 >
-                  <td className="p-8">
-                    <div className="flex items-center gap-4">
-                      <div className="w-12 h-12 bg-black text-white rounded-2xl flex items-center justify-center shadow-lg">
-                        {c.gender === 'Moral' ? <Building2 size={20} /> : <User size={20} />}
+                  <div className="flex items-start gap-3 min-w-0">
+                    <div className="w-10 h-10 bg-black text-white rounded-xl flex items-center justify-center shadow-lg shrink-0">
+                      {c.gender === 'Moral' ? <Building2 size={18} /> : <User size={18} />}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-black text-black text-sm uppercase tracking-tight truncate">{getFullName(c)}</p>
+                      <p className="mt-1 text-[11px] font-bold text-black/60 truncate">{c.email || '—'}</p>
+                      <p className="text-[11px] font-bold text-black/60 truncate">{c.phone || '—'}</p>
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        <span className="text-[10px] font-black uppercase tracking-widest text-black/40">{formatDate(c.birthday)}</span>
+                        <span className="text-[10px] font-black uppercase tracking-widest text-black/40">{c.insurance_type || '—'}</span>
                       </div>
-                      <p className="font-black text-black text-base uppercase tracking-tighter">{getFullName(c)}</p>
                     </div>
-                  </td>
-                  <td className="p-8">
-                    <div className="space-y-1">
-                      <p className="text-sm font-black text-black flex items-center gap-2 text-xs uppercase">
-                        <Mail size={12} className="opacity-30" /> {c.email || '—'}
-                      </p>
-                      <p className="text-sm font-black text-black flex items-center gap-2 text-xs uppercase">
-                        <Phone size={12} className="opacity-30" /> {c.phone || '—'}
-                      </p>
-                    </div>
-                  </td>
-                  <td className="p-8 text-sm font-black text-black uppercase">{formatDate(c.birthday)}</td>
-                  <td className="p-8 text-sm font-black text-black uppercase">{c.ocupation || '—'}</td>
-                  <td className="p-8 text-sm font-black text-black uppercase">{c.insurance_type || '—'}</td>
-                  <td className="p-8 text-right" onClick={(e) => e.stopPropagation()}>
-                    <div className="relative inline-block">
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          setOptionsRowId((id) => (id === c.id ? null : c.id))
-                        }}
-                        className="p-2 rounded-xl hover:bg-black/5 transition-all opacity-0 group-hover:opacity-100"
-                        aria-label="Opciones"
-                      >
-                        <MoreVertical size={20} className="text-black/50" />
-                      </button>
-                      {optionsRowId === c.id && (
-                        <div
-                          ref={optionsRef}
-                          className="absolute right-0 top-full mt-1 py-2 min-w-[200px] bg-white border border-black/10 rounded-2xl shadow-xl z-10"
-                        >
-                          <button
-                            onClick={() => {
-                              setDetailCustomer(c)
-                              setOptionsRowId(null)
-                            }}
-                            className="w-full px-4 py-3 text-left text-sm font-black uppercase tracking-tighter flex items-center gap-2 hover:bg-[#ece7e2]/50 transition-colors"
-                          >
-                            <FileText size={18} /> Ver toda la información
-                          </button>
-                          <button
-                            onClick={() => {
-                              setNotesCustomer(c)
-                              setOptionsRowId(null)
-                            }}
-                            className="w-full px-4 py-3 text-left text-sm font-black uppercase tracking-tighter flex items-center gap-2 hover:bg-[#ece7e2]/50 transition-colors"
-                          >
-                            <StickyNote size={18} /> Notas
-                          </button>
+                  </div>
+                </button>
+              ))}
+            </div>
+
+            <div className="hidden md:block overflow-x-auto">
+              <table className="w-full min-w-[980px] text-left">
+                <thead>
+                  <tr className="bg-gray-50 border-b border-black/5">
+                    <th className="p-8 text-[10px] font-black text-black/40 uppercase tracking-widest">Nombre completo</th>
+                    <th className="p-8 text-[10px] font-black text-black/40 uppercase tracking-widest">Contacto</th>
+                    <th className="p-8 text-[10px] font-black text-black/40 uppercase tracking-widest">Fecha de nacimiento</th>
+                    <th className="p-8 text-[10px] font-black text-black/40 uppercase tracking-widest">Ocupación</th>
+                    <th className="p-8 text-[10px] font-black text-black/40 uppercase tracking-widest">Tipo de seguro</th>
+                    <th className="p-8 w-16"></th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-50">
+                  {filteredCustomers.map((c) => (
+                    <tr
+                      key={c.id}
+                      onClick={() => openEdit(c)}
+                      className="hover:bg-[#ece7e2]/30 transition-all group cursor-pointer"
+                    >
+                      <td className="p-8">
+                        <div className="flex items-center gap-4">
+                          <div className="w-12 h-12 bg-black text-white rounded-2xl flex items-center justify-center shadow-lg">
+                            {c.gender === 'Moral' ? <Building2 size={20} /> : <User size={20} />}
+                          </div>
+                          <p className="font-black text-black text-base uppercase tracking-tighter">{getFullName(c)}</p>
+                        </div>
+                      </td>
+                      <td className="p-8">
+                        <div className="space-y-1">
+                          <p className="text-sm font-black text-black flex items-center gap-2 text-xs uppercase">
+                            <Mail size={12} className="opacity-30" /> {c.email || '—'}
+                          </p>
+                          <p className="text-sm font-black text-black flex items-center gap-2 text-xs uppercase">
+                            <Phone size={12} className="opacity-30" /> {c.phone || '—'}
+                          </p>
+                        </div>
+                      </td>
+                      <td className="p-8 text-sm font-black text-black uppercase">{formatDate(c.birthday)}</td>
+                      <td className="p-8 text-sm font-black text-black uppercase">{c.ocupation || '—'}</td>
+                      <td className="p-8 text-sm font-black text-black uppercase">{c.insurance_type || '—'}</td>
+                      <td className="p-8 text-right" onClick={(e) => e.stopPropagation()}>
+                        <div className="relative inline-block">
                           <button
                             onClick={(e) => {
-                              deleteCustomer(c.id, e)
-                              setOptionsRowId(null)
+                              e.stopPropagation()
+                              setOptionsRowId((id) => (id === c.id ? null : c.id))
                             }}
-                            className="w-full px-4 py-3 text-left text-sm font-black uppercase tracking-tighter flex items-center gap-2 hover:bg-red-50 text-red-600 transition-colors"
+                            className="p-2 rounded-xl hover:bg-black/5 transition-all opacity-0 group-hover:opacity-100"
+                            aria-label="Opciones"
                           >
-                            <Trash2 size={18} /> Eliminar
+                            <MoreVertical size={20} className="text-black/50" />
                           </button>
+                          {optionsRowId === c.id && (
+                            <div
+                              ref={optionsRef}
+                              className="absolute right-0 top-full mt-1 py-2 min-w-[200px] bg-white border border-black/10 rounded-2xl shadow-xl z-10"
+                            >
+                              <button
+                                onClick={() => {
+                                  setDetailCustomer(c)
+                                  setOptionsRowId(null)
+                                }}
+                                className="w-full px-4 py-3 text-left text-sm font-black uppercase tracking-tighter flex items-center gap-2 hover:bg-[#ece7e2]/50 transition-colors"
+                              >
+                                <FileText size={18} /> Ver toda la información
+                              </button>
+                              <button
+                                onClick={() => {
+                                  setNotesCustomer(c)
+                                  setOptionsRowId(null)
+                                }}
+                                className="w-full px-4 py-3 text-left text-sm font-black uppercase tracking-tighter flex items-center gap-2 hover:bg-[#ece7e2]/50 transition-colors"
+                              >
+                                <StickyNote size={18} /> Notas
+                              </button>
+                              <button
+                                onClick={(e) => {
+                                  deleteCustomer(c.id, e)
+                                  setOptionsRowId(null)
+                                }}
+                                className="w-full px-4 py-3 text-left text-sm font-black uppercase tracking-tighter flex items-center gap-2 hover:bg-red-50 text-red-600 transition-colors"
+                              >
+                                <Trash2 size={18} /> Eliminar
+                              </button>
+                            </div>
+                          )}
                         </div>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
         ) : (
           <div className="flex flex-col items-center justify-center h-[400px]">
             <Users size={60} className="text-gray-100 mb-4" />

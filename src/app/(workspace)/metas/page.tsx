@@ -603,7 +603,7 @@ export default function MetasPage() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[999] bg-black/50 backdrop-blur-sm p-4 sm:p-8"
+            className="fixed inset-0 z-[999] bg-black/50 backdrop-blur-sm p-4 sm:p-8 overflow-y-auto"
             onClick={() => setIsModalOpen(false)}
           >
             <motion.div
@@ -611,7 +611,7 @@ export default function MetasPage() {
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: 16, scale: 0.98 }}
               transition={{ type: "spring", stiffness: 240, damping: 24 }}
-              className="bg-white w-full max-w-2xl mx-auto rounded-[3rem] border border-black/5 shadow-2xl overflow-hidden"
+              className="bg-white w-full max-w-2xl mx-auto rounded-[3rem] border border-black/5 shadow-2xl overflow-y-auto max-h-[calc(100dvh-2rem)] sm:max-h-[calc(100dvh-4rem)] overscroll-contain"
               onClick={(e) => e.stopPropagation()}
             >
               <div className="p-8 sm:p-10 border-b border-black/5 flex items-start justify-between gap-6">
