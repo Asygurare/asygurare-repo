@@ -239,12 +239,12 @@ export default function DashboardPage() {
       </section>
 
       {/* --- ACTIVIDAD Y TAREAS --- */}
-      <section className="grid lg:grid-cols-3 gap-8">
+      <section className="grid lg:grid-cols-3 gap-6 sm:gap-8">
 
-        <div className="lg:col-span-2 bg-white rounded-[2.5rem] border border-black/5 p-10 flex flex-col">
-          <div className="flex justify-between items-center mb-10">
+        <div className="lg:col-span-2 bg-white rounded-[2rem] sm:rounded-[2.5rem] border border-black/5 p-4 sm:p-10 flex flex-col min-w-0">
+          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-6 sm:mb-10">
             <h3 className="text-xl font-black text-black italic">Actividad del Mes</h3>
-            <span className="text-[10px] font-black text-(--accents) bg-(--accents)/10 px-4 py-2 rounded-full uppercase">En tiempo real</span>
+            <span className="inline-flex w-fit text-[10px] font-black text-(--accents) bg-(--accents)/10 px-4 py-2 rounded-full uppercase">En tiempo real</span>
           </div>
 
           {loading ? (
@@ -277,37 +277,42 @@ export default function DashboardPage() {
                     t.entity_type === 'lead' ? 'Prospecto' : null
 
                 return (
-                  <div key={t.id} className="flex items-center gap-4 p-4 hover:bg-gray-50 rounded-2xl transition-all">
-                    <div className={`w-2 h-2 rounded-full ${t.status === 'done' ? 'bg-green-500' : priorityDot(t.priority)}`} />
+                  <div key={t.id} className="p-3 sm:p-4 hover:bg-gray-50 rounded-2xl transition-all min-w-0">
+                    <div className="flex items-start gap-3 sm:gap-4 min-w-0">
+                      <div className={`mt-2 w-2 h-2 rounded-full shrink-0 ${t.status === 'done' ? 'bg-green-500' : priorityDot(t.priority)}`} />
 
-                    <div className="p-2 bg-gray-50 rounded-xl text-black shrink-0">
-                      <Icon size={16} />
-                    </div>
-
-                    <div className="flex-1 min-w-0">
-                      <p className={`text-sm font-black text-black truncate ${t.status === 'done' ? 'line-through opacity-60' : ''}`}>
-                        {t.title}
-                      </p>
-                      <div className="flex items-center gap-3 mt-1 flex-wrap">
-                        <span className={`text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full ${t.status === 'done' ? 'bg-green-50 text-green-700' :
-                            t.priority === 'Alta' ? 'bg-red-50 text-red-600' :
-                              t.priority === 'Media' ? 'bg-orange-50 text-orange-700' :
-                                'bg-gray-50 text-gray-600'
-                          }`}>
-                          {t.status === 'done' ? 'HECHA' : t.priority}
-                        </span>
-                        {badge ? (
-                          <span className="text-[10px] font-black uppercase tracking-widest text-black/30 flex items-center gap-2">
-                            <Target size={12} className="opacity-30" />
-                            {badge}{t.related_name ? `: ${t.related_name}` : ''}
-                          </span>
-                        ) : null}
+                      <div className="p-2 bg-gray-50 rounded-xl text-black shrink-0">
+                        <Icon size={16} />
                       </div>
-                    </div>
 
-                    <span className="text-[10px] font-black text-gray-300 whitespace-nowrap">
-                      {timeLabel} · {hourLabel}
-                    </span>
+                      <div className="flex-1 min-w-0">
+                        <p className={`text-sm font-black text-black truncate ${t.status === 'done' ? 'line-through opacity-60' : ''}`}>
+                          {t.title}
+                        </p>
+                        <div className="flex items-center gap-2 sm:gap-3 mt-1 flex-wrap min-w-0">
+                          <span className={`text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full ${t.status === 'done' ? 'bg-green-50 text-green-700' :
+                              t.priority === 'Alta' ? 'bg-red-50 text-red-600' :
+                                t.priority === 'Media' ? 'bg-orange-50 text-orange-700' :
+                                  'bg-gray-50 text-gray-600'
+                            }`}>
+                            {t.status === 'done' ? 'HECHA' : t.priority}
+                          </span>
+                          {badge ? (
+                            <span className="text-[10px] font-black uppercase tracking-widest text-black/30 flex items-center gap-2 break-words min-w-0">
+                              <Target size={12} className="opacity-30 shrink-0" />
+                              <span className="break-all sm:break-words">{badge}{t.related_name ? `: ${t.related_name}` : ''}</span>
+                            </span>
+                          ) : null}
+                        </div>
+                        <span className="mt-2 block sm:hidden text-[10px] font-black text-gray-300">
+                          {timeLabel} · {hourLabel}
+                        </span>
+                      </div>
+
+                      <span className="hidden sm:block text-[10px] font-black text-gray-300 whitespace-nowrap shrink-0">
+                        {timeLabel} · {hourLabel}
+                      </span>
+                    </div>
                   </div>
                 )
               })}

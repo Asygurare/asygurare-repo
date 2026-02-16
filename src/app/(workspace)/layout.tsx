@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   LayoutDashboard, Users, Target, Shield,
   CreditCard, Settings, BrainCircuit, CalendarDays, BarChart3,
@@ -33,12 +33,15 @@ const menuItems = [
 export default function WorkspaceLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false)
+  const previousPathnameRef = useRef(pathname)
 
   useEffect(() => {
-    // Cierra el menú en móvil al navegar
-    if (!isMobileSidebarOpen) return
-    queueMicrotask(() => setIsMobileSidebarOpen(false))
-  }, [pathname, isMobileSidebarOpen])
+    // Cierra el menú móvil solo cuando realmente cambia la ruta.
+    if (previousPathnameRef.current !== pathname) {
+      setIsMobileSidebarOpen(false)
+      previousPathnameRef.current = pathname
+    }
+  }, [pathname])
 
   useEffect(() => {
     if (!isMobileSidebarOpen) return
