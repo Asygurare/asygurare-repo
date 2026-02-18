@@ -194,7 +194,7 @@ export default function ClientesPage() {
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
         <div>
           <h2 className="text-4xl font-black text-black tracking-tighter italic uppercase">Cartera.</h2>
-          <p className="text-black font-bold text-[10px] uppercase tracking-[0.3em] mt-1 opacity-50">Base de Datos Maestra</p>
+          <p className="text-black font-bold text-[10px] uppercase tracking-[0.3em] mt-1 opacity-50">Administra a tus clientes</p>
         </div>
         <button
           onClick={() => {
