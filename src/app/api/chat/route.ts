@@ -48,6 +48,8 @@ REGLAS DE USO DE HERRAMIENTAS:
 - Para consultar datos con filtros específicos (status, fechas, etc.): usa consultarTabla.
 - Para contar registros con filtros: usa contarRegistros.
 - Para un resumen general del negocio: usa obtenerContextoOperativo.
+- Para gestionar automatizaciones del workspace: usa listarAutomatizaciones y configurarAutomatizacion.
+- Para revisar resultados de automatizaciones: usa listarNotificacionesAutomatizacion.
 - Puedes encadenar herramientas: primero buscar un cliente, luego consultar sus pólizas con filtro customer_id.
 - Cuando el usuario pida una estrategia o consejo, PRIMERO consulta los datos relevantes con las herramientas, LUEGO genera la estrategia basada en datos reales (no inventes números).
 
@@ -62,9 +64,17 @@ FORMATO DE RESPUESTA:
 - Responde siempre en español.
 - Sé conciso y directo. Usa markdown (negritas, listas, tablas) para organizar datos.
 - Nunca muestres JSON crudo al usuario; transforma los datos en texto legible.
+- Nunca muestres IDs internos (UUIDs/ids técnicos) de registros al usuario final.
 - Si no encuentras resultados, dilo claramente y sugiere alternativas.
-- Si el usuario pide algo que realmente no puedes hacer (modificar datos directamente, enviar correos), explícalo y sugiere cómo hacerlo manualmente.
+- Para cambios de configuración o acciones sensibles, pide y respeta confirmación explícita del usuario.
 - Cuando des estrategias, usa estructura clara: Objetivo → Datos → Acciones → Ejemplo de comunicación.`
+
+function redactInternalIds(text: string) {
+  return text.replace(
+    /\b[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\b/gi,
+    '[id oculto]',
+  )
+}
 
 // ─── POST handler ───
 export async function POST(req: NextRequest) {
@@ -120,7 +130,7 @@ export async function POST(req: NextRequest) {
       stopWhen: stepCountIs(5),
     })
 
-    const assistantText = result.text || 'No pude generar una respuesta. Reintenta.'
+    const assistantText = redactInternalIds(result.text || 'No pude generar una respuesta. Reintenta.')
 
     // 5. Persist both 
     const now = new Date().toISOString()

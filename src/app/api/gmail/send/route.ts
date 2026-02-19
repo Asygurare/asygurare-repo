@@ -13,9 +13,131 @@ type SendBody = {
   text?: string
 }
 
+type SenderProfileRow = {
+  first_name?: string | null
+  last_name?: string | null
+}
+
+type ContactNameRow = {
+  email?: string | null
+  name?: string | null
+  last_name?: string | null
+  full_name?: string | null
+}
+
+type RecipientContext = {
+  clientName: string
+  prospectName: string
+  anyName: string
+}
+
+function normalizeEmail(raw: string) {
+  const value = String(raw || "").trim()
+  const angleMatch = value.match(/<([^>]+)>/)
+  const email = angleMatch?.[1] ?? value
+  return email.trim().toLowerCase()
+}
+
 function isValidEmail(email: string) {
   // suficiente para validación básica UI/API
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
+}
+
+async function resolveSenderName(supabase: Awaited<ReturnType<typeof createServerClient>>, user: any) {
+  const metadata = (user?.user_metadata ?? {}) as Record<string, unknown>
+  const metaFirst = String(metadata.first_name ?? "").trim()
+  const metaLast = String(metadata.last_name ?? "").trim()
+  const metaFull = `${metaFirst} ${metaLast}`.trim()
+  if (metaFull) return metaFull
+
+  const profileRes = await supabase
+    .from(DATABASE.TABLES.PROFILES)
+    .select("first_name,last_name")
+    .eq("id", user.id)
+    .maybeSingle()
+
+  const profile = (profileRes.data as SenderProfileRow | null) ?? null
+  const first = String(profile?.first_name ?? "").trim()
+  const last = String(profile?.last_name ?? "").trim()
+  const profileFull = `${first} ${last}`.trim()
+  if (profileFull) return profileFull
+
+  const email = String(user?.email ?? "").trim()
+  if (email.includes("@")) return email.split("@")[0] ?? "user_name"
+  return "user_name"
+}
+
+function applySenderPlaceholder(template: string, senderName: string) {
+  return template
+    .replace(/\buser_name\b/gi, senderName)
+    .replace(/\[\s*tu nombre(?: completo)?\s*\]/gi, senderName)
+    .replace(/\btu nombre(?: completo)?\b/gi, senderName)
+}
+
+function getContactDisplayName(row?: ContactNameRow | null) {
+  if (!row) return ""
+  const full = String(row.full_name ?? "").trim()
+  if (full) return full
+  const first = String(row.name ?? "").trim()
+  const last = String(row.last_name ?? "").trim()
+  return `${first} ${last}`.trim()
+}
+
+async function resolveRecipientContext(
+  supabase: Awaited<ReturnType<typeof createServerClient>>,
+  userId: string,
+  recipientEmail: string
+): Promise<RecipientContext> {
+  const target = normalizeEmail(recipientEmail)
+
+  const fetchRows = async (table: string) => {
+    const full = await supabase
+      .from(table)
+      .select("email,name,last_name,full_name")
+      .eq("user_id", userId)
+      .limit(1000)
+    if (!full.error) return (full.data as ContactNameRow[] | null) ?? []
+
+    const legacy = await supabase
+      .from(table)
+      .select("email,name,last_name")
+      .eq("user_id", userId)
+      .limit(1000)
+    return (legacy.data as ContactNameRow[] | null) ?? []
+  }
+
+  const [leads, customers2, customersLegacy] = await Promise.all([
+    fetchRows(DATABASE.TABLES.WS_LEADS),
+    fetchRows(DATABASE.TABLES.WS_CUSTOMERS_2),
+    fetchRows(DATABASE.TABLES.WS_CUSTOMERS),
+  ])
+
+  const leadRow = leads.find((r) => normalizeEmail(String(r.email ?? "")) === target) ?? null
+  const customerRow =
+    [...customers2, ...customersLegacy].find((r) => normalizeEmail(String(r.email ?? "")) === target) ?? null
+
+  const leadName = String(leadRow?.name ?? "").trim() || getContactDisplayName(leadRow)
+  const customerName = String(customerRow?.full_name ?? "").trim() || getContactDisplayName(customerRow)
+  const anyName = customerName || leadName || "Cliente"
+
+  return {
+    clientName: customerName || anyName,
+    prospectName: leadName || anyName,
+    anyName,
+  }
+}
+
+function applyRecipientPlaceholders(template: string, recipient: RecipientContext) {
+  const clientName = recipient.clientName || recipient.anyName || "Cliente"
+  const prospectName = recipient.prospectName || recipient.anyName || "Prospecto"
+  const anyName = recipient.anyName || clientName || prospectName || "Cliente"
+
+  return template
+    .replace(/\bclient_name\b/gi, anyName)
+    .replace(/\bnombre_cliente\b/gi, clientName)
+    .replace(/\bnombre_prospecto\b/gi, prospectName)
+    .replace(/\[\s*nombre del cliente\s*\]/gi, clientName)
+    .replace(/\bnombre del cliente\b/gi, clientName)
 }
 
 export async function POST(request: Request) {
@@ -40,12 +162,26 @@ export async function POST(request: Request) {
   if (!to || !subject) {
     return NextResponse.json({ ok: false, error: "to y subject son requeridos" }, { status: 400 })
   }
-  if (!isValidEmail(to)) {
+  if (!isValidEmail(normalizeEmail(to))) {
     return NextResponse.json({ ok: false, error: "Email inválido" }, { status: 400 })
   }
   if (!html && !text) {
     return NextResponse.json({ ok: false, error: "html o text es requerido" }, { status: 400 })
   }
+
+  const senderName = await resolveSenderName(supabase, user)
+  const recipientContext = await resolveRecipientContext(supabase, user.id, normalizeEmail(to)).catch(() => ({
+    clientName: "Cliente",
+    prospectName: "Prospecto",
+    anyName: "Cliente",
+  }))
+  const finalSubject = applySenderPlaceholder(applyRecipientPlaceholders(subject, recipientContext), senderName)
+  const finalHtml = html
+    ? applySenderPlaceholder(applyRecipientPlaceholders(html, recipientContext), senderName)
+    : undefined
+  const finalText = text
+    ? applySenderPlaceholder(applyRecipientPlaceholders(text, recipientContext), senderName)
+    : undefined
 
   let accessToken: string
   let providerEmail: string | null
@@ -57,7 +193,13 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: e instanceof Error ? e.message : "Token error" }, { status: 400 })
   }
 
-  const raw = buildRawMessage({ from: providerEmail, to, subject, html, text })
+  const raw = buildRawMessage({
+    from: providerEmail,
+    to: normalizeEmail(to),
+    subject: finalSubject,
+    html: finalHtml,
+    text: finalText,
+  })
   const gmailRes = await fetch("https://gmail.googleapis.com/gmail/v1/users/me/messages/send", {
     method: "POST",
     headers: {
@@ -97,7 +239,7 @@ export async function POST(request: Request) {
     {
       user_id: user.id,
       to_email: to,
-      subject,
+      subject: finalSubject,
       audience: "single",
       gmail_message_id: data?.id ?? null,
     },

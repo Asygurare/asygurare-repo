@@ -17,8 +17,106 @@ type BulkBody = {
   limit?: number
 }
 
+type ContactNameRow = {
+  email?: string | null
+  name?: string | null
+  last_name?: string | null
+  full_name?: string | null
+}
+
+type RecipientContext = {
+  clientName: string
+  prospectName: string
+  anyName: string
+}
+
+type SenderProfileRow = {
+  first_name?: string | null
+  last_name?: string | null
+}
+
+function normalizeEmail(raw: string) {
+  const value = String(raw || "").trim()
+  const angleMatch = value.match(/<([^>]+)>/)
+  const email = angleMatch?.[1] ?? value
+  return email.trim().toLowerCase()
+}
+
 function isValidEmail(email: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
+}
+
+function getContactDisplayName(row?: ContactNameRow | null) {
+  if (!row) return ""
+  const full = String(row.full_name ?? "").trim()
+  if (full) return full
+  const first = String(row.name ?? "").trim()
+  const last = String(row.last_name ?? "").trim()
+  return `${first} ${last}`.trim()
+}
+
+function applyRecipientPlaceholders(template: string, recipient: RecipientContext) {
+  const clientName = recipient.clientName || recipient.anyName || "Cliente"
+  const prospectName = recipient.prospectName || recipient.anyName || "Prospecto"
+  const anyName = recipient.anyName || clientName || prospectName || "Cliente"
+
+  return template
+    .replace(/\bclient_name\b/gi, anyName)
+    .replace(/\bnombre_cliente\b/gi, clientName)
+    .replace(/\bnombre_prospecto\b/gi, prospectName)
+}
+
+async function fetchContactRows(
+  supabase: Awaited<ReturnType<typeof createServerClient>>,
+  table: string,
+  userId: string
+) {
+  const full = await supabase
+    .from(table)
+    .select("email,name,last_name,full_name")
+    .eq("user_id", userId)
+    .limit(1000)
+
+  if (!full.error) return (full.data as ContactNameRow[] | null) ?? []
+
+  const legacy = await supabase
+    .from(table)
+    .select("email,name,last_name")
+    .eq("user_id", userId)
+    .limit(1000)
+
+  return (legacy.data as ContactNameRow[] | null) ?? []
+}
+
+async function resolveSenderName(supabase: Awaited<ReturnType<typeof createServerClient>>, user: any) {
+  const metadata = (user?.user_metadata ?? {}) as Record<string, unknown>
+  const metaFirst = String(metadata.first_name ?? "").trim()
+  const metaLast = String(metadata.last_name ?? "").trim()
+  const metaFull = `${metaFirst} ${metaLast}`.trim()
+  if (metaFull) return metaFull
+
+  const profileRes = await supabase
+    .from(DATABASE.TABLES.PROFILES)
+    .select("first_name,last_name")
+    .eq("id", user.id)
+    .maybeSingle()
+
+  const profile = (profileRes.data as SenderProfileRow | null) ?? null
+  const first = String(profile?.first_name ?? "").trim()
+  const last = String(profile?.last_name ?? "").trim()
+  const profileFull = `${first} ${last}`.trim()
+  if (profileFull) return profileFull
+
+  const email = String(user?.email ?? "").trim()
+  if (email.includes("@")) return email.split("@")[0] ?? "user_name"
+  return "user_name"
+}
+
+function applySenderPlaceholder(template: string, senderName: string) {
+  return template
+    .replace(/\buser_name\b/gi, senderName)
+    .replace(/\[\s*tu nombre(?: completo)?\s*\]/gi, senderName)
+    .replace(/\btu nombre(?: completo)?\b/gi, senderName)
 }
 
 async function sendOne(
@@ -99,7 +197,7 @@ export async function POST(request: Request) {
     emails = Array.from(
       new Set(
         recipients
-          .map((e) => String(e || "").trim())
+          .map((e) => normalizeEmail(String(e || "")))
           .filter((e) => e && isValidEmail(e))
       )
     ).slice(0, 50)
@@ -120,7 +218,7 @@ export async function POST(request: Request) {
     emails = Array.from(
       new Set(
         ((data as Array<{ email?: string | null }> | null) ?? [])
-          .map((r) => (r.email || "").trim())
+          .map((r) => normalizeEmail(String(r.email || "")))
           .filter((e) => e && isValidEmail(e))
       )
     ).slice(0, limit)
@@ -128,6 +226,45 @@ export async function POST(request: Request) {
 
   if (emails.length === 0) {
     return NextResponse.json({ ok: false, error: "No hay emails válidos para enviar" }, { status: 400 })
+  }
+
+  const senderName = await resolveSenderName(supabase, user)
+
+  const recipientByEmail = new Map<string, RecipientContext>()
+  try {
+    const [leadsRows, customersRows, customersLegacyRows] = await Promise.all([
+      fetchContactRows(supabase, DATABASE.TABLES.WS_LEADS, user.id),
+      fetchContactRows(supabase, DATABASE.TABLES.WS_CUSTOMERS_2, user.id),
+      fetchContactRows(supabase, DATABASE.TABLES.WS_CUSTOMERS, user.id),
+    ])
+
+    for (const row of leadsRows) {
+      const email = normalizeEmail(String(row.email ?? ""))
+      if (!email) continue
+      const existing = recipientByEmail.get(email)
+      const prospectName = String(row.name ?? "").trim() || getContactDisplayName(row)
+      if (!prospectName) continue
+      recipientByEmail.set(email, {
+        clientName: existing?.clientName ?? "",
+        prospectName,
+        anyName: existing?.anyName || prospectName,
+      })
+    }
+
+    for (const row of [...customersRows, ...customersLegacyRows]) {
+      const email = normalizeEmail(String(row.email ?? ""))
+      if (!email) continue
+      const existing = recipientByEmail.get(email)
+      const clientName = String(row.full_name ?? "").trim() || getContactDisplayName(row)
+      if (!clientName) continue
+      recipientByEmail.set(email, {
+        clientName,
+        prospectName: existing?.prospectName ?? "",
+        anyName: clientName || existing?.anyName || "",
+      })
+    }
+  } catch {
+    // Si hay error consultando nombres, continuamos envío sin personalización.
   }
 
   let accessToken: string
@@ -141,7 +278,29 @@ export async function POST(request: Request) {
   }
 
   const settled = await mapWithConcurrency(emails, 3, async (to) => {
-    const r = await sendOne(accessToken, providerEmail, to, subject, html, text)
+    const recipientContext = recipientByEmail.get(to.toLowerCase()) ?? {
+      clientName: "",
+      prospectName: "",
+      anyName: "",
+    }
+    const perRecipientSubject = applySenderPlaceholder(
+      applyRecipientPlaceholders(subject, recipientContext),
+      senderName
+    )
+    const perRecipientHtml = html
+      ? applySenderPlaceholder(applyRecipientPlaceholders(html, recipientContext), senderName)
+      : undefined
+    const perRecipientText = text
+      ? applySenderPlaceholder(applyRecipientPlaceholders(text, recipientContext), senderName)
+      : undefined
+    const r = await sendOne(
+      accessToken,
+      providerEmail,
+      to,
+      perRecipientSubject,
+      perRecipientHtml,
+      perRecipientText
+    )
     return { to, id: r.id ?? null }
   })
 

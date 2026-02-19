@@ -2,6 +2,8 @@ import { tool } from 'ai'
 import { z } from 'zod'
 import { SupabaseClient } from '@supabase/supabase-js'
 import * as fn from '@/src/lib/utils/functions'
+import { DATABASE } from '@/src/config'
+import { DEFAULT_AUTOMATIONS, isAutomationKey } from '@/src/services/automations/config'
 
 // ─── Context passed from the route ───
 type ToolCtx = {
@@ -136,6 +138,105 @@ export function buildChatTools(ctx: ToolCtx) {
       inputSchema: z.object({}),
       execute: async () =>
         fn.obtenerContextoOperativoWorkspaceConCache(supabase, { tz, nowIso }),
+    }),
+
+    listarAutomatizaciones: tool({
+      description: 'Lista automatizaciones del usuario (activas/inactivas).',
+      inputSchema: z.object({}),
+      execute: async () => {
+        const { data: authData } = await supabase.auth.getUser()
+        const userId = authData.user?.id
+        if (!userId) return { ok: false, error: 'No autorizado' }
+
+        const { data, error } = await supabase
+          .from(DATABASE.TABLES.WS_AUTOMATIONS)
+          .select('key,enabled,config')
+          .eq('user_id', userId)
+        if (error) return { ok: false, error: error.message }
+
+        const byKey = new Map<string, any>()
+        ;(data || []).forEach((row: any) => byKey.set(String(row.key || ''), row))
+        const automations = DEFAULT_AUTOMATIONS.map((base) => {
+          const row = byKey.get(base.key)
+          return row
+            ? { key: row.key, enabled: Boolean(row.enabled), config: row.config || {} }
+            : base
+        })
+
+        return { ok: true, automations }
+      },
+    }),
+
+    configurarAutomatizacion: tool({
+      description:
+        'Activa/desactiva o configura automatizaciones (cumpleaños y renovaciones). Requiere confirmación explícita.',
+      inputSchema: z.object({
+        key: z.string(),
+        enabled: z.boolean(),
+        days_before: z.number().optional(),
+        timezone: z.string().optional(),
+        template_id: z.string().optional(),
+        confirm: z.boolean(),
+      }),
+      execute: async (args) => {
+        if (!args.confirm) {
+          return { ok: false, requires_confirmation: true, message: 'Falta confirmación explícita.' }
+        }
+        if (!isAutomationKey(args.key)) return { ok: false, error: 'key inválido' }
+
+        const { data: authData } = await supabase.auth.getUser()
+        const userId = authData.user?.id
+        if (!userId) return { ok: false, error: 'No autorizado' }
+
+        const base = DEFAULT_AUTOMATIONS.find((x) => x.key === args.key)
+        const config = {
+          ...(base?.config || {}),
+          ...(args.days_before !== undefined
+            ? { days_before: Math.max(1, Math.min(120, Number(args.days_before))) }
+            : {}),
+          ...(args.timezone ? { timezone: String(args.timezone).trim() } : {}),
+          ...(args.template_id !== undefined ? { template_id: String(args.template_id || '').trim() || null } : {}),
+        }
+
+        const payload = {
+          user_id: userId,
+          key: args.key,
+          enabled: args.enabled === true,
+          config,
+          updated_at: new Date().toISOString(),
+        }
+
+        const { data, error } = await supabase
+          .from(DATABASE.TABLES.WS_AUTOMATIONS)
+          .upsert([payload], { onConflict: 'user_id,key' })
+          .select('key,enabled,config')
+          .single()
+        if (error) return { ok: false, error: error.message }
+
+        return { ok: true, automation: data }
+      },
+    }),
+
+    listarNotificacionesAutomatizacion: tool({
+      description: 'Lista notificaciones de automatizaciones.',
+      inputSchema: z.object({
+        limit: z.number().optional(),
+      }),
+      execute: async (args) => {
+        const { data: authData } = await supabase.auth.getUser()
+        const userId = authData.user?.id
+        if (!userId) return { ok: false, error: 'No autorizado' }
+        const limit = Math.max(1, Math.min(200, Number(args.limit || 30)))
+
+        const { data, error } = await supabase
+          .from(DATABASE.TABLES.WS_AUTOMATION_LOGS)
+          .select('id,automation_key,target_table,status,message,run_date,created_at')
+          .eq('user_id', userId)
+          .order('created_at', { ascending: false })
+          .limit(limit)
+        if (error) return { ok: false, error: error.message }
+        return { ok: true, logs: data || [] }
+      },
     }),
   }
 }

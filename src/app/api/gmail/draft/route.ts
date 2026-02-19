@@ -192,6 +192,25 @@ function normalizeYear(text: string, currentYear: number) {
   return text.replace(/\b20(1\d|2\d|3\d)\b/g, String(currentYear))
 }
 
+function normalizePlaceholders(text: string) {
+  return text
+    .replace(/\[\s*tu nombre(?: completo)?\s*\]/gi, "user_name")
+    .replace(/\btu nombre(?: completo)?\b/gi, "user_name")
+    .replace(/\[\s*nombre del cliente\s*\]/gi, "client_name")
+    .replace(/\bnombre del cliente\b/gi, "client_name")
+    .replace(/\[\s*nombre del prospecto\s*\]/gi, "nombre_prospecto")
+    .replace(/\bnombre del prospecto\b/gi, "nombre_prospecto")
+}
+
+function ensureCompleteMessage(text: string) {
+  let out = text.trim()
+  if (!out) return out
+
+  if (!/[.!?…]$/.test(out)) out += "."
+  if (!/\buser_name\b/i.test(out)) out += "\n\nSaludos,\nuser_name"
+  return out
+}
+
 function buildFallbackBody({
   instructions,
   audience,
@@ -223,8 +242,8 @@ function buildFallbackBody({
 
   const closing =
     tone === "direct"
-      ? "Quedo atento(a) si necesitas algo.\n\nSaludos,"
-      : "Quedo a tus órdenes para cualquier cosa que necesites.\n\nSaludos,"
+      ? "Quedo atento(a) si necesitas algo.\n\nSaludos,\nuser_name"
+      : "Quedo a tus órdenes para cualquier cosa que necesites.\n\nSaludos,\nuser_name"
 
   const body = isSeasonal ? seasonalBody : genericBody
 
@@ -261,8 +280,8 @@ async function geminiGenerate({
       ],
       generationConfig: {
         temperature: 0.4,
-        // mantenemos un límite razonable: el correo debe ser corto
-        maxOutputTokens: 500,
+        // Margen alto para evitar recortes del mensaje.
+        maxOutputTokens: 4096,
       },
     }),
   })
@@ -316,9 +335,12 @@ export async function POST(request: Request) {
     "NO uses ``` ni texto antes/después del JSON.",
     "En el JSON, usa \\n para saltos de línea dentro de strings (no pongas saltos de línea literales dentro de comillas).",
     "Devuelve el JSON en UNA SOLA LÍNEA.",
-    "Límites: subject <= 70 caracteres. text <= 90 palabras.",
+    "Límites: subject <= 100 caracteres. text <= 450 palabras.",
     "No uses saludos de temporada (Año Nuevo/Navidad) a menos que el usuario lo pida explícitamente.",
     "No inventes años/fechas. Si necesitas mencionar un año, usa el año actual.",
+    "Firma final: usa 'Saludos,' y en la siguiente linea exactamente 'user_name'.",
+    "No uses placeholders como '[Tu Nombre]'. Usa 'user_name'.",
+    "No cortes el mensaje: entregalo completo y bien cerrado.",
   ].join("\n")
 
   const context = [
@@ -337,9 +359,10 @@ export async function POST(request: Request) {
     `{"subject": string, "text": string}`,
     "Reglas:",
     "- No inventes datos personales del destinatario.",
-    "- Máximo ~90 palabras en text.",
+    "- Maximo ~450 palabras en text.",
     "- No incluyas CTA a menos que el usuario lo solicite explícitamente.",
     "- No incluyas explicaciones ni variantes, solo una versión final.",
+    "- Si necesitas placeholders, usa nombre_cliente o nombre_prospecto (y user_name para el remitente).",
     `Instrucciones del usuario:\n${instructions}`,
   ]
     .filter(Boolean)
@@ -394,10 +417,14 @@ export async function POST(request: Request) {
           const looseSubject = extractLooseJsonField(rawOut, "subject")
           const looseText = extractLooseJsonField(rawOut, "text")
           if (looseSubject || looseText) {
-            const subject = normalizeYear((looseSubject ?? "Asunto").trim(), currentYear)
+            const subject = normalizePlaceholders(
+              normalizeYear((looseSubject ?? "Asunto").trim(), currentYear)
+            )
             const text =
               looseText && looseText.trim()
-                ? normalizeYear(looseText.trim(), currentYear)
+                ? ensureCompleteMessage(
+                    normalizePlaceholders(normalizeYear(looseText.trim(), currentYear))
+                  )
                 : buildFallbackBody({ instructions, audience: body.audience, tone })
             return NextResponse.json(
               {
@@ -422,8 +449,10 @@ export async function POST(request: Request) {
             {
               ok: true,
               draft: {
-                subject: normalizeYear(fallbackSubject, currentYear),
-                text: rawOut.trim() ? normalizeYear(rawOut, currentYear) : buildFallbackBody({ instructions, audience: body.audience, tone }),
+                subject: normalizePlaceholders(normalizeYear(fallbackSubject, currentYear)),
+                text: rawOut.trim()
+                  ? ensureCompleteMessage(normalizePlaceholders(normalizeYear(rawOut, currentYear)))
+                  : buildFallbackBody({ instructions, audience: body.audience, tone }),
               },
               model_used: model,
               repaired: true,
@@ -434,11 +463,15 @@ export async function POST(request: Request) {
         }
 
         // Normalizaciones post-parse (año + cuerpo mínimo)
-        const normalizedSubject = normalizeYear(String(parsed.subject).trim(), currentYear)
-        const normalizedTextRaw = normalizeYear(String(parsed.text).trim(), currentYear)
+        const normalizedSubject = normalizePlaceholders(
+          normalizeYear(String(parsed.subject).trim(), currentYear)
+        )
+        const normalizedTextRaw = normalizePlaceholders(
+          normalizeYear(String(parsed.text).trim(), currentYear)
+        )
         const normalizedText =
           normalizedTextRaw.length >= 20
-            ? normalizedTextRaw
+            ? ensureCompleteMessage(normalizedTextRaw)
             : buildFallbackBody({ instructions, audience: body.audience, tone })
 
         return NextResponse.json(

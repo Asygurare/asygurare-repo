@@ -1,6 +1,7 @@
 "use client"
 
 import React, { useCallback, useEffect, useMemo, useState } from "react"
+import Image from "next/image"
 import { DATABASE } from "@/src/config"
 import { motion, AnimatePresence } from "framer-motion"
 import {
@@ -21,6 +22,9 @@ import {
   CheckCircle2,
   AlertCircle,
   Briefcase,
+  RefreshCw,
+  ExternalLink,
+  Video,
 } from "lucide-react"
 import { supabaseClient } from "@/src/lib/supabase/client"
 import { getFullName } from "@/src/lib/utils/utils"
@@ -55,6 +59,63 @@ type LightweightPerson = {
   full_name: string
   email?: string | null
   phone?: string | null
+}
+
+type GoogleCalendarStatus = {
+  connected: boolean
+  has_google_connection?: boolean
+  needs_reconnect?: boolean
+  email?: string | null
+}
+
+type GoogleCalendarEvent = {
+  id: string
+  status: string
+  summary: string
+  description?: string | null
+  htmlLink?: string | null
+  hangoutLink?: string | null
+  start?: { dateTime?: string; date?: string; timeZone?: string } | null
+  end?: { dateTime?: string; date?: string; timeZone?: string } | null
+  attendeesCount?: number
+}
+
+type CalendlyStatus = {
+  connected: boolean
+  email?: string | null
+  user_uri?: string | null
+}
+
+type CalendlyEvent = {
+  id: string
+  status: string
+  summary: string
+  start?: string | null
+  end?: string | null
+  htmlLink?: string | null
+  location?: {
+    type?: string
+    location?: string
+    join_url?: string
+    status?: string
+  } | null
+}
+
+type CalComStatus = {
+  connected: boolean
+  email?: string | null
+  username?: string | null
+  user_id?: string | null
+}
+
+type CalComEvent = {
+  id: string
+  status: string
+  summary: string
+  start?: string | null
+  end?: string | null
+  htmlLink?: string | null
+  location?: string | null
 }
 
 const LS_KEY_PREFIX = "tg_calendar_tasks_v1"
@@ -150,6 +211,21 @@ export default function CalendarioPage() {
   const [customers, setCustomers] = useState<LightweightPerson[]>([])
   const [leads, setLeads] = useState<LightweightPerson[]>([])
   const [tasks, setTasks] = useState<Task[]>([])
+  const [googleCalendarLoading, setGoogleCalendarLoading] = useState(true)
+  const [googleCalendarStatus, setGoogleCalendarStatus] = useState<GoogleCalendarStatus | null>(null)
+  const [googleCalendarEvents, setGoogleCalendarEvents] = useState<GoogleCalendarEvent[]>([])
+  const [syncingGoogleCalendar, setSyncingGoogleCalendar] = useState(false)
+  const [googleSyncPrefs, setGoogleSyncPrefs] = useState<Record<string, boolean>>({})
+  const [calendlyLoading, setCalendlyLoading] = useState(true)
+  const [calendlyStatus, setCalendlyStatus] = useState<CalendlyStatus | null>(null)
+  const [calendlyEvents, setCalendlyEvents] = useState<CalendlyEvent[]>([])
+  const [syncingCalendly, setSyncingCalendly] = useState(false)
+  const [syncingCalendlyTasks, setSyncingCalendlyTasks] = useState(false)
+  const [calComLoading, setCalComLoading] = useState(true)
+  const [calComStatus, setCalComStatus] = useState<CalComStatus | null>(null)
+  const [calComEvents, setCalComEvents] = useState<CalComEvent[]>([])
+  const [syncingCalCom, setSyncingCalCom] = useState(false)
+  const [syncingCalComTasks, setSyncingCalComTasks] = useState(false)
 
   const [searchTerm, setSearchTerm] = useState("")
   const [priorityTab, setPriorityTab] = useState<Priority>("Todas")
@@ -175,6 +251,7 @@ export default function CalendarioPage() {
     entity_id: string
     description: string
     notes: string
+    sync_google: boolean
   }>({
     title: "",
     kind: "Llamada",
@@ -185,10 +262,14 @@ export default function CalendarioPage() {
     entity_id: "",
     description: "",
     notes: "",
+    sync_google: false,
   })
 
   const lsKey = useMemo(() => {
     return `${LS_KEY_PREFIX}:${userId || "anon"}`
+  }, [userId])
+  const gcalSyncLsKey = useMemo(() => {
+    return `tg_gcal_sync_pref_v1:${userId || "anon"}`
   }, [userId])
 
   const loadFromLocal = useCallback((): Task[] => {
@@ -230,6 +311,32 @@ export default function CalendarioPage() {
     },
     [lsKey]
   )
+
+  useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem(gcalSyncLsKey)
+      if (!raw) {
+        setGoogleSyncPrefs({})
+        return
+      }
+      const parsed = JSON.parse(raw)
+      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+        setGoogleSyncPrefs({})
+        return
+      }
+      setGoogleSyncPrefs(parsed as Record<string, boolean>)
+    } catch {
+      setGoogleSyncPrefs({})
+    }
+  }, [gcalSyncLsKey])
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(gcalSyncLsKey, JSON.stringify(googleSyncPrefs))
+    } catch {
+      // ignore
+    }
+  }, [gcalSyncLsKey, googleSyncPrefs])
 
   const fetchPeople = useCallback(async () => {
     const [custRes, leadsRes] = await Promise.all([
@@ -297,6 +404,147 @@ export default function CalendarioPage() {
     }
   }, [loadFromLocal])
 
+  const fetchGoogleCalendarEvents = useCallback(async (opts?: { quiet?: boolean }) => {
+    if (!opts?.quiet) setSyncingGoogleCalendar(true)
+    try {
+      const res = await fetch("/api/google-calendar/events?max=8", {
+        method: "GET",
+        cache: "no-store",
+      })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        if (!opts?.quiet) {
+          toast.error(json?.detail || json?.error || "No se pudieron cargar eventos de Google Calendar")
+        }
+        setGoogleCalendarEvents([])
+        return
+      }
+      setGoogleCalendarEvents(Array.isArray(json?.items) ? json.items : [])
+    } catch (e: any) {
+      if (!opts?.quiet) toast.error("Error cargando Google Calendar: " + (e?.message || "Error desconocido"))
+      setGoogleCalendarEvents([])
+    } finally {
+      if (!opts?.quiet) setSyncingGoogleCalendar(false)
+    }
+  }, [])
+
+  const fetchGoogleCalendarStatus = useCallback(async () => {
+    setGoogleCalendarLoading(true)
+    try {
+      const res = await fetch("/api/google-calendar/status", {
+        method: "GET",
+        cache: "no-store",
+      })
+      const json = (await res.json().catch(() => ({}))) as GoogleCalendarStatus
+      if (!res.ok) throw new Error((json as any)?.error || "No se pudo consultar Google Calendar")
+      setGoogleCalendarStatus(json)
+      if (json.connected) {
+        await fetchGoogleCalendarEvents({ quiet: true })
+      } else {
+        setGoogleCalendarEvents([])
+      }
+    } catch {
+      setGoogleCalendarStatus({ connected: false })
+      setGoogleCalendarEvents([])
+    } finally {
+      setGoogleCalendarLoading(false)
+    }
+  }, [fetchGoogleCalendarEvents])
+
+  const fetchCalendlyEvents = useCallback(async (opts?: { quiet?: boolean }) => {
+    if (!opts?.quiet) setSyncingCalendly(true)
+    try {
+      const res = await fetch("/api/calendly/events?max=8", {
+        method: "GET",
+        cache: "no-store",
+      })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        if (!opts?.quiet) {
+          toast.error(json?.detail || json?.error || "No se pudieron cargar eventos de Calendly")
+        }
+        setCalendlyEvents([])
+        return
+      }
+      setCalendlyEvents(Array.isArray(json?.items) ? json.items : [])
+    } catch (e: any) {
+      if (!opts?.quiet) toast.error("Error cargando Calendly: " + (e?.message || "Error desconocido"))
+      setCalendlyEvents([])
+    } finally {
+      if (!opts?.quiet) setSyncingCalendly(false)
+    }
+  }, [])
+
+  const fetchCalendlyStatus = useCallback(async () => {
+    setCalendlyLoading(true)
+    try {
+      const res = await fetch("/api/calendly/status", {
+        method: "GET",
+        cache: "no-store",
+      })
+      const json = (await res.json().catch(() => ({}))) as CalendlyStatus
+      if (!res.ok) throw new Error((json as any)?.error || "No se pudo consultar Calendly")
+      setCalendlyStatus(json)
+      if (json.connected) {
+        await fetchCalendlyEvents({ quiet: true })
+      } else {
+        setCalendlyEvents([])
+      }
+    } catch {
+      setCalendlyStatus({ connected: false })
+      setCalendlyEvents([])
+    } finally {
+      setCalendlyLoading(false)
+    }
+  }, [fetchCalendlyEvents])
+
+  const fetchCalComEvents = useCallback(async (opts?: { quiet?: boolean }) => {
+    if (!opts?.quiet) setSyncingCalCom(true)
+    try {
+      const res = await fetch("/api/cal-com/events?max=8", {
+        method: "GET",
+        cache: "no-store",
+      })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        if (!opts?.quiet) {
+          toast.error(json?.detail || json?.error || "No se pudieron cargar eventos de Cal.com")
+        }
+        setCalComEvents([])
+        return
+      }
+      setCalComEvents(Array.isArray(json?.items) ? json.items : [])
+    } catch (e: any) {
+      if (!opts?.quiet) toast.error("Error cargando Cal.com: " + (e?.message || "Error desconocido"))
+      setCalComEvents([])
+    } finally {
+      if (!opts?.quiet) setSyncingCalCom(false)
+    }
+  }, [])
+
+  const fetchCalComStatus = useCallback(async () => {
+    setCalComLoading(true)
+    try {
+      const res = await fetch("/api/cal-com/status", {
+        method: "GET",
+        cache: "no-store",
+      })
+      const json = (await res.json().catch(() => ({}))) as CalComStatus
+      if (!res.ok) throw new Error((json as any)?.error || "No se pudo consultar Cal.com")
+      setCalComStatus(json)
+      if (json.connected) {
+        await fetchCalComEvents({ quiet: true })
+      } else {
+        setCalComEvents([])
+      }
+    } catch {
+      setCalComStatus({ connected: false })
+      setCalComEvents([])
+    } finally {
+      setCalComLoading(false)
+    }
+  }, [fetchCalComEvents])
+
   const bootstrap = useCallback(async () => {
     setLoading(true)
     try {
@@ -305,17 +553,80 @@ export default function CalendarioPage() {
       const user = data.user
       setUserId(user?.id || null)
 
-      await Promise.all([fetchPeople(), fetchTasks()])
+      await Promise.all([
+        fetchPeople(),
+        fetchTasks(),
+        fetchGoogleCalendarStatus(),
+        fetchCalendlyStatus(),
+        fetchCalComStatus(),
+      ])
     } catch (e: any) {
       toast.error("No se pudo inicializar Calendario: " + (e?.message || "Error desconocido"))
     } finally {
       setLoading(false)
     }
-  }, [fetchPeople, fetchTasks])
+  }, [fetchCalComStatus, fetchCalendlyStatus, fetchGoogleCalendarStatus, fetchPeople, fetchTasks])
 
   useEffect(() => {
     bootstrap()
   }, [bootstrap])
+
+  useEffect(() => {
+    const current = new URL(window.location.href)
+    const gcalStatus = current.searchParams.get("gcal")
+    if (!gcalStatus) return
+
+    if (gcalStatus === "connected") {
+      toast.success("Google Calendar conectado")
+    } else if (gcalStatus === "error") {
+      const reason = current.searchParams.get("reason") || "No se pudo conectar"
+      toast.error("Error de conexión con Google Calendar: " + reason)
+    }
+
+    current.searchParams.delete("gcal")
+    current.searchParams.delete("reason")
+    current.searchParams.delete("detail")
+    window.history.replaceState({}, "", `${current.pathname}${current.search}${current.hash}`)
+    void fetchGoogleCalendarStatus()
+  }, [fetchGoogleCalendarStatus])
+
+  useEffect(() => {
+    const current = new URL(window.location.href)
+    const calendly = current.searchParams.get("calendly")
+    if (!calendly) return
+
+    if (calendly === "connected") {
+      toast.success("Calendly conectado")
+    } else if (calendly === "error") {
+      const reason = current.searchParams.get("reason") || "No se pudo conectar"
+      toast.error("Error de conexión con Calendly: " + reason)
+    }
+
+    current.searchParams.delete("calendly")
+    current.searchParams.delete("reason")
+    current.searchParams.delete("detail")
+    window.history.replaceState({}, "", `${current.pathname}${current.search}${current.hash}`)
+    void fetchCalendlyStatus()
+  }, [fetchCalendlyStatus])
+
+  useEffect(() => {
+    const current = new URL(window.location.href)
+    const calcom = current.searchParams.get("calcom")
+    if (!calcom) return
+
+    if (calcom === "connected") {
+      toast.success("Cal.com conectado")
+    } else if (calcom === "error") {
+      const reason = current.searchParams.get("reason") || "No se pudo conectar"
+      toast.error("Error de conexión con Cal.com: " + reason)
+    }
+
+    current.searchParams.delete("calcom")
+    current.searchParams.delete("reason")
+    current.searchParams.delete("detail")
+    window.history.replaceState({}, "", `${current.pathname}${current.search}${current.hash}`)
+    void fetchCalComStatus()
+  }, [fetchCalComStatus])
 
   const monthLabel = useMemo(() => {
     const fmt = new Intl.DateTimeFormat("es-MX", { month: "long", year: "numeric" })
@@ -351,6 +662,80 @@ export default function CalendarioPage() {
     }
     return map
   }, [tasks])
+
+  const googleEventsByDayCounts = useMemo(() => {
+    const map = new Map<string, number>()
+    for (const event of googleCalendarEvents) {
+      const start = event.start?.dateTime || event.start?.date
+      if (!start) continue
+      const d = new Date(start)
+      if (Number.isNaN(d.getTime())) continue
+      const key = dayKey(d)
+      map.set(key, (map.get(key) || 0) + 1)
+    }
+    return map
+  }, [googleCalendarEvents])
+
+  const calendlyEventsByDayCounts = useMemo(() => {
+    const map = new Map<string, number>()
+    for (const event of calendlyEvents) {
+      if (!event.start) continue
+      const d = new Date(event.start)
+      if (Number.isNaN(d.getTime())) continue
+      const key = dayKey(d)
+      map.set(key, (map.get(key) || 0) + 1)
+    }
+    return map
+  }, [calendlyEvents])
+
+  const calComEventsByDayCounts = useMemo(() => {
+    const map = new Map<string, number>()
+    for (const event of calComEvents) {
+      if (!event.start) continue
+      const d = new Date(event.start)
+      if (Number.isNaN(d.getTime())) continue
+      const key = dayKey(d)
+      map.set(key, (map.get(key) || 0) + 1)
+    }
+    return map
+  }, [calComEvents])
+
+  const externalEventsByMonth = useMemo(() => {
+    const map = new Map<string, { google: number; calendly: number; calcom: number; total: number }>()
+
+    for (const event of googleCalendarEvents) {
+      const start = event.start?.dateTime || event.start?.date
+      if (!start) continue
+      const d = new Date(start)
+      if (Number.isNaN(d.getTime())) continue
+      const key = `${d.getFullYear()}-${pad2(d.getMonth() + 1)}`
+      const prev = map.get(key) || { google: 0, calendly: 0, calcom: 0, total: 0 }
+      const next = { ...prev, google: prev.google + 1, total: prev.total + 1 }
+      map.set(key, next)
+    }
+
+    for (const event of calendlyEvents) {
+      if (!event.start) continue
+      const d = new Date(event.start)
+      if (Number.isNaN(d.getTime())) continue
+      const key = `${d.getFullYear()}-${pad2(d.getMonth() + 1)}`
+      const prev = map.get(key) || { google: 0, calendly: 0, calcom: 0, total: 0 }
+      const next = { ...prev, calendly: prev.calendly + 1, total: prev.total + 1 }
+      map.set(key, next)
+    }
+
+    for (const event of calComEvents) {
+      if (!event.start) continue
+      const d = new Date(event.start)
+      if (Number.isNaN(d.getTime())) continue
+      const key = `${d.getFullYear()}-${pad2(d.getMonth() + 1)}`
+      const prev = map.get(key) || { google: 0, calendly: 0, calcom: 0, total: 0 }
+      const next = { ...prev, calcom: prev.calcom + 1, total: prev.total + 1 }
+      map.set(key, next)
+    }
+
+    return map
+  }, [calComEvents, calendlyEvents, googleCalendarEvents])
 
   const upcomingTasks = useMemo(() => {
     const now = new Date()
@@ -455,6 +840,7 @@ export default function CalendarioPage() {
       entity_id: "",
       description: "",
       notes: "",
+      sync_google: googleCalendarConnected,
     })
     setIsPanelOpen(true)
   }
@@ -472,11 +858,55 @@ export default function CalendarioPage() {
       entity_id: t.entity_id || "",
       description: (t.description || "") as string,
       notes: (t.notes || "") as string,
+      sync_google: googleSyncPrefs[t.id] ?? t.kind === "Cita",
     })
     setIsPanelOpen(true)
   }
 
-  const upsertTask = async (payload: Task) => {
+  const syncTaskWithGoogleCalendar = useCallback(
+    async (task: Task, action: "upsert" | "delete", shouldSync: boolean) => {
+      if (!googleCalendarStatus?.connected) return
+      try {
+        const res = await fetch("/api/google-calendar/events/sync", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action,
+            should_sync: shouldSync,
+            task: {
+              id: task.id,
+              title: task.title,
+              description: task.description ?? null,
+              notes: task.notes ?? null,
+              due_at: task.due_at,
+              kind: task.kind,
+            },
+          }),
+        })
+        const json = await res.json().catch(() => ({}))
+        if (!res.ok) {
+          throw new Error(json?.error || "No se pudo sincronizar con Google Calendar")
+        }
+        if (action === "upsert" || action === "delete") {
+          await fetchGoogleCalendarEvents({ quiet: true })
+        }
+      } catch (e: any) {
+        toast.error("Tarea guardada, pero falló sync con Google Calendar: " + (e?.message || "Error desconocido"))
+      }
+    },
+    [fetchGoogleCalendarEvents, googleCalendarStatus?.connected]
+  )
+
+  const getTaskShouldSync = useCallback(
+    (task: Task) => {
+      if (typeof googleSyncPrefs[task.id] === "boolean") return googleSyncPrefs[task.id]
+      return task.kind === "Cita"
+    },
+    [googleSyncPrefs]
+  )
+
+  const upsertTask = async (payload: Task, shouldSyncOverride?: boolean) => {
+    const shouldSync = typeof shouldSyncOverride === "boolean" ? shouldSyncOverride : getTaskShouldSync(payload)
     // optimistic update in UI, then persist
     setTasks((prev) => {
       const exists = prev.some((t) => t.id === payload.id)
@@ -492,6 +922,7 @@ export default function CalendarioPage() {
         return updated
       })()
       saveToLocal(next)
+      await syncTaskWithGoogleCalendar(payload, "upsert", shouldSync)
       return
     }
 
@@ -525,14 +956,22 @@ export default function CalendarioPage() {
       const updated = exists ? current.map((t) => (t.id === payload.id ? payload : t)) : [payload, ...current]
       saveToLocal(updated)
     }
+    await syncTaskWithGoogleCalendar(payload, "upsert", shouldSync)
   }
 
   const removeTask = async (id: string) => {
+    const existingTask = tasks.find((t) => t.id === id)
     setTasks((prev) => prev.filter((t) => t.id !== id))
 
     if (storageMode === "local") {
       const current = loadFromLocal().filter((t) => t.id !== id)
       saveToLocal(current)
+      if (existingTask) await syncTaskWithGoogleCalendar(existingTask, "delete", false)
+      setGoogleSyncPrefs((prev) => {
+        const next = { ...prev }
+        delete next[id]
+        return next
+      })
       return
     }
 
@@ -547,6 +986,12 @@ export default function CalendarioPage() {
       const current = loadFromLocal().filter((t) => t.id !== id)
       saveToLocal(current)
     }
+    if (existingTask) await syncTaskWithGoogleCalendar(existingTask, "delete", false)
+    setGoogleSyncPrefs((prev) => {
+      const next = { ...prev }
+      delete next[id]
+      return next
+    })
   }
 
   const onSubmit = async (e: React.FormEvent) => {
@@ -577,7 +1022,11 @@ export default function CalendarioPage() {
         updated_at: now,
       }
 
-      await upsertTask(base)
+      setGoogleSyncPrefs((prev) => ({
+        ...prev,
+        [base.id]: form.sync_google,
+      }))
+      await upsertTask(base, form.sync_google)
       toast.success(selectedTask ? "Tarea actualizada" : "Tarea creada")
       setIsPanelOpen(false)
       setSelectedTask(null)
@@ -595,7 +1044,7 @@ export default function CalendarioPage() {
       completed_at: t.status === "done" ? null : new Date().toISOString(),
       updated_at: new Date().toISOString(),
     }
-    await upsertTask(next)
+    await upsertTask(next, getTaskShouldSync(next))
   }
 
   const selectedDateLabel = useMemo(() => {
@@ -615,6 +1064,315 @@ export default function CalendarioPage() {
     setSelectedDate(next)
     setMonthCursor(startOfMonth(next))
     setYearCursor(next.getFullYear())
+  }
+
+  const connectGoogleCalendar = () => {
+    window.location.href = "/api/gmail/oauth/start?service=calendar"
+  }
+
+  const connectCalendly = () => {
+    window.location.href = "/api/calendly/oauth/start"
+  }
+
+  const connectCalCom = () => {
+    window.location.href = "/api/cal-com/oauth/start"
+  }
+
+  const disconnectGoogleCalendar = async () => {
+    if (!confirm("¿Desconectar Google Calendar?")) return
+    try {
+      const res = await fetch("/api/gmail/disconnect", {
+        method: "POST",
+        cache: "no-store",
+      })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        throw new Error(json?.error || "No se pudo desconectar")
+      }
+      setGoogleCalendarStatus({ connected: false, has_google_connection: false, needs_reconnect: false })
+      setGoogleCalendarEvents([])
+      toast.success("Google Calendar desconectado")
+    } catch (e: any) {
+      toast.error("Error al desconectar Google Calendar: " + (e?.message || "Error desconocido"))
+    }
+  }
+
+  const disconnectCalendly = async () => {
+    if (!confirm("¿Desconectar Calendly?")) return
+    try {
+      const res = await fetch("/api/calendly/disconnect", {
+        method: "POST",
+        cache: "no-store",
+      })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(json?.error || "No se pudo desconectar Calendly")
+      setCalendlyStatus({ connected: false })
+      setCalendlyEvents([])
+      toast.success("Calendly desconectado")
+    } catch (e: any) {
+      toast.error("Error al desconectar Calendly: " + (e?.message || "Error desconocido"))
+    }
+  }
+
+  const disconnectCalCom = async () => {
+    if (!confirm("¿Desconectar Cal.com?")) return
+    try {
+      const res = await fetch("/api/cal-com/disconnect", {
+        method: "POST",
+        cache: "no-store",
+      })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(json?.error || "No se pudo desconectar Cal.com")
+      setCalComStatus({ connected: false })
+      setCalComEvents([])
+      toast.success("Cal.com desconectado")
+    } catch (e: any) {
+      toast.error("Error al desconectar Cal.com: " + (e?.message || "Error desconocido"))
+    }
+  }
+
+  const syncCalComIntoTasks = async () => {
+    if (!calComConnected) {
+      toast.error("Conecta Cal.com primero")
+      return
+    }
+    setSyncingCalComTasks(true)
+    try {
+      const res = await fetch("/api/cal-com/sync/tasks?max=50", {
+        method: "POST",
+        cache: "no-store",
+      })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(json?.detail || json?.error || "No se pudo sincronizar a tareas")
+
+      await Promise.all([fetchTasks(), fetchCalComEvents({ quiet: true })])
+      toast.success(
+        `Cal.com → Tareas listo: ${json?.created || 0} nuevas, ${json?.updated || 0} actualizadas, ${json?.canceled || 0} canceladas`
+      )
+    } catch (e: any) {
+      toast.error("Error sincronizando Cal.com a tareas: " + (e?.message || "Error desconocido"))
+    } finally {
+      setSyncingCalComTasks(false)
+    }
+  }
+
+  const syncCalendlyIntoTasks = async () => {
+    if (!calendlyConnected) {
+      toast.error("Conecta Calendly primero")
+      return
+    }
+    setSyncingCalendlyTasks(true)
+    try {
+      const res = await fetch("/api/calendly/sync/tasks?max=50", {
+        method: "POST",
+        cache: "no-store",
+      })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(json?.detail || json?.error || "No se pudo sincronizar a tareas")
+
+      await Promise.all([fetchTasks(), fetchCalendlyEvents({ quiet: true })])
+      toast.success(
+        `Calendly → Tareas listo: ${json?.created || 0} nuevas, ${json?.updated || 0} actualizadas, ${json?.canceled || 0} canceladas`
+      )
+    } catch (e: any) {
+      toast.error("Error sincronizando Calendly a tareas: " + (e?.message || "Error desconocido"))
+    } finally {
+      setSyncingCalendlyTasks(false)
+    }
+  }
+
+  const googleCalendarConnected = !!googleCalendarStatus?.connected
+  const googleConnectionNeedsReconnect = !!googleCalendarStatus?.needs_reconnect
+  const nextGoogleEvent = googleCalendarEvents[0] || null
+  const calendlyConnected = !!calendlyStatus?.connected
+  const nextCalendlyEvent = calendlyEvents[0] || null
+  const calComConnected = !!calComStatus?.connected
+  const nextCalComEvent = calComEvents[0] || null
+
+  const formatGoogleEventWhen = (event: GoogleCalendarEvent) => {
+    const start = event.start?.dateTime || event.start?.date
+    if (!start) return "Sin fecha"
+    const dt = new Date(start)
+    if (Number.isNaN(dt.getTime())) return "Sin fecha"
+    return new Intl.DateTimeFormat("es-MX", {
+      day: "2-digit",
+      month: "short",
+      hour: event.start?.dateTime ? "2-digit" : undefined,
+      minute: event.start?.dateTime ? "2-digit" : undefined,
+    })
+      .format(dt)
+      .toUpperCase()
+  }
+
+  const formatCalendlyEventWhen = (event: CalendlyEvent) => {
+    const start = event.start
+    if (!start) return "Sin fecha"
+    const dt = new Date(start)
+    if (Number.isNaN(dt.getTime())) return "Sin fecha"
+    return new Intl.DateTimeFormat("es-MX", {
+      day: "2-digit",
+      month: "short",
+      hour: "2-digit",
+      minute: "2-digit",
+    })
+      .format(dt)
+      .toUpperCase()
+  }
+
+  const isCalendlyCanceled = (event: CalendlyEvent) => String(event.status || "").toLowerCase() === "canceled"
+
+  const formatCalComEventWhen = (event: CalComEvent) => {
+    const start = event.start
+    if (!start) return "Sin fecha"
+    const dt = new Date(start)
+    if (Number.isNaN(dt.getTime())) return "Sin fecha"
+    return new Intl.DateTimeFormat("es-MX", {
+      day: "2-digit",
+      month: "short",
+      hour: "2-digit",
+      minute: "2-digit",
+    })
+      .format(dt)
+      .toUpperCase()
+  }
+
+  const isCalComCanceled = (event: CalComEvent) => {
+    const status = String(event.status || "").toLowerCase()
+    return status === "canceled" || status === "cancelled"
+  }
+
+  const selectedDayGoogleEvents = useMemo(() => {
+    return googleCalendarEvents
+      .filter((event) => {
+        const start = event.start?.dateTime || event.start?.date
+        if (!start) return false
+        const dt = new Date(start)
+        if (Number.isNaN(dt.getTime())) return false
+        return sameDay(dt, selectedDate)
+      })
+      .sort((a, b) => {
+        const aStart = new Date(a.start?.dateTime || a.start?.date || "").getTime()
+        const bStart = new Date(b.start?.dateTime || b.start?.date || "").getTime()
+        return aStart - bStart
+      })
+  }, [googleCalendarEvents, selectedDate])
+
+  const selectedDayCalendlyEvents = useMemo(() => {
+    return calendlyEvents
+      .filter((event) => {
+        if (!event.start) return false
+        const dt = new Date(event.start)
+        if (Number.isNaN(dt.getTime())) return false
+        return sameDay(dt, selectedDate)
+      })
+      .sort((a, b) => {
+        const aStart = new Date(a.start || "").getTime()
+        const bStart = new Date(b.start || "").getTime()
+        return aStart - bStart
+      })
+  }, [calendlyEvents, selectedDate])
+
+  const selectedDayCalComEvents = useMemo(() => {
+    return calComEvents
+      .filter((event) => {
+        if (!event.start) return false
+        const dt = new Date(event.start)
+        if (Number.isNaN(dt.getTime())) return false
+        return sameDay(dt, selectedDate)
+      })
+      .sort((a, b) => {
+        const aStart = new Date(a.start || "").getTime()
+        const bStart = new Date(b.start || "").getTime()
+        return aStart - bStart
+      })
+  }, [calComEvents, selectedDate])
+
+  const renderTaskCard = (t: Task) => {
+    const Icon = kindIcon(t.kind)
+    const dt = new Date(t.due_at)
+    const time = `${pad2(dt.getHours())}:${pad2(dt.getMinutes())}`
+    const related =
+      t.entity_type === "customer"
+        ? customers.find((c) => c.id === t.entity_id)
+        : t.entity_type === "lead"
+          ? leads.find((l) => l.id === t.entity_id)
+          : null
+    const relatedLabel = t.entity_type === "customer" ? "Cliente" : t.entity_type === "lead" ? "Prospecto" : null
+
+    return (
+      <div
+        key={t.id}
+        className={`relative overflow-hidden p-4 sm:p-5 rounded-[1.6rem] border transition-all ${
+          t.status === "done"
+            ? "bg-gray-50/70 border-gray-100 opacity-85"
+            : "bg-white border-black/5 hover:border-(--accents)/30 hover:shadow-sm"
+        }`}
+      >
+        <div className={`absolute left-0 top-0 h-full w-1.5 ${kindBar(t.kind)} ${t.status === "done" ? "opacity-40" : ""}`} />
+
+        <div className="flex flex-col gap-3">
+          <div className="min-w-0 w-full">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest text-black/50 bg-gray-50 border border-black/5 rounded-full px-2.5 py-1">
+                <Clock size={11} className="opacity-60" /> {time}
+              </span>
+              <span className={`text-[10px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full border ${kindPill(t.kind)}`}>
+                {t.kind}
+              </span>
+              <span className={`text-[10px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full border ${priorityPill(t.priority)}`}>
+                {t.priority}
+              </span>
+            </div>
+
+            <div className="mt-3 flex items-start gap-2 w-full">
+              <div className={`p-2 rounded-xl border ${kindIconWrap(t.kind)}`}>
+                <Icon size={15} />
+              </div>
+              <div className="min-w-0 w-full">
+                <p
+                  className={`w-full font-black text-black uppercase tracking-tight leading-tight whitespace-normal break-words ${
+                    t.status === "done" ? "line-through" : ""
+                  }`}
+                >
+                  {t.title}
+                </p>
+                {t.description ? (
+                  <p className="text-[11px] font-bold text-black/50 mt-1.5 leading-relaxed line-clamp-1">{t.description}</p>
+                ) : null}
+              </div>
+            </div>
+
+            {related && relatedLabel ? (
+              <p className="mt-3 text-[10px] font-black uppercase tracking-widest text-black/45 flex items-center gap-2">
+                {t.entity_type === "customer" ? <Users size={12} className="opacity-40" /> : <Target size={12} className="opacity-40" />}
+                {relatedLabel}: <span className="text-black/70">{related.full_name}</span>
+              </p>
+            ) : null}
+          </div>
+
+          <div className="flex items-center gap-2 self-end">
+            <button
+              onClick={() => toggleDone(t)}
+              className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all ${
+                t.status === "done" ? "bg-green-600 text-white hover:bg-green-700" : "bg-(--accents) text-white hover:bg-black"
+              }`}
+              title={t.status === "done" ? "Marcar como pendiente" : "Marcar como hecha"}
+              aria-label={t.status === "done" ? "Marcar como pendiente" : "Completar tarea"}
+            >
+              <CheckCircle2 size={14} />
+              {t.status === "done" ? "Hecha" : "Hecha?"}
+            </button>
+            <button
+              onClick={() => openEditTask(t)}
+              className="p-2.5 rounded-xl text-black/25 hover:text-black hover:bg-gray-50 transition-all"
+              title="Editar"
+            >
+              <ChevronRight size={18} />
+            </button>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   if (loading) {
@@ -668,6 +1426,254 @@ export default function CalendarioPage() {
             <span className="sm:hidden">NUEVA</span>
             <span className="hidden sm:inline">NUEVA TAREA</span>
           </button>
+        </div>
+      </div>
+
+      {/* INTEGRACIONES */}
+      <div className="space-y-3">
+        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">Integraciones de calendario</p>
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+          <div className="bg-white p-4 rounded-[1.5rem] border border-black/5 shadow-sm flex flex-col gap-4 min-h-[280px]">
+            <div className="flex items-center gap-4 min-w-0">
+              <div className="h-16 w-16 rounded-2xl bg-[#f6f8ff] border border-black/5 flex items-center justify-center shrink-0 shadow-sm">
+                <Image
+                  src="/logo_integrations/google_calendar.png"
+                  alt="Google Calendar"
+                  width={86}
+                  height={86}
+                  className="h-62 w-62 object-contain"
+                />
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs font-black text-black uppercase tracking-widest truncate">Google Calendar</p>
+                <p className="text-[10px] font-bold text-black/50 uppercase tracking-widest leading-relaxed">
+                  {googleCalendarLoading
+                    ? "Cargando..."
+                    : googleCalendarConnected
+                      ? `Conectado${googleCalendarStatus?.email ? ` · ${googleCalendarStatus.email}` : ""}`
+                      : googleConnectionNeedsReconnect
+                        ? "Falta permiso"
+                        : "Sin conexión"}
+                </p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                onClick={connectGoogleCalendar}
+                className="px-3 py-2.5 rounded-xl bg-black text-white font-black text-[10px] uppercase tracking-widest hover:bg-(--accents) transition-all"
+              >
+                {googleCalendarConnected ? "Reautorizar" : "Conectar"}
+              </button>
+              {googleCalendarConnected ? (
+                <button
+                  onClick={disconnectGoogleCalendar}
+                  className="px-3 py-2.5 rounded-xl bg-red-50 text-red-600 border border-red-100 font-black text-[10px] uppercase tracking-widest hover:bg-red-600 hover:text-white transition-all"
+                >
+                  Desconectar
+                </button>
+              ) : null}
+              <button
+                onClick={() => fetchGoogleCalendarEvents()}
+                disabled={!googleCalendarConnected || syncingGoogleCalendar || googleCalendarLoading}
+                className={`px-3 py-2.5 rounded-xl bg-gray-50 text-black font-black text-[10px] uppercase tracking-widest hover:bg-black hover:text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 ${
+                  googleCalendarConnected ? "col-span-2" : "col-span-1"
+                }`}
+              >
+                {syncingGoogleCalendar ? <Loader2 className="animate-spin" size={13} /> : <RefreshCw size={13} />}
+                Sync
+              </button>
+            </div>
+
+            {!googleCalendarLoading && googleCalendarConnected && nextGoogleEvent ? (
+              <a
+                href={nextGoogleEvent.htmlLink || "#"}
+                target={nextGoogleEvent.htmlLink ? "_blank" : undefined}
+                rel={nextGoogleEvent.htmlLink ? "noreferrer" : undefined}
+                className="block rounded-xl border border-black/5 px-3 py-2.5 hover:border-(--accents)/30 hover:bg-[#ece7e2]/30 transition-all"
+              >
+                <div className="flex items-center justify-between gap-3">
+                  <p className="font-black text-[11px] text-black uppercase tracking-tight truncate">
+                    Próximo: {nextGoogleEvent.summary || "Evento sin título"}
+                  </p>
+                  <span className="text-[10px] font-black uppercase tracking-widest text-black/40 shrink-0">
+                    {formatGoogleEventWhen(nextGoogleEvent)}
+                  </span>
+                </div>
+              </a>
+            ) : null}
+
+            {!googleCalendarLoading && !googleCalendarConnected ? (
+              <div className="rounded-xl border border-dashed border-black/10 px-3 py-2.5 text-[11px] text-black/60 flex items-start gap-2">
+                <AlertCircle size={14} className="mt-0.5 shrink-0" />
+                <p>
+                  Conecta Google Calendar.
+                  {googleConnectionNeedsReconnect ? " Falta autorizar permiso de Calendar." : ""}
+                </p>
+              </div>
+            ) : null}
+          </div>
+
+          {/* <div className="bg-white p-4 rounded-[1.5rem] border border-black/5 shadow-sm flex flex-col gap-4 min-h-[280px]">
+            <div className="flex items-center gap-4 min-w-0">
+              <div className="h-16 w-16 rounded-2xl bg-white border border-black/5 flex items-center justify-center shrink-0 shadow-sm">
+              <Image
+                  src="/logo_integrations/cal_logo.png"
+                  alt="Calendly"
+                  width={306}
+                  height={306}
+                  className="h-62 w-62 object-contain"
+                />
+              </div>
+              <div className="min-w-0">
+             
+                <p className="text-[10px] font-bold text-black/50 uppercase tracking-widest leading-relaxed">
+                  {calComLoading
+                    ? "Cargando..."
+                    : calComConnected
+                      ? `Conectado${calComStatus?.email ? ` · ${calComStatus.email}` : ""}`
+                      : "Sin conexión"}
+                </p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                onClick={connectCalCom}
+                className="px-3 py-2.5 rounded-xl bg-black text-white font-black text-[10px] uppercase tracking-widest hover:bg-(--accents) transition-all"
+              >
+                {calComConnected ? "Reautorizar" : "Conectar"}
+              </button>
+              {calComConnected ? (
+                <button
+                  onClick={disconnectCalCom}
+                  className="px-3 py-2.5 rounded-xl bg-red-50 text-red-600 border border-red-100 font-black text-[10px] uppercase tracking-widest hover:bg-red-600 hover:text-white transition-all"
+                >
+                  Desconectar
+                </button>
+              ) : null}
+              <button
+                onClick={() => fetchCalComEvents()}
+                disabled={!calComConnected || syncingCalCom || calComLoading}
+                className={`px-3 py-2.5 rounded-xl bg-gray-50 text-black font-black text-[10px] uppercase tracking-widest hover:bg-black hover:text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 ${
+                  calComConnected ? "col-span-2" : "col-span-1"
+                }`}
+              >
+                {syncingCalCom ? <Loader2 className="animate-spin" size={13} /> : <RefreshCw size={13} />}
+                Sync
+              </button>
+              <button
+                onClick={syncCalComIntoTasks}
+                disabled={!calComConnected || syncingCalComTasks || calComLoading}
+                className="px-3 py-2.5 rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-100 font-black text-[10px] uppercase tracking-widest hover:bg-emerald-600 hover:text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 col-span-2"
+              >
+                {syncingCalComTasks ? <Loader2 className="animate-spin" size={13} /> : <CalendarDays size={13} />}
+                A tareas
+              </button>
+            </div>
+
+            {!calComLoading && calComConnected && nextCalComEvent ? (
+              <a
+                href={nextCalComEvent.htmlLink || "#"}
+                target={nextCalComEvent.htmlLink ? "_blank" : undefined}
+                rel={nextCalComEvent.htmlLink ? "noreferrer" : undefined}
+                className={`block rounded-xl px-3 py-2.5 ${
+                  isCalComCanceled(nextCalComEvent) ? "border border-red-200 bg-red-50/60" : "border border-black/5"
+                }`}
+              >
+                <div className="flex items-center justify-between gap-3">
+                  <p className="font-black text-[11px] text-black uppercase tracking-tight truncate">
+                    Próximo: {nextCalComEvent.summary || "Evento sin título"}
+                  </p>
+                  <span
+                    className={`text-[10px] font-black uppercase tracking-widest shrink-0 ${
+                      isCalComCanceled(nextCalComEvent) ? "text-red-600" : "text-black/40"
+                    }`}
+                  >
+                    {formatCalComEventWhen(nextCalComEvent)} {isCalComCanceled(nextCalComEvent) ? "· CANCELADO" : ""}
+                  </span>
+                </div>
+              </a>
+            ) : null}
+          </div> */}
+
+          <div className="bg-white p-4 rounded-[1.5rem] border border-black/5 shadow-sm flex flex-col gap-4 min-h-[280px]">
+            <div className="flex items-center gap-4 min-w-0">
+              <div className="h-16 w-16 rounded-2xl bg-white border border-black/5 flex items-center justify-center shrink-0 shadow-sm">
+                <Image
+                  src="/logo_integrations/calendly_logo.png"
+                  alt="Calendly"
+                  width={56}
+                  height={56}
+                  className="h-12 w-12 object-contain"
+                />
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs font-black text-black uppercase tracking-widest truncate">Calendly</p>
+                <p className="text-[10px] font-bold text-black/50 uppercase tracking-widest leading-relaxed">
+                  {calendlyLoading
+                    ? "Cargando..."
+                    : calendlyConnected
+                      ? `Conectado${calendlyStatus?.email ? ` · ${calendlyStatus.email}` : ""}`
+                      : "Sin conexión"}
+                </p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                onClick={connectCalendly}
+                className="px-3 py-2.5 rounded-xl bg-black text-white font-black text-[10px] uppercase tracking-widest hover:bg-(--accents) transition-all"
+              >
+                {calendlyConnected ? "Reautorizar" : "Conectar"}
+              </button>
+              {calendlyConnected ? (
+                <button
+                  onClick={disconnectCalendly}
+                  className="px-3 py-2.5 rounded-xl bg-red-50 text-red-600 border border-red-100 font-black text-[10px] uppercase tracking-widest hover:bg-red-600 hover:text-white transition-all"
+                >
+                  Desconectar
+                </button>
+              ) : null}
+              <button
+                onClick={() => fetchCalendlyEvents()}
+                disabled={!calendlyConnected || syncingCalendly || calendlyLoading}
+                className="px-3 py-2.5 rounded-xl bg-gray-50 text-black font-black text-[10px] uppercase tracking-widest hover:bg-black hover:text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              >
+                {syncingCalendly ? <Loader2 className="animate-spin" size={13} /> : <RefreshCw size={13} />}
+                Sync
+              </button>
+              <button
+                onClick={syncCalendlyIntoTasks}
+                disabled={!calendlyConnected || syncingCalendlyTasks || calendlyLoading}
+                className="px-3 py-2.5 rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-100 font-black text-[10px] uppercase tracking-widest hover:bg-emerald-600 hover:text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              >
+                {syncingCalendlyTasks ? <Loader2 className="animate-spin" size={13} /> : <CalendarDays size={13} />}
+                A tareas
+              </button>
+            </div>
+
+            {!calendlyLoading && calendlyConnected && nextCalendlyEvent ? (
+              <div
+                className={`block rounded-xl px-3 py-2.5 ${
+                  isCalendlyCanceled(nextCalendlyEvent) ? "border border-red-200 bg-red-50/60" : "border border-black/5"
+                }`}
+              >
+                <div className="flex items-center justify-between gap-3">
+                  <p className="font-black text-[11px] text-black uppercase tracking-tight truncate">
+                    Próximo: {nextCalendlyEvent.summary || "Evento sin título"}
+                  </p>
+                  <span
+                    className={`text-[10px] font-black uppercase tracking-widest shrink-0 ${
+                      isCalendlyCanceled(nextCalendlyEvent) ? "text-red-600" : "text-black/40"
+                    }`}
+                  >
+                    {formatCalendlyEventWhen(nextCalendlyEvent)} {isCalendlyCanceled(nextCalendlyEvent) ? "· CANCELADO" : ""}
+                  </span>
+                </div>
+              </div>
+            ) : null}
+          </div>
         </div>
       </div>
 
@@ -778,11 +1784,17 @@ export default function CalendarioPage() {
               const openCount = list.filter((t) => t.status !== "done").length
               const highCount = list.filter((t) => t.status !== "done" && t.priority === "Alta").length
               const doneCount = list.filter((t) => t.status === "done").length
+              const googleExternalCount = googleEventsByDayCounts.get(key) || 0
+              const calendlyExternalCount = calendlyEventsByDayCounts.get(key) || 0
+              const calComExternalCount = calComEventsByDayCounts.get(key) || 0
+              const externalCount = googleExternalCount + calendlyExternalCount + calComExternalCount
               const selected = sameDay(date, selectedDate)
               const totalCount = openCount + doneCount
-              const hasAny = totalCount > 0
-              const stackOpenPct = hasAny ? Math.round((openCount / totalCount) * 100) : 0
-              const stackDonePct = hasAny ? 100 - stackOpenPct : 0
+              const pendingCount = openCount + externalCount
+              const hasPending = pendingCount > 0
+              const hasAny = totalCount > 0 || externalCount > 0
+              const stackOpenPct = totalCount > 0 ? Math.round((openCount / totalCount) * 100) : 0
+              const stackDonePct = totalCount > 0 ? 100 - stackOpenPct : 0
 
               return (
                 <button
@@ -797,7 +1809,11 @@ export default function CalendarioPage() {
                   }`}
                 >
                   <div className="flex items-start justify-between gap-2">
-                    <div className={`text-[13px] sm:text-sm font-black ${inMonth ? "" : selected ? "text-white/60" : "text-black/20"}`}>
+                    <div
+                      className={`text-[13px] sm:text-sm font-black ${
+                        inMonth ? (selected ? "text-white" : "text-black") : selected ? "text-white/70" : "text-black/35"
+                      }`}
+                    >
                       {date.getDate()}
                     </div>
                     {isToday(date) ? (
@@ -809,52 +1825,37 @@ export default function CalendarioPage() {
                     ) : null}
                   </div>
 
-                  <div className="mt-2.5 space-y-2">
-                    {hasAny ? (
-                      <>
-                        <div
-                          className={`text-[10px] font-black uppercase tracking-widest leading-none whitespace-nowrap ${
-                            selected ? "text-white/80" : "text-black/50"
-                          }`}
-                          title={`Pendientes: ${openCount} · Hechas: ${doneCount} · Alta: ${highCount}`}
-                        >
-                          {openCount > 0 ? (
-                            <span className={selected ? "text-white" : "text-(--accents)"}>
-                              P{openCount}
-                            </span>
-                          ) : (
-                            <span className={selected ? "text-white/30" : "text-black/20"}>P0</span>
-                          )}
-                          <span className={selected ? "text-white/30" : "text-black/20"}> · </span>
-                          {doneCount > 0 ? (
-                            <span className={selected ? "text-green-200" : "text-green-700"}>
-                              H{doneCount}
-                            </span>
-                          ) : (
-                            <span className={selected ? "text-white/30" : "text-black/20"}>H0</span>
-                          )}
-                          {highCount > 0 ? (
-                            <>
-                              <span className={selected ? "text-white/30" : "text-black/20"}> · </span>
-                              <span className={selected ? "text-red-200" : "text-red-700"}>A{highCount}</span>
-                            </>
-                          ) : null}
-                        </div>
+                  <div className="mt-2.5 space-y-1.5">
+                    <div
+                      className={`inline-flex items-center px-2 py-1 rounded-full text-[9px] sm:text-[10px] font-black uppercase tracking-widest ${
+                        hasPending
+                          ? selected
+                            ? "bg-white/15 text-white"
+                            : "bg-black text-white"
+                          : selected
+                            ? "bg-green-300 text-black"
+                            : "bg-green-100 text-green-800"
+                      }`}
+                      title={`Pendientes: ${pendingCount} · Internas: ${openCount} · Google: ${googleExternalCount} · Calendly: ${calendlyExternalCount} · Cal.com: ${calComExternalCount} · Hechas: ${doneCount} · Alta: ${highCount}`}
+                    >
+                      {hasPending ? `${pendingCount} EVENTO${pendingCount === 1 ? "" : "S"}` : "SIN EVENTOS"}
+                    </div>
 
-                        <div className={`h-2 rounded-full overflow-hidden ${selected ? "bg-white/10" : "bg-black/5"}`}>
-                          <div className="h-full flex">
-                            <div className={`${selected ? "bg-white/60" : "bg-(--accents)"} h-full`} style={{ width: `${stackOpenPct}%` }} />
-                            <div className={`${selected ? "bg-green-300" : "bg-green-600"} h-full`} style={{ width: `${stackDonePct}%` }} />
-                          </div>
+                    {hasAny ? (
+                      <div className={`text-[9px] font-black uppercase tracking-widest ${selected ? "text-white/70" : "text-black/40"}`}>
+                        A{openCount} · G{googleExternalCount} · C{calendlyExternalCount} · Co{calComExternalCount}
+                        {doneCount > 0 ? ` · H${doneCount}` : ""}
+                      </div>
+                    ) : null}
+
+                    {totalCount > 0 ? (
+                      <div className={`h-1.5 rounded-full overflow-hidden ${selected ? "bg-white/10" : "bg-black/5"}`}>
+                        <div className="h-full flex">
+                          <div className={`${selected ? "bg-white/60" : "bg-(--accents)"} h-full`} style={{ width: `${stackOpenPct}%` }} />
+                          <div className={`${selected ? "bg-green-300" : "bg-green-600"} h-full`} style={{ width: `${stackDonePct}%` }} />
                         </div>
-                      </>
-                    ) : (
-                      <span className={`text-[9px] sm:text-[10px] font-bold uppercase tracking-widest leading-none ${
-                        selected ? "text-white/30" : "text-black/20"
-                      }`}>
-                        —
-                      </span>
-                    )}
+                      </div>
+                    ) : null}
                   </div>
                 </button>
               )
@@ -870,10 +1871,153 @@ export default function CalendarioPage() {
           </div>
 
           <div className="flex-1 space-y-4 overflow-y-auto custom-scrollbar pr-1">
-            {selectedDayTasks.length === 0 ? (
+            {selectedDayGoogleEvents.length > 0 ? (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between px-1">
+                  <p className="text-[10px] font-black uppercase tracking-widest text-black/40">
+                    Google Calendar ({selectedDayGoogleEvents.length})
+                  </p>
+                  <span className="inline-flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-black/40">
+                    <span className="w-2 h-2 rounded-full bg-blue-600" /> Externo
+                  </span>
+                </div>
+                {selectedDayGoogleEvents.map((event) => (
+                  <div key={`gcal-${event.id}`} className="rounded-[1.4rem] border border-blue-100 bg-blue-50/50 p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="font-black text-black uppercase tracking-tight truncate">{event.summary || "Evento de Google"}</p>
+                        <p className="text-[10px] font-black uppercase tracking-widest text-black/45 mt-1">
+                          {formatGoogleEventWhen(event)} · {event.status}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        {event.hangoutLink ? (
+                          <a
+                            href={event.hangoutLink}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest bg-white border border-blue-200 text-blue-700 hover:bg-blue-600 hover:text-white transition-all"
+                          >
+                            <Video size={12} />
+                            Meet
+                          </a>
+                        ) : null}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : null}
+
+            {selectedDayCalendlyEvents.length > 0 ? (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between px-1">
+                  <p className="text-[10px] font-black uppercase tracking-widest text-black/40">
+                    Calendly ({selectedDayCalendlyEvents.length})
+                  </p>
+                  <span className="inline-flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-black/40">
+                    <span className="w-2 h-2 rounded-full bg-[#06a763]" /> Externo
+                  </span>
+                </div>
+                {selectedDayCalendlyEvents.map((event) => (
+                  <div
+                    key={`calendly-${event.id}`}
+                    className={`rounded-[1.4rem] p-4 ${
+                      isCalendlyCanceled(event) ? "border border-red-200 bg-red-50/60" : "border border-emerald-100 bg-emerald-50/50"
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="font-black text-black uppercase tracking-tight truncate">{event.summary || "Evento de Calendly"}</p>
+                        <p
+                          className={`text-[10px] font-black uppercase tracking-widest mt-1 ${
+                            isCalendlyCanceled(event) ? "text-red-600" : "text-black/45"
+                          }`}
+                        >
+                          {formatCalendlyEventWhen(event)} · {event.status}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        {event.location?.join_url ? (
+                          <a
+                            href={event.location.join_url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
+                              isCalendlyCanceled(event)
+                                ? "bg-white border border-red-200 text-red-700 hover:bg-red-600 hover:text-white"
+                                : "bg-white border border-emerald-200 text-emerald-700 hover:bg-emerald-600 hover:text-white"
+                            }`}
+                          >
+                            <Video size={12} />
+                            Join
+                          </a>
+                        ) : null}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : null}
+
+            {selectedDayCalComEvents.length > 0 ? (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between px-1">
+                  <p className="text-[10px] font-black uppercase tracking-widest text-black/40">
+                    Cal.com ({selectedDayCalComEvents.length})
+                  </p>
+                  <span className="inline-flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-black/40">
+                    <span className="w-2 h-2 rounded-full bg-[#f97316]" /> Externo
+                  </span>
+                </div>
+                {selectedDayCalComEvents.map((event) => (
+                  <div
+                    key={`calcom-${event.id}`}
+                    className={`rounded-[1.4rem] p-4 ${
+                      isCalComCanceled(event) ? "border border-red-200 bg-red-50/60" : "border border-orange-100 bg-orange-50/60"
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="font-black text-black uppercase tracking-tight truncate">{event.summary || "Evento de Cal.com"}</p>
+                        <p
+                          className={`text-[10px] font-black uppercase tracking-widest mt-1 ${
+                            isCalComCanceled(event) ? "text-red-600" : "text-black/45"
+                          }`}
+                        >
+                          {formatCalComEventWhen(event)} · {event.status}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        {event.htmlLink ? (
+                          <a
+                            href={event.htmlLink}
+                            target="_blank"
+                            rel="noreferrer"
+                            className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
+                              isCalComCanceled(event)
+                                ? "bg-white border border-red-200 text-red-700 hover:bg-red-600 hover:text-white"
+                                : "bg-white border border-orange-200 text-orange-700 hover:bg-orange-500 hover:text-white"
+                            }`}
+                          >
+                            <ExternalLink size={12} />
+                            Abrir
+                          </a>
+                        ) : null}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : null}
+
+            {selectedDayTasks.length === 0 &&
+            selectedDayGoogleEvents.length === 0 &&
+            selectedDayCalendlyEvents.length === 0 &&
+            selectedDayCalComEvents.length === 0 ? (
               <div className="flex-1 flex flex-col items-center justify-center text-center opacity-40 py-14">
                 <CalendarDays size={44} className="text-gray-100 mb-4" />
-                <p className="font-bold text-black">Sin tareas para este día</p>
+                <p className="font-bold text-black">Sin eventos ni tareas para este día</p>
                 {!showDone && selectedDayAllCounts.done > 0 ? (
                   <p className="text-[11px] font-black text-black/40 mt-2">
                     Hay <span className="text-green-700">{selectedDayAllCounts.done}</span> hecha{selectedDayAllCounts.done === 1 ? "" : "s"} (activa “Mostrar hechas”).
@@ -899,90 +2043,7 @@ export default function CalendarioPage() {
                   </div>
                 ) : null}
 
-                {selectedDayPendingTasks.map((t) => {
-                const Icon = kindIcon(t.kind)
-                const dt = new Date(t.due_at)
-                const time = `${pad2(dt.getHours())}:${pad2(dt.getMinutes())}`
-                const related =
-                  t.entity_type === "customer"
-                    ? customers.find((c) => c.id === t.entity_id)
-                    : t.entity_type === "lead"
-                      ? leads.find((l) => l.id === t.entity_id)
-                      : null
-                const relatedLabel =
-                  t.entity_type === "customer" ? "Cliente" : t.entity_type === "lead" ? "Prospecto" : null
-
-                return (
-                  <div
-                    key={t.id}
-                    className={`relative overflow-hidden p-4 sm:p-6 rounded-[2rem] border transition-all group ${
-                      t.status === "done" ? "bg-gray-50/60 border-gray-100 opacity-70" : "bg-white border-black/5 hover:border-(--accents)/30"
-                    }`}
-                  >
-                    <div className={`absolute left-0 top-0 h-full w-1.5 ${kindBar(t.kind)} ${t.status === "done" ? "opacity-40" : ""}`} />
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="flex items-start gap-4 min-w-0">
-                        <button
-                          onClick={() => toggleDone(t)}
-                          className={`mt-1 inline-flex items-center gap-2 px-4 py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all shrink-0 shadow-sm ${
-                            t.status === "done"
-                              ? "bg-green-600 text-white hover:bg-green-700"
-                              : "bg-(--accents) text-white hover:bg-black ring-2 ring-(--accents)/20"
-                          }`}
-                          title={t.status === "done" ? "Marcar como pendiente" : "Marcar como hecha"}
-                          aria-label={t.status === "done" ? "Marcar como pendiente" : "Completar tarea"}
-                        >
-                          <CheckCircle2 size={18} />
-                          <span className="hidden sm:inline">{t.status === "done" ? "Hecha" : "Completar"}</span>
-                        </button>
-
-                        <div className="min-w-0">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <div className={`p-2 rounded-xl border ${kindIconWrap(t.kind)}`}>
-                              <Icon size={16} />
-                            </div>
-                            <p className={`font-black text-black uppercase tracking-tighter truncate ${t.status === "done" ? "line-through" : ""}`}>
-                              {t.title}
-                            </p>
-                          </div>
-
-                          <div className="flex items-center gap-3 mt-2 flex-wrap">
-                            <span className="text-[10px] font-black uppercase tracking-widest text-black/40 flex items-center gap-2">
-                              <Clock size={12} className="opacity-40" /> {time}
-                            </span>
-                            <span className={`text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full border ${kindPill(t.kind)}`}>
-                              {t.kind}
-                            </span>
-                            <span className={`text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full border ${priorityPill(t.priority)}`}>
-                              {t.priority}
-                            </span>
-                            {related && relatedLabel ? (
-                              <span className="text-[10px] font-black uppercase tracking-widest text-black/40 flex items-center gap-2">
-                                {t.entity_type === "customer" ? <Users size={12} className="opacity-40" /> : <Target size={12} className="opacity-40" />}
-                                {relatedLabel}: <span className="text-black/70">{related.full_name}</span>
-                              </span>
-                            ) : null}
-                          </div>
-
-                          {t.description ? (
-                            <p className="text-[11px] font-bold text-black/50 mt-3 leading-relaxed line-clamp-2">
-                              {t.description}
-                            </p>
-                          ) : null}
-                        </div>
-                      </div>
-
-                      <button
-                        onClick={() => openEditTask(t)}
-                        className="p-3 rounded-2xl text-black/20 hover:text-black hover:bg-gray-50 transition-all"
-                        title="Editar"
-                      >
-                        <ChevronRight size={20} />
-                      </button>
-                    </div>
-                  </div>
-                )
-                })}
+                {selectedDayPendingTasks.map((t) => renderTaskCard(t))}
 
                 {showDone && selectedDayDoneTasks.length > 0 ? (
                   <div className="pt-4 mt-2 border-t border-black/5">
@@ -995,80 +2056,7 @@ export default function CalendarioPage() {
                       </span>
                     </div>
                     <div className="space-y-4">
-                      {selectedDayDoneTasks.map((t) => {
-                        const Icon = kindIcon(t.kind)
-                        const dt = new Date(t.due_at)
-                        const time = `${pad2(dt.getHours())}:${pad2(dt.getMinutes())}`
-                        const related =
-                          t.entity_type === "customer"
-                            ? customers.find((c) => c.id === t.entity_id)
-                            : t.entity_type === "lead"
-                              ? leads.find((l) => l.id === t.entity_id)
-                              : null
-                        const relatedLabel =
-                          t.entity_type === "customer" ? "Cliente" : t.entity_type === "lead" ? "Prospecto" : null
-
-                        return (
-                          <div
-                            key={t.id}
-                            className={`relative overflow-hidden p-4 sm:p-6 rounded-[2rem] border transition-all group ${
-                              "bg-gray-50/60 border-gray-100 opacity-80"
-                            }`}
-                          >
-                            <div className={`absolute left-0 top-0 h-full w-1.5 ${kindBar(t.kind)} opacity-40`} />
-                            <div className="flex items-start justify-between gap-4">
-                              <div className="flex items-start gap-4 min-w-0">
-                                <button
-                                  onClick={() => toggleDone(t)}
-                                  className="mt-1 inline-flex items-center gap-2 px-4 py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all shrink-0 shadow-sm bg-green-600 text-white hover:bg-green-700"
-                                  title="Marcar como pendiente"
-                                  aria-label="Marcar como pendiente"
-                                >
-                                  <CheckCircle2 size={18} />
-                                  <span className="hidden sm:inline">Hecha</span>
-                                </button>
-
-                                <div className="min-w-0">
-                                  <div className="flex items-center gap-2 flex-wrap">
-                                    <div className={`p-2 rounded-xl border ${kindIconWrap(t.kind)}`}>
-                                      <Icon size={16} />
-                                    </div>
-                                    <p className="font-black text-black uppercase tracking-tighter truncate line-through">
-                                      {t.title}
-                                    </p>
-                                  </div>
-
-                                  <div className="flex items-center gap-3 mt-2 flex-wrap">
-                                    <span className="text-[10px] font-black uppercase tracking-widest text-black/40 flex items-center gap-2">
-                                      <Clock size={12} className="opacity-40" /> {time}
-                                    </span>
-                                    <span className={`text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full border ${kindPill(t.kind)}`}>
-                                      {t.kind}
-                                    </span>
-                                    <span className={`text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full border ${priorityPill(t.priority)}`}>
-                                      {t.priority}
-                                    </span>
-                                    {related && relatedLabel ? (
-                                      <span className="text-[10px] font-black uppercase tracking-widest text-black/40 flex items-center gap-2">
-                                        {t.entity_type === "customer" ? <Users size={12} className="opacity-40" /> : <Target size={12} className="opacity-40" />}
-                                        {relatedLabel}: <span className="text-black/70">{related.full_name}</span>
-                                      </span>
-                                    ) : null}
-                                  </div>
-                                </div>
-                              </div>
-
-                              <button
-                                onClick={() => openEditTask(t)}
-                                className="p-3 rounded-2xl text-black/20 hover:text-black hover:bg-gray-50 transition-all"
-                                title="Editar"
-                              >
-                                <ChevronRight size={20} />
-                              </button>
-                            </div>
-                          </div>
-                        )
-                      })}
+                      {selectedDayDoneTasks.map((t) => renderTaskCard(t))}
                     </div>
                   </div>
                 ) : null}
@@ -1140,10 +2128,175 @@ export default function CalendarioPage() {
             </div>
 
             <div className="flex-1 space-y-4 overflow-y-auto custom-scrollbar pr-1">
-              {selectedDayTasks.length === 0 ? (
+              {selectedDayGoogleEvents.length > 0 ? (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between px-1">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-black/40">
+                      Google Calendar ({selectedDayGoogleEvents.length})
+                    </p>
+                    <span className="inline-flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-black/40">
+                      <span className="w-2 h-2 rounded-full bg-blue-600" /> Externo
+                    </span>
+                  </div>
+                  {selectedDayGoogleEvents.map((event) => (
+                    <div key={`gcal-day-${event.id}`} className="rounded-[1.4rem] border border-blue-100 bg-blue-50/50 p-4">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="font-black text-black uppercase tracking-tight truncate">{event.summary || "Evento de Google"}</p>
+                          <p className="text-[10px] font-black uppercase tracking-widest text-black/45 mt-1">
+                            {formatGoogleEventWhen(event)} · {event.status}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          {event.hangoutLink ? (
+                            <a
+                              href={event.hangoutLink}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest bg-white border border-blue-200 text-blue-700 hover:bg-blue-600 hover:text-white transition-all"
+                            >
+                              <Video size={12} />
+                              Meet
+                            </a>
+                          ) : null}
+                          {event.htmlLink ? (
+                            <a
+                              href={event.htmlLink}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest bg-white border border-black/10 text-black/70 hover:bg-black hover:text-white transition-all"
+                            >
+                              <ExternalLink size={12} />
+                              Abrir
+                            </a>
+                          ) : null}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
+
+              {selectedDayCalendlyEvents.length > 0 ? (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between px-1">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-black/40">
+                      Calendly ({selectedDayCalendlyEvents.length})
+                    </p>
+                    <span className="inline-flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-black/40">
+                      <span className="w-2 h-2 rounded-full bg-[#06a763]" /> Externo
+                    </span>
+                  </div>
+                  {selectedDayCalendlyEvents.map((event) => (
+                    <div
+                      key={`calendly-day-${event.id}`}
+                      className={`rounded-[1.4rem] p-4 ${
+                        isCalendlyCanceled(event) ? "border border-red-200 bg-red-50/60" : "border border-emerald-100 bg-emerald-50/50"
+                      }`}
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="font-black text-black uppercase tracking-tight truncate">{event.summary || "Evento de Calendly"}</p>
+                          <p
+                            className={`text-[10px] font-black uppercase tracking-widest mt-1 ${
+                              isCalendlyCanceled(event) ? "text-red-600" : "text-black/45"
+                            }`}
+                          >
+                            {formatCalendlyEventWhen(event)} · {event.status}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          {event.location?.join_url ? (
+                            <a
+                              href={event.location.join_url}
+                              target="_blank"
+                              rel="noreferrer"
+                              className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
+                                isCalendlyCanceled(event)
+                                  ? "bg-white border border-red-200 text-red-700 hover:bg-red-600 hover:text-white"
+                                  : "bg-white border border-emerald-200 text-emerald-700 hover:bg-emerald-600 hover:text-white"
+                              }`}
+                            >
+                              <Video size={12} />
+                              Join
+                            </a>
+                          ) : null}
+                          {event.htmlLink ? (
+                            <a
+                              href={event.htmlLink}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest bg-white border border-black/10 text-black/70 hover:bg-black hover:text-white transition-all"
+                            >
+                              <ExternalLink size={12} />
+                              Abrir
+                            </a>
+                          ) : null}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
+
+              {selectedDayCalComEvents.length > 0 ? (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between px-1">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-black/40">
+                      Cal.com ({selectedDayCalComEvents.length})
+                    </p>
+                    <span className="inline-flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-black/40">
+                      <span className="w-2 h-2 rounded-full bg-[#f97316]" /> Externo
+                    </span>
+                  </div>
+                  {selectedDayCalComEvents.map((event) => (
+                    <div
+                      key={`calcom-day-${event.id}`}
+                      className={`rounded-[1.4rem] p-4 ${
+                        isCalComCanceled(event) ? "border border-red-200 bg-red-50/60" : "border border-orange-100 bg-orange-50/60"
+                      }`}
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="font-black text-black uppercase tracking-tight truncate">{event.summary || "Evento de Cal.com"}</p>
+                          <p
+                            className={`text-[10px] font-black uppercase tracking-widest mt-1 ${
+                              isCalComCanceled(event) ? "text-red-600" : "text-black/45"
+                            }`}
+                          >
+                            {formatCalComEventWhen(event)} · {event.status}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          {event.htmlLink ? (
+                            <a
+                              href={event.htmlLink}
+                              target="_blank"
+                              rel="noreferrer"
+                              className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
+                                isCalComCanceled(event)
+                                  ? "bg-white border border-red-200 text-red-700 hover:bg-red-600 hover:text-white"
+                                  : "bg-white border border-orange-200 text-orange-700 hover:bg-orange-500 hover:text-white"
+                              }`}
+                            >
+                              <ExternalLink size={12} />
+                              Abrir
+                            </a>
+                          ) : null}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
+
+              {selectedDayTasks.length === 0 &&
+              selectedDayGoogleEvents.length === 0 &&
+              selectedDayCalendlyEvents.length === 0 &&
+              selectedDayCalComEvents.length === 0 ? (
                 <div className="flex-1 flex flex-col items-center justify-center text-center opacity-40 py-14">
                   <CalendarDays size={44} className="text-gray-100 mb-4" />
-                  <p className="font-bold text-black">Sin tareas para este día</p>
+                  <p className="font-bold text-black">Sin eventos ni tareas para este día</p>
                   {!showDone && selectedDayAllCounts.done > 0 ? (
                     <p className="text-[11px] font-black text-black/40 mt-2">
                       Hay <span className="text-green-700">{selectedDayAllCounts.done}</span> hecha{selectedDayAllCounts.done === 1 ? "" : "s"} (activa “Mostrar hechas”).
@@ -1169,104 +2322,7 @@ export default function CalendarioPage() {
                     </div>
                   ) : null}
 
-                  {selectedDayPendingTasks.map((t) => {
-                  const Icon = kindIcon(t.kind)
-                  const dt = new Date(t.due_at)
-                  const time = `${pad2(dt.getHours())}:${pad2(dt.getMinutes())}`
-                  const related =
-                    t.entity_type === "customer"
-                      ? customers.find((c) => c.id === t.entity_id)
-                      : t.entity_type === "lead"
-                        ? leads.find((l) => l.id === t.entity_id)
-                        : null
-                  const relatedLabel =
-                    t.entity_type === "customer" ? "Cliente" : t.entity_type === "lead" ? "Prospecto" : null
-
-                  return (
-                    <div
-                      key={t.id}
-                      className={`relative overflow-hidden p-4 sm:p-6 rounded-[2rem] border transition-all group ${
-                        t.status === "done"
-                          ? "bg-gray-50/60 border-gray-100 opacity-70"
-                          : "bg-white border-black/5 hover:border-(--accents)/30"
-                      }`}
-                    >
-                      <div className={`absolute left-0 top-0 h-full w-1.5 ${kindBar(t.kind)} ${t.status === "done" ? "opacity-40" : ""}`} />
-                      <div className="flex items-start justify-between gap-4">
-                        <div className="flex items-start gap-4 min-w-0">
-                          <button
-                            onClick={() => toggleDone(t)}
-                            className={`mt-1 inline-flex items-center gap-2 px-4 py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all shrink-0 shadow-sm ${
-                              t.status === "done"
-                                ? "bg-green-600 text-white hover:bg-green-700"
-                                : "bg-(--accents) text-white hover:bg-black ring-2 ring-(--accents)/20"
-                            }`}
-                            title={t.status === "done" ? "Marcar como pendiente" : "Marcar como hecha"}
-                            aria-label={t.status === "done" ? "Marcar como pendiente" : "Completar tarea"}
-                          >
-                            <CheckCircle2 size={18} />
-                            <span className="hidden sm:inline">{t.status === "done" ? "Hecha" : "Completar"}</span>
-                          </button>
-
-                          <div className="min-w-0">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <div className={`p-2 rounded-xl border ${kindIconWrap(t.kind)}`}>
-                                <Icon size={16} />
-                              </div>
-                              <p
-                                className={`font-black text-black uppercase tracking-tighter truncate ${
-                                  t.status === "done" ? "line-through" : ""
-                                }`}
-                              >
-                                {t.title}
-                              </p>
-                            </div>
-
-                            <div className="flex items-center gap-3 mt-2 flex-wrap">
-                              <span className="text-[10px] font-black uppercase tracking-widest text-black/40 flex items-center gap-2">
-                                <Clock size={12} className="opacity-40" /> {time}
-                              </span>
-                              <span className={`text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full border ${kindPill(t.kind)}`}>
-                                {t.kind}
-                              </span>
-                              <span
-                                className={`text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full border ${priorityPill(
-                                  t.priority
-                                )}`}
-                              >
-                                {t.priority}
-                              </span>
-                              {related && relatedLabel ? (
-                                <span className="text-[10px] font-black uppercase tracking-widest text-black/40 flex items-center gap-2">
-                                  {t.entity_type === "customer" ? (
-                                    <Users size={12} className="opacity-40" />
-                                  ) : (
-                                    <Target size={12} className="opacity-40" />
-                                  )}
-                                  {relatedLabel}: <span className="text-black/70">{related.full_name}</span>
-                                </span>
-                              ) : null}
-                            </div>
-
-                            {t.description ? (
-                              <p className="text-[11px] font-bold text-black/50 mt-3 leading-relaxed line-clamp-2">
-                                {t.description}
-                              </p>
-                            ) : null}
-                          </div>
-                        </div>
-
-                        <button
-                          onClick={() => openEditTask(t)}
-                          className="p-3 rounded-2xl text-black/20 hover:text-black hover:bg-gray-50 transition-all"
-                          title="Editar"
-                        >
-                          <ChevronRight size={20} />
-                        </button>
-                      </div>
-                    </div>
-                  )
-                  })}
+                  {selectedDayPendingTasks.map((t) => renderTaskCard(t))}
 
                   {showDone && selectedDayDoneTasks.length > 0 ? (
                     <div className="pt-4 mt-2 border-t border-black/5">
@@ -1279,78 +2335,7 @@ export default function CalendarioPage() {
                         </span>
                       </div>
                       <div className="space-y-4">
-                        {selectedDayDoneTasks.map((t) => {
-                          const Icon = kindIcon(t.kind)
-                          const dt = new Date(t.due_at)
-                          const time = `${pad2(dt.getHours())}:${pad2(dt.getMinutes())}`
-                          const related =
-                            t.entity_type === "customer"
-                              ? customers.find((c) => c.id === t.entity_id)
-                              : t.entity_type === "lead"
-                                ? leads.find((l) => l.id === t.entity_id)
-                                : null
-                          const relatedLabel =
-                            t.entity_type === "customer" ? "Cliente" : t.entity_type === "lead" ? "Prospecto" : null
-
-                          return (
-                            <div
-                              key={t.id}
-                              className="relative overflow-hidden p-4 sm:p-6 rounded-[2rem] border transition-all group bg-gray-50/60 border-gray-100 opacity-80"
-                            >
-                              <div className={`absolute left-0 top-0 h-full w-1.5 ${kindBar(t.kind)} opacity-40`} />
-                              <div className="flex items-start justify-between gap-4">
-                                <div className="flex items-start gap-4 min-w-0">
-                                  <button
-                                    onClick={() => toggleDone(t)}
-                                    className="mt-1 inline-flex items-center gap-2 px-4 py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all shrink-0 shadow-sm bg-green-600 text-white hover:bg-green-700"
-                                    title="Marcar como pendiente"
-                                    aria-label="Marcar como pendiente"
-                                  >
-                                    <CheckCircle2 size={18} />
-                                    <span className="hidden sm:inline">Hecha</span>
-                                  </button>
-
-                                  <div className="min-w-0">
-                                    <div className="flex items-center gap-2 flex-wrap">
-                                      <div className={`p-2 rounded-xl border ${kindIconWrap(t.kind)}`}>
-                                        <Icon size={16} />
-                                      </div>
-                                      <p className="font-black text-black uppercase tracking-tighter truncate line-through">
-                                        {t.title}
-                                      </p>
-                                    </div>
-
-                                    <div className="flex items-center gap-3 mt-2 flex-wrap">
-                                      <span className="text-[10px] font-black uppercase tracking-widest text-black/40 flex items-center gap-2">
-                                        <Clock size={12} className="opacity-40" /> {time}
-                                      </span>
-                                      <span className={`text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full border ${kindPill(t.kind)}`}>
-                                        {t.kind}
-                                      </span>
-                                      <span className={`text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full border ${priorityPill(t.priority)}`}>
-                                        {t.priority}
-                                      </span>
-                                      {related && relatedLabel ? (
-                                        <span className="text-[10px] font-black uppercase tracking-widest text-black/40 flex items-center gap-2">
-                                          {t.entity_type === "customer" ? <Users size={12} className="opacity-40" /> : <Target size={12} className="opacity-40" />}
-                                          {relatedLabel}: <span className="text-black/70">{related.full_name}</span>
-                                        </span>
-                                      ) : null}
-                                    </div>
-                                  </div>
-                                </div>
-
-                                <button
-                                  onClick={() => openEditTask(t)}
-                                  className="p-3 rounded-2xl text-black/20 hover:text-black hover:bg-gray-50 transition-all"
-                                  title="Editar"
-                                >
-                                  <ChevronRight size={20} />
-                                </button>
-                              </div>
-                            </div>
-                          )
-                        })}
+                        {selectedDayDoneTasks.map((t) => renderTaskCard(t))}
                       </div>
                     </div>
                   ) : null}
@@ -1435,7 +2420,7 @@ export default function CalendarioPage() {
               <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Año</p>
               <h3 className="text-2xl font-black text-black italic">{yearLabel}</h3>
               <p className="text-[10px] font-bold text-black/40 uppercase tracking-widest mt-1">
-                {storageMode === "supabase" ? "Sync con Supabase" : "Modo local (este dispositivo)"}
+                {storageMode === "supabase" ? "" : "Modo local (este dispositivo)"}
               </p>
             </div>
 
@@ -1471,6 +2456,7 @@ export default function CalendarioPage() {
               const monthDate = new Date(yearCursor, idx, 1)
               const monthKey = `${yearCursor}-${String(idx + 1).padStart(2, "0")}`
               const stats = tasksByMonth.get(monthKey) || { total: 0, open: 0, high: 0 }
+              const external = externalEventsByMonth.get(monthKey) || { google: 0, calendly: 0, calcom: 0, total: 0 }
               const label = new Intl.DateTimeFormat("es-MX", { month: "long" }).format(monthDate)
               const monthLabel = label.charAt(0).toUpperCase() + label.slice(1)
 
@@ -1497,7 +2483,18 @@ export default function CalendarioPage() {
                         · {stats.high} alta
                       </span>
                     ) : null}
+                    {external.total > 0 ? (
+                      <span className="text-[10px] font-black uppercase tracking-widest text-blue-700">
+                        · ext {external.total}
+                      </span>
+                    ) : null}
                   </div>
+
+                  {external.total > 0 ? (
+                    <p className="mt-2 text-[10px] font-black uppercase tracking-widest text-black/40">
+                      G{external.google} · C{external.calendly} · Co{external.calcom}
+                    </p>
+                  ) : null}
 
                   <div className="mt-3">
                     <span className="inline-block text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full border bg-gray-50 text-gray-600 border-gray-100">
@@ -1616,6 +2613,42 @@ export default function CalendarioPage() {
                         className="w-full bg-transparent text-xl font-black text-black outline-none uppercase"
                       />
                     </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-black/40 uppercase tracking-widest block">
+                      Sync con Google Calendar
+                    </label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setForm((f) => ({ ...f, sync_google: true }))}
+                        disabled={!googleCalendarConnected}
+                        className={`px-4 py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all border ${
+                          form.sync_google
+                            ? "bg-black text-white border-black shadow-lg"
+                            : "bg-white text-black/40 border-black/5 hover:bg-gray-50"
+                        } disabled:opacity-50 disabled:cursor-not-allowed`}
+                      >
+                        Sí sincronizar
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setForm((f) => ({ ...f, sync_google: false }))}
+                        className={`px-4 py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all border ${
+                          !form.sync_google
+                            ? "bg-black text-white border-black shadow-lg"
+                            : "bg-white text-black/40 border-black/5 hover:bg-gray-50"
+                        }`}
+                      >
+                        No sincronizar
+                      </button>
+                    </div>
+                    <p className="text-[11px] font-bold text-black/40">
+                      {googleCalendarConnected
+                        ? "Elige si esta tarea se refleja en Google Calendar."
+                        : "Conecta Google Calendar para poder sincronizar tareas."}
+                    </p>
                   </div>
 
                   <div className="space-y-3">

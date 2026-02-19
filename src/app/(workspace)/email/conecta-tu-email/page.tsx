@@ -1,6 +1,6 @@
-import AutomatizacionesClient from "./AutomatizacionesClient"
+import ConectaEmailClient from "../components/ConectaEmailClient"
 
-export default async function AutomatizacionesPage({
+export default async function EmailConectaPage({
   searchParams,
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>
@@ -9,6 +9,5 @@ export default async function AutomatizacionesPage({
   const banner = typeof sp.gmail === "string" ? sp.gmail : null
   const reason = typeof sp.reason === "string" ? sp.reason : null
 
-  return <AutomatizacionesClient banner={banner} reason={reason} />
+  return <ConectaEmailClient banner={banner} reason={reason} />
 }
-
