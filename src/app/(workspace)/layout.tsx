@@ -6,12 +6,16 @@ import { useEffect, useRef, useState } from 'react'
 import {
   LayoutDashboard, Users, Target, Shield,
   CreditCard, Settings, BrainCircuit, CalendarDays, BarChart3,
-  Cpu, Flag, X,
+  Cpu, Flag, X, ChevronDown,
   User2Icon,
-  CpuIcon
+  CpuIcon, FileText, Signature,
+  Mail,
+  Send,
+  Link2
 } from 'lucide-react'
 import WorkspaceNavbar from '@/src/components/navbar/WorkspaceNavbar'
 import Image from 'next/image'
+import AgentOrb from '../../components/workspace/chat/AgentOrb'
 
 const Avatar = <Image src="/avatar/avatar.png" alt='' width={80} height={80}/>
 const menuItems = [
@@ -22,10 +26,23 @@ const menuItems = [
   { icon: Shield, label: 'Pólizas', href: '/polizas' },
   { icon: CreditCard, label: 'Pagos', href: '/pagos', hidden: true }, // omitido por el momento
   { icon: CalendarDays, label: 'Calendario', href: '/calendario' },
+  { icon: Cpu, label: 'Automatizar', href: '/automatizar' },
+  {
+    icon: Mail,
+    label: 'Email',
+    href: '/email',
+    comingSoon: false,
+    children: [
+      { icon: Link2, label: 'Conecta tu email', href: '/email/conecta-tu-email' },
+      { icon: Send, label: 'Enviar', href: '/email/enviar' },
+      { icon: FileText, label: 'Mis plantillas', href: '/email/plantillas' },
+      { icon: Signature, label: 'Firma electrónica', href: '/email/firma-electronica' },
+    ],
+  },
   { icon: BrainCircuit, label: 'Guros IA', href: '/ia' },
   { icon: BarChart3, label: 'Análisis', href: '/analytics', comingSoon: false },
   { icon: User2Icon, label: 'Soporte', href: '/soporte', comingSoon: false},
-  { icon: CpuIcon, label: 'Automatización', href: '/automatizaciones', comingSoon: true},
+ 
 
 
 ]
@@ -33,6 +50,7 @@ const menuItems = [
 export default function WorkspaceLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false)
+  const [isEmailMenuOpen, setIsEmailMenuOpen] = useState(pathname.startsWith('/email'))
   const previousPathnameRef = useRef(pathname)
 
   useEffect(() => {
@@ -44,6 +62,10 @@ export default function WorkspaceLayout({ children }: { children: React.ReactNod
   }, [pathname])
 
   useEffect(() => {
+    if (pathname.startsWith('/email')) setIsEmailMenuOpen(true)
+  }, [pathname])
+
+  useEffect(() => {
     if (!isMobileSidebarOpen) return
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') setIsMobileSidebarOpen(false)
@@ -51,6 +73,8 @@ export default function WorkspaceLayout({ children }: { children: React.ReactNod
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [isMobileSidebarOpen])
+
+  const showAgentOrb = !pathname.startsWith('/ia')
 
   const SidebarInner = ({ onNavigate }: { onNavigate?: () => void }) => (
     <>
@@ -88,6 +112,58 @@ export default function WorkspaceLayout({ children }: { children: React.ReactNod
                 <span className="text-[9px] font-black uppercase tracking-widest px-3 py-1 rounded-full bg-(--accents)/50 text-white">
                   Soon
                 </span>
+              </div>
+            )
+          }
+
+          const children = (item as any).children as Array<{ icon: any; label: string; href: string }> | undefined
+          if (children && children.length > 0) {
+            return (
+              <div key={item.href} className="space-y-1">
+                <button
+                  type="button"
+                  onClick={() => setIsEmailMenuOpen((prev) => !prev)}
+                  className={`
+                    w-full flex items-center justify-between gap-3 px-4 py-3 rounded-2xl font-bold text-sm transition-all
+                    ${isActive
+                      ? 'bg-(--accents) text-white shadow-lg shadow-(--accents)/20'
+                      : 'text-gray-400 hover:text-black hover:bg-gray-50'
+                    }
+                  `}
+                >
+                  <span className="flex items-center gap-3">
+                    <item.icon size={20} />
+                    {item.label}
+                  </span>
+                  <ChevronDown
+                    size={16}
+                    className={`transition-transform duration-200 ${isEmailMenuOpen ? 'rotate-180' : ''}`}
+                  />
+                </button>
+                {isEmailMenuOpen ? (
+                  <div className="ml-4 pl-3 border-l border-black/10 space-y-1">
+                    {children.map((child) => {
+                      const isChildActive = pathname === child.href || pathname.startsWith(`${child.href}/`)
+                      return (
+                        <Link
+                          key={child.href}
+                          href={child.href}
+                          onClick={onNavigate}
+                          className={`
+                            flex items-center gap-2 px-3 py-2 rounded-xl font-bold text-[12px] transition-all
+                            ${isChildActive
+                              ? 'bg-black text-white'
+                              : 'text-gray-500 hover:text-black hover:bg-gray-50'
+                            }
+                          `}
+                        >
+                          <child.icon size={14} />
+                          {child.label}
+                        </Link>
+                      )
+                    })}
+                  </div>
+                ) : null}
               </div>
             )
           }
@@ -182,6 +258,7 @@ export default function WorkspaceLayout({ children }: { children: React.ReactNod
           </div>
         </div>
       </main>
+      {showAgentOrb ? <AgentOrb /> : null}
     </div>
   )
 }
