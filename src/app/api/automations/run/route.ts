@@ -80,7 +80,8 @@ function daysUntilInTimeZone(targetDateLike: string | null | undefined, now: Dat
 }
 
 async function insertLogOnce(
-  admin: ReturnType<typeof createClient>,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  admin: any,
   row: {
     user_id: string
     automation_key: AutomationKey
@@ -92,21 +93,22 @@ async function insertLogOnce(
     metadata?: Record<string, unknown>
   },
 ) {
-  const { error } = await admin.from(DATABASE.TABLES.WS_AUTOMATION_LOGS).upsert(
-    [
-      {
-        user_id: row.user_id,
-        automation_key: row.automation_key,
-        target_table: row.target_table,
-        target_id: row.target_id,
-        status: row.status,
-        message: row.message,
-        run_date: row.run_date,
-        metadata: row.metadata || {},
-      },
-    ],
-    { onConflict: "user_id,automation_key,target_table,target_id,run_date", ignoreDuplicates: true },
-  )
+  const payload = [
+    {
+      user_id: row.user_id,
+      automation_key: row.automation_key,
+      target_table: row.target_table,
+      target_id: row.target_id,
+      status: row.status,
+      message: row.message,
+      run_date: row.run_date,
+      metadata: row.metadata || {},
+    },
+  ]
+  const { error } = await (admin.from(DATABASE.TABLES.WS_AUTOMATION_LOGS) as any).upsert(payload, {
+    onConflict: "user_id,automation_key,target_table,target_id,run_date",
+    ignoreDuplicates: true,
+  })
   return !error
 }
 
