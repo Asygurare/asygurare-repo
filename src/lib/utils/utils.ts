@@ -12,3 +12,23 @@ export function getFullName(person: {
   const l = String(person?.last_name ?? '').trim()
   return `${n} ${l}`.trim() || 'Sin nombre'
 }
+
+/**
+ * Calcula la edad en años a partir de una fecha de nacimiento.
+ * @param birthDate - Fecha de nacimiento (Date, string ISO o timestamp)
+ * @returns Edad en años, o null si la fecha no es válida
+ */
+export function calculateAge(birthDate: Date | string | number): number | null {
+  const date =
+    typeof birthDate === 'object' && birthDate instanceof Date
+      ? birthDate
+      : new Date(birthDate)
+  if (Number.isNaN(date.getTime())) return null
+  const today = new Date()
+  let age = today.getFullYear() - date.getFullYear()
+  const monthDiff = today.getMonth() - date.getMonth()
+  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < date.getDate())) {
+    age--
+  }
+  return age < 0 ? 0 : age
+}

@@ -9,7 +9,7 @@ import {
 } from 'lucide-react'
 import { supabaseClient } from '@/src/lib/supabase/client'
 import { toast, Toaster } from 'sonner'
-import { getFullName } from '@/src/lib/utils/utils'
+import { getFullName, calculateAge } from '@/src/lib/utils/utils'
 import { SelectWithOther } from '@/src/components/ui/SelectWithOther'
 import { InsuranceType } from '@/src/config/constants'
 
@@ -49,6 +49,8 @@ export default function ClientesPage() {
   const [success, setSuccess] = useState(false)
   const [customers, setCustomers] = useState<any[]>([])
   const [searchTerm, setSearchTerm] = useState('')
+  const [formBirthday, setFormBirthday] = useState('')
+  const [formAge, setFormAge] = useState('')
 
   // 1. CARGA DE DATOS
   const fetchCustomers = useCallback(async () => {
@@ -81,6 +83,21 @@ export default function ClientesPage() {
     return () => document.removeEventListener('click', handleClick)
   }, [optionsRowId])
 
+  // Sincronizar fecha de nacimiento y edad al abrir el modal
+  useEffect(() => {
+    if (isModalOpen) {
+      const b = selectedCustomer?.birthday ?? ''
+      setFormBirthday(b)
+      const age =
+        selectedCustomer?.age != null
+          ? String(selectedCustomer.age)
+          : b
+            ? String(calculateAge(b) ?? '')
+            : ''
+      setFormAge(age)
+    }
+  }, [isModalOpen, selectedCustomer?.id, selectedCustomer?.birthday, selectedCustomer?.age])
+
   const filteredCustomers = useMemo(() => {
     const term = searchTerm.toLowerCase()
     return customers.filter(
@@ -111,7 +128,8 @@ export default function ClientesPage() {
       const birthdayStr = String(formData.get('birthday') || '').trim()
       const birthday = birthdayStr || null
       const ageRaw = String(formData.get('age') || '').trim()
-      const age = ageRaw ? (Number.isFinite(parseInt(ageRaw, 10)) ? parseInt(ageRaw, 10) : null) : null
+      let age = ageRaw ? (Number.isFinite(parseInt(ageRaw, 10)) ? parseInt(ageRaw, 10) : null) : null
+      if (age == null && birthday) age = calculateAge(birthday) ?? null
       const valueStr = String(formData.get('estimated_value') || '').trim()
       const estimatedValue = valueStr ? (Number.isFinite(parseFloat(valueStr)) ? parseFloat(valueStr) : null) : null
 
@@ -247,6 +265,7 @@ export default function ClientesPage() {
                 <th className="p-8 text-[10px] font-black text-black/40 uppercase tracking-widest">Nombre completo</th>
                 <th className="p-8 text-[10px] font-black text-black/40 uppercase tracking-widest">Contacto</th>
                 <th className="p-8 text-[10px] font-black text-black/40 uppercase tracking-widest">Fecha de nacimiento</th>
+                <th className="p-8 text-[10px] font-black text-black/40 uppercase tracking-widest">Edad</th>
                 <th className="p-8 text-[10px] font-black text-black/40 uppercase tracking-widest">Ocupación</th>
                 <th className="p-8 text-[10px] font-black text-black/40 uppercase tracking-widest">Tipo de seguro</th>
                 <th className="p-8 w-16"></th>
@@ -278,6 +297,9 @@ export default function ClientesPage() {
                     </div>
                   </td>
                   <td className="p-8 text-sm font-black text-black uppercase">{formatDate(c.birthday)}</td>
+                  <td className="p-8 text-sm font-black text-black uppercase">
+                    {c.age != null ? c.age : c.birthday ? (calculateAge(c.birthday) ?? '—') : '—'}
+                  </td>
                   <td className="p-8 text-sm font-black text-black uppercase">{c.ocupation || '—'}</td>
                   <td className="p-8 text-sm font-black text-black uppercase">{c.insurance_type || '—'}</td>
                   <td className="p-8 text-right" onClick={(e) => e.stopPropagation()}>
@@ -424,7 +446,12 @@ export default function ClientesPage() {
                       <input
                         name="birthday"
                         type="date"
-                        defaultValue={selectedCustomer?.birthday ?? ''}
+                        value={formBirthday}
+                        onChange={(e) => {
+                          const v = e.target.value
+                          setFormBirthday(v)
+                          setFormAge(v ? String(calculateAge(v) ?? '') : '')
+                        }}
                         className="w-full bg-white p-5 rounded-2xl font-black text-black text-lg outline-none"
                       />
                     </div>
@@ -435,8 +462,9 @@ export default function ClientesPage() {
                         type="number"
                         min={0}
                         max={120}
-                        defaultValue={selectedCustomer?.age ?? ''}
-                        placeholder="Ej. 32"
+                        value={formAge}
+                        onChange={(e) => setFormAge(e.target.value)}
+                        placeholder="Se calcula automático"
                         className="w-full bg-white p-5 rounded-2xl font-black text-black text-lg outline-none"
                       />
                     </div>
@@ -629,7 +657,16 @@ export default function ClientesPage() {
                   <Row label="Email" value={detailCustomer.email} />
                   <Row label="Teléfono" value={detailCustomer.phone} />
                   <Row label="Fecha de nacimiento" value={formatDate(detailCustomer.birthday)} />
-                  <Row label="Edad" value={detailCustomer.age != null ? String(detailCustomer.age) : null} />
+                  <Row
+                    label="Edad"
+                    value={
+                      detailCustomer.age != null
+                        ? String(detailCustomer.age)
+                        : detailCustomer.birthday
+                          ? String(calculateAge(detailCustomer.birthday) ?? '')
+                          : null
+                    }
+                  />
                   <Row label="Género" value={detailCustomer.gender} />
                   <Row label="Estado civil" value={detailCustomer.marital_status} />
                   <Row label="Tipo de seguro" value={detailCustomer.insurance_type} />
