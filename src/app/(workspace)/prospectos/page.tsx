@@ -25,6 +25,7 @@ import { supabaseClient } from '@/src/lib/supabase/client'
 import { toast, Toaster } from 'sonner'
 import { calculateAge } from '@/src/lib/utils/utils'
 import { SelectWithOther } from '@/src/components/ui/SelectWithOther'
+import { RefreshButton } from '@/src/components/workspace/RefreshButton'
 
 export default function ProspectosFinalUltraPage() {
   const [leads, setLeads] = useState<any[]>([])
@@ -688,6 +689,7 @@ export default function ProspectosFinalUltraPage() {
           </button>
         </div>
         <div className="flex flex-wrap items-center gap-4">
+          <RefreshButton onRefresh={fetchData} refreshing={fetching} />
           {activeTab === 'activos' && (
             <div className="flex items-center gap-2 mr-5">
               <span className="text-sm font-black uppercase tracking-widest text-black/70 whitespace-nowrap">Incluir descartados</span>
@@ -915,6 +917,10 @@ export default function ProspectosFinalUltraPage() {
                         name="phone"
                         defaultValue={selectedLead?.phone || ''}
                         placeholder="+52..."
+                        maxLength={12}
+                        inputMode="numeric"
+                        autoComplete="tel"
+                        onInput={(e) => { const v = e.currentTarget.value.replace(/\D/g, '').slice(0, 12); e.currentTarget.value = v; }}
                         className="w-full bg-[#ece7e2] p-5 rounded-2xl font-black text-black text-lg outline-none"
                       />
                     </div>
@@ -1059,11 +1065,11 @@ export default function ProspectosFinalUltraPage() {
                             name="age"
                             type="number"
                             value={formAge}
-                            onChange={(e) => setFormAge(e.target.value)}
+                            onChange={(e) => { const v = e.target.value; const n = v === '' ? '' : Math.min(99, Math.max(0, parseInt(v, 10) || 0)).toString(); setFormAge(n); }}
                             readOnly={!!formBirthday}
                             placeholder={formBirthday ? '' : 'Ej. 32 (editable si no hay fecha)'}
                             min={0}
-                            max={120}
+                            max={99}
                             className={`w-full p-5 rounded-2xl font-black text-black text-lg outline-none ${formBirthday ? 'bg-gray-100 cursor-not-allowed' : 'bg-[#ece7e2]'}`}
                           />
                         </div>
@@ -1287,6 +1293,7 @@ export default function ProspectosFinalUltraPage() {
                           name="economic_dependents"
                           type="number"
                           min={0}
+                          max={99}
                           value={additionalForm.economic_dependents}
                           onChange={(e) => setAdditionalForm((p) => ({ ...p, economic_dependents: e.target.value }))}
                           placeholder="Ej. 2"
@@ -1436,12 +1443,13 @@ export default function ProspectosFinalUltraPage() {
                                     <input
                                       value={child.age}
                                       onChange={(e) => {
-                                        const v = e.target.value
-                                        setChildren((prev) => prev.map((c, i) => (i === idx ? { ...c, age: v } : c)))
+                                        const v = e.target.value.replace(/\D/g, '').slice(0, 2)
+                                        const n = v === '' ? v : String(Math.min(99, parseInt(v, 10) || 0))
+                                        setChildren((prev) => prev.map((c, i) => (i === idx ? { ...c, age: n } : c)))
                                       }}
-                                      type="number"
-                                      min={0}
-                                      max={120}
+                                      type="text"
+                                      inputMode="numeric"
+                                      maxLength={2}
                                       placeholder="Ej. 8"
                                       className="w-full bg-[#ece7e2] p-4 rounded-2xl font-black text-black text-base outline-none"
                                     />

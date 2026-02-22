@@ -22,7 +22,8 @@ import type {
 // Componentes
 import { PolicyCard } from '@/src/components/workspace/polizas/PolicyCard'
 import { PolicyStats } from '@/src/components/workspace/polizas/PolicyStats'
-import { PolicyCaptureModal } from '@/src/components/workspace/polizas/PolicyCaptureModal' 
+import { PolicyCaptureModal } from '@/src/components/workspace/polizas/PolicyCaptureModal'
+import { RefreshButton } from '@/src/components/workspace/RefreshButton' 
 // Nota: Ya no importamos CustomerOption de aquí
 
 export default function PolizasPage() {
@@ -177,6 +178,8 @@ export default function PolizasPage() {
     const { data: { user } } = await supabaseClient.auth.getUser()
     if (!user) throw new Error('Sesión no válida')
 
+    const premiumRaw = parseFloat(String(formData.get('premium') || 0))
+    const total_premium = Math.max(0, Number.isNaN(premiumRaw) ? 0 : premiumRaw)
     const payload = {
       user_id: user.id,
       customer_id: formData.get('customerId'),
@@ -185,8 +188,9 @@ export default function PolizasPage() {
       category: formData.get('category'),
       effective_date: formData.get('effectiveDate'),
       expiry_date: formData.get('expiryDate'),
-      total_premium: parseFloat(String(formData.get('premium') || 0)),
+      total_premium,
       frecuencia_pago: formData.get('frecuencia_pago'),
+      metodo_pago: String(formData.get('metodo_pago') || '').trim() || null,
       start_date: formData.get('effectiveDate'),
     }
 
@@ -217,22 +221,23 @@ export default function PolizasPage() {
         <div>
            <div className="flex items-center gap-3">
              <h2 className="text-4xl font-black text-black tracking-tighter italic uppercase">Gestión de Cartera.</h2>
-             {refreshing && <RefreshCw className="animate-spin text-gray-400" size={20}/>}
            </div>
            <p className="text-gray-400 font-bold text-[10px] uppercase tracking-[0.3em] mt-1 ml-1">
              Risk Intelligence Dashboard
            </p>
         </div>
-        
-        <button 
-          onClick={handleCreate}
-          className="bg-black text-white px-8 py-4 rounded-full font-bold text-xs flex items-center gap-3 hover:bg-[#333] transition-all shadow-xl hover:shadow-2xl active:scale-95 group"
-        >
+        <div className="flex items-center gap-4">
+          <RefreshButton onRefresh={() => fetchData(true)} refreshing={refreshing} />
+          <button 
+            onClick={handleCreate}
+            className="bg-black text-white px-8 py-4 rounded-full font-bold text-xs flex items-center gap-3 hover:bg-[#333] transition-all shadow-xl hover:shadow-2xl active:scale-95 group"
+          >
           <div className="bg-white/20 p-1 rounded-full group-hover:rotate-90 transition-transform">
             <Plus size={14} />
           </div>
           NUEVA OPORTUNIDAD
-        </button>
+          </button>
+        </div>
       </div>
 
       {/* KPIs */}

@@ -71,24 +71,32 @@ export function SelectWithOther({
       if (isControlled && controlledValue && !options.includes(controlledValue))
         setCustomOther(controlledValue)
       setShowOtherModal(true)
-    } else if (!isControlled) {
+    } else {
       updateEffective(v)
     }
   }
 
   const handleConfirmOther = () => {
-    if (!isControlled) updateEffective(customOther.trim() || otherOptionValue)
+    updateEffective(customOther.trim() || otherOptionValue)
     setShowOtherModal(false)
   }
 
   const handleCloseOther = () => {
-    if (!customOther.trim()) setSelectValue(emptyOption != null ? '' : options[0] ?? '')
-    if (!isControlled && !customOther.trim()) updateEffective(emptyOption != null ? '' : options[0] ?? '')
+    if (!customOther.trim()) {
+      setSelectValue(emptyOption != null ? '' : options[0] ?? '')
+      const fallback = emptyOption != null ? '' : options[0] ?? ''
+      if (isControlled) updateEffective(fallback)
+      else updateEffective(fallback)
+    }
     setShowOtherModal(false)
   }
 
   const displaySelectValue = isControlled
-    ? (options.includes(controlledValue) ? controlledValue : otherOptionValue)
+    ? (controlledValue === '' || controlledValue == null
+        ? (emptyOption != null ? '' : (options[0] ?? ''))
+        : options.includes(controlledValue)
+          ? controlledValue
+          : otherOptionValue)
     : selectValue
   const displayCustomOther = isControlled && !options.includes(controlledValue) ? controlledValue : customOther
 

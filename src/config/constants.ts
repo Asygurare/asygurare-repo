@@ -13,7 +13,7 @@ export type PolicyPaymentType = 'mensual' | 'trimestral' | 'semestral' | 'anual'
 export enum InsuranceType {
     Vida = 'Vida',
     Autos = 'Auto',
-    Salud = 'SGMM',
+    SGMM = 'SGMM',
     Hogar = 'Hogar',
     Retiro = 'Retiro',
     Accidentes = 'Accidentes personales',
@@ -23,9 +23,7 @@ export enum InsuranceType {
 export enum Gender {
     Masculino = 'Masculino',
     Femenino = 'Femenino',
-    NoBinario = 'No binario',
     Otro = 'Otro',
-    PrefieroNoDecir = 'Prefiero no decir'
 }
 
 export enum MaritalStatus {
@@ -93,6 +91,13 @@ export enum Currency {
     MXN = 'MXN',
     USD = 'USD',
     EUR = 'EUR',
+}
+
+/** Método de pago para pólizas (campo metodo_pago en WS_POLICIES). */
+export enum PolicyMetodoPago {
+  TarjetaCredito = 'Tarjeta de Crédito',
+  Debito = 'Débito',
+  ContadoEfectivo = 'Contado (efectivo)',
 }
 
 // ——— Clientes only ———

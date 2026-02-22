@@ -10,8 +10,9 @@ import { getFullName } from '@/src/lib/utils/utils'
 import { toast } from 'sonner'
 import { type Customer, type PolicyFormData } from '@/src/types/policy'
 import { SelectWithOther } from '@/src/components/ui/SelectWithOther'
-import { InsuranceType } from '@/src/config/constants'
+import { InsuranceType, PolicyMetodoPago } from '@/src/config/constants'
 const INSURANCE_TYPES = Object.values(InsuranceType)
+const PAYMENT_METHODS = Object.values(PolicyMetodoPago)
 
 type PolicyCaptureModalProps = {
   isOpen: boolean
@@ -229,7 +230,7 @@ export function PolicyCaptureModal({
               <label className="text-[11px] font-black text-black uppercase tracking-widest italic">
                 03. Estructura Financiera
               </label>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="bg-black p-8 rounded-[2.5rem] shadow-2xl relative overflow-hidden group">
                   <DollarSign
                     className="absolute -right-4 -top-4 text-(--accents)/20 group-hover:scale-110 transition-transform"
@@ -243,8 +244,10 @@ export function PolicyCaptureModal({
                     name="premium"
                     type="number"
                     step="0.01"
+                    min={0}
                     defaultValue={selectedPolicy?.total_premium ?? ''}
                     placeholder="0.00"
+                    onInput={(e) => { const n = parseFloat((e.target as HTMLInputElement).value); if (!Number.isNaN(n) && n < 0) (e.target as HTMLInputElement).value = '0'; }}
                     className="w-full bg-transparent text-white text-4xl font-black outline-none relative z-10 placeholder:text-white/40"
                   />
                 </div>
@@ -265,6 +268,21 @@ export function PolicyCaptureModal({
                     <option value="Trimestral">Trimestral (4)</option>
                     <option value="Semestral">Semestral (2)</option>
                     <option value="Contado">Contado (1)</option>
+                  </select>
+                </div>
+                <div className="bg-white p-8 rounded-[2.5rem] border-2 border-black/5 flex flex-col justify-center">
+                  <label className="text-[10px] font-black text-black/40 uppercase block mb-2 tracking-widest italic">
+                    Método de pago
+                  </label>
+                  <select
+                    required
+                    name="metodo_pago"
+                    defaultValue={(selectedPolicy as any)?.metodo_pago ?? PolicyMetodoPago.TarjetaCredito}
+                    className="w-full bg-transparent text-black font-black text-lg outline-none cursor-pointer appearance-none uppercase"
+                  >
+                    {PAYMENT_METHODS.map((opt) => (
+                      <option key={opt} value={opt}>{opt}</option>
+                    ))}
                   </select>
                 </div>
               </div>

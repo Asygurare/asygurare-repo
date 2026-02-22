@@ -13,6 +13,7 @@ import { supabaseClient } from '@/src/lib/supabase/client'
 import { toast, Toaster } from 'sonner'
 import { getFullName, calculateAge } from '@/src/lib/utils/utils'
 import { SelectWithOther } from '@/src/components/ui/SelectWithOther'
+import { RefreshButton } from '@/src/components/workspace/RefreshButton'
 
 const INSURANCE_TYPES = Object.values(InsuranceType)
 const ORIGIN_SOURCES = Object.values(OriginSource)
@@ -83,6 +84,7 @@ export default function ClientesPage() {
   const [sortKey, setSortKey] = useState<'name' | 'contact' | 'status' | 'insurance_type' | 'added_at'>('added_at')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
   const [postCreateCustomerId, setPostCreateCustomerId] = useState<string | null>(null)
+  const [policyCountByCustomerId, setPolicyCountByCustomerId] = useState<Record<string, number>>({})
   const router = useRouter()
   const searchParams = useSearchParams()
 
@@ -97,6 +99,15 @@ export default function ClientesPage() {
 
       if (error) throw error
       setCustomers(data || [])
+
+      const { data: policiesData } = await supabaseClient
+        .from(DATABASE.TABLES.WS_POLICIES)
+        .select('customer_id')
+      const countMap: Record<string, number> = {}
+      ;(policiesData || []).forEach((p: { customer_id: string }) => {
+        countMap[p.customer_id] = (countMap[p.customer_id] ?? 0) + 1
+      })
+      setPolicyCountByCustomerId(countMap)
     } catch (error: any) {
       toast.error('Error al cargar clientes: ' + error.message)
     } finally {
@@ -499,6 +510,7 @@ export default function ClientesPage() {
           </button>
         </div>
         <div className="flex flex-wrap items-center gap-4">
+          <RefreshButton onRefresh={fetchCustomers} refreshing={fetching} />
           {activeTab === 'activos' && (
             <div className="flex items-center gap-2">
               <span className="text-sm font-black uppercase tracking-widest text-black/70 whitespace-nowrap">Incluir descartados</span>
@@ -562,6 +574,7 @@ export default function ClientesPage() {
                       <div className="mt-2 flex flex-wrap gap-2">
                         <span className="text-[10px] font-black uppercase tracking-widest text-black/40">{normalizedStatus(c) || '—'}</span>
                         <span className="text-[10px] font-black uppercase tracking-widest text-black/40">{c.insurance_type || '—'}</span>
+                        <span className="text-[10px] font-black uppercase tracking-widest text-black/40">{policyCountByCustomerId[c.id] ?? 0} póliza(s)</span>
                         <span className="text-[10px] font-black uppercase tracking-widest text-black/40">{formatDate(getCustomerAddedAt(c))}</span>
                       </div>
                     </div>
@@ -574,31 +587,34 @@ export default function ClientesPage() {
               <table className="w-full min-w-[800px] text-left">
                 <thead>
                   <tr className="bg-gray-50 border-b border-black/5">
-                    <th className="p-8 text-[10px] font-black text-black/40 uppercase tracking-widest">
+                    <th className="p-8 text-sm font-black text-black/40 tracking-widest">
                       <button type="button" onClick={() => toggleSort('name')} className="flex items-center gap-1 hover:text-black">
                         Nombre completo
                         {sortKey === 'name' ? (sortDir === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />) : null}
                       </button>
                     </th>
-                    <th className="p-8 text-[10px] font-black text-black/40 uppercase tracking-widest">
+                    <th className="p-8 text-sm font-black text-black/40 tracking-widest">
                       <button type="button" onClick={() => toggleSort('contact')} className="flex items-center gap-1 hover:text-black">
                         Contacto
                         {sortKey === 'contact' ? (sortDir === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />) : null}
                       </button>
                     </th>
-                    <th className="p-8 text-[10px] font-black text-black/40 uppercase tracking-widest">
+                    <th className="p-8 text-sm font-black text-black/40 tracking-widest">
                       <button type="button" onClick={() => toggleSort('status')} className="flex items-center gap-1 hover:text-black">
                         Estatus
                         {sortKey === 'status' ? (sortDir === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />) : null}
                       </button>
                     </th>
-                    <th className="p-8 text-[10px] font-black text-black/40 uppercase tracking-widest">
+                    <th className="p-8 text-sm font-black text-black/40 tracking-widest">
                       <button type="button" onClick={() => toggleSort('insurance_type')} className="flex items-center gap-1 hover:text-black">
                         Tipo de seguro
                         {sortKey === 'insurance_type' ? (sortDir === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />) : null}
                       </button>
                     </th>
-                    <th className="p-8 text-[10px] font-black text-black/40 uppercase tracking-widest">
+                    <th className="p-8 text-sm font-black text-black/40 tracking-widest text-center">
+                      Pólizas
+                    </th>
+                    <th className="p-8 text-sm font-black text-black/40 tracking-widest">
                       <button type="button" onClick={() => toggleSort('added_at')} className="flex items-center gap-1 hover:text-black">
                         Se agregó
                         {sortKey === 'added_at' ? (sortDir === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />) : null}
@@ -634,6 +650,11 @@ export default function ClientesPage() {
                       </td>
                       <td className="p-8 text-sm font-black text-black uppercase">{normalizedStatus(c) || '—'}</td>
                       <td className="p-8 text-sm font-black text-black uppercase">{c.insurance_type || '—'}</td>
+                      <td className="p-8 text-center">
+                        <span className="inline-flex items-center justify-center min-w-[2rem] py-1.5 px-2 rounded-xl bg-black/5 text-black font-black text-sm">
+                          {policyCountByCustomerId[c.id] ?? 0}
+                        </span>
+                      </td>
                       <td className="p-8 text-sm font-black text-black uppercase">{formatDate(getCustomerAddedAt(c))}</td>
                       <td className="p-8 text-right" onClick={(e) => e.stopPropagation()}>
                         <div className="relative inline-block">
@@ -669,6 +690,15 @@ export default function ClientesPage() {
                                 className="w-full px-4 py-3 text-left text-sm font-black uppercase tracking-tighter flex items-center gap-2 text-gray-600 hover:bg-[#ece7e2]/50 transition-colors"
                               >
                                 <StickyNote size={18} /> Notas
+                              </button>
+                              <button
+                                onClick={() => {
+                                  router.push(`/polizas?customerId=${c.id}`)
+                                  setOptionsRowId(null)
+                                }}
+                                className="w-full px-4 py-3 text-left text-sm font-black uppercase tracking-tighter flex items-center gap-2 text-gray-600 hover:bg-[#ece7e2]/50 transition-colors"
+                              >
+                                <FileCheck size={18} /> Registrar póliza
                               </button>
                               <button
                                 onClick={(e) => {
@@ -761,7 +791,7 @@ export default function ClientesPage() {
                       </div>
                       <div className="space-y-2">
                         <label className="text-[12px] font-black uppercase text-black italic">Teléfono</label>
-                        <input name="phone" defaultValue={selectedCustomer?.phone ?? ''} placeholder="+52..." className="w-full bg-[#ece7e2] p-5 rounded-2xl font-black text-black text-lg outline-none" />
+                        <input name="phone" defaultValue={selectedCustomer?.phone ?? ''} placeholder="+52..." maxLength={12} inputMode="numeric" autoComplete="tel" onInput={(e) => { const v = e.currentTarget.value.replace(/\D/g, '').slice(0, 12); e.currentTarget.value = v; }} className="w-full bg-[#ece7e2] p-5 rounded-2xl font-black text-black text-lg outline-none" />
                       </div>
                       <div className="bg-[#ece7e2] p-6 rounded-[2rem] border border-black/5 space-y-4">
                         <div className="flex items-center justify-between gap-4">
@@ -818,7 +848,7 @@ export default function ClientesPage() {
                           </div>
                           <div className="space-y-2">
                             <label className="text-[12px] font-black uppercase text-black italic">Edad</label>
-                            <input name="age" type="number" min={0} max={120} value={formAge} onChange={(e) => setFormAge(e.target.value)} readOnly={!!formBirthday} placeholder={formBirthday ? '' : 'Editable si no hay fecha'} className={`w-full p-5 rounded-2xl font-black text-black text-lg outline-none ${formBirthday ? 'bg-gray-100 cursor-not-allowed' : 'bg-[#ece7e2]'}`} />
+                            <input name="age" type="number" min={0} max={99} value={formAge} onChange={(e) => { const v = e.target.value; const n = v === '' ? '' : Math.min(99, Math.max(0, parseInt(v, 10) || 0)).toString(); setFormAge(n); }} readOnly={!!formBirthday} placeholder={formBirthday ? '' : 'Ej. 32 (editable si no hay fecha)'} className={`w-full p-5 rounded-2xl font-black text-black text-lg outline-none ${formBirthday ? 'bg-gray-100 cursor-not-allowed' : 'bg-[#ece7e2]'}`} />
                           </div>
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -920,7 +950,7 @@ export default function ClientesPage() {
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="space-y-2">
                           <label className="text-[12px] font-black uppercase text-black italic">Dependientes económicos</label>
-                          <input type="number" min={0} value={additionalForm.economic_dependents} onChange={(e) => setAdditionalForm((p) => ({ ...p, economic_dependents: e.target.value }))} placeholder="Ej. 2" className="w-full bg-[#ece7e2] p-5 rounded-2xl font-black text-black text-lg outline-none" />
+                          <input type="number" min={0} max={99} value={additionalForm.economic_dependents} onChange={(e) => setAdditionalForm((p) => ({ ...p, economic_dependents: e.target.value }))} placeholder="Ej. 2" className="w-full bg-[#ece7e2] p-5 rounded-2xl font-black text-black text-lg outline-none" />
                         </div>
                         <div className="space-y-2">
                           <label className="text-[12px] font-black uppercase text-black italic">Nivel de estudios</label>
@@ -977,7 +1007,7 @@ export default function ClientesPage() {
                                   </div>
                                   <div className="space-y-2">
                                     <label className="text-[11px] font-black uppercase text-black italic">Edad</label>
-                                    <input value={child.age} onChange={(e) => setChildren((prev) => prev.map((c, i) => (i === idx ? { ...c, age: e.target.value } : c)))} type="number" min={0} max={120} placeholder="Ej. 8" className="w-full bg-white p-4 rounded-2xl font-black text-black text-base outline-none" />
+                                    <input value={child.age} onChange={(e) => { const v = e.target.value.replace(/\D/g, '').slice(0, 2); const n = v === '' ? v : String(Math.min(99, parseInt(v, 10) || 0)); setChildren((prev) => prev.map((c, i) => (i === idx ? { ...c, age: n } : c))); }} type="text" inputMode="numeric" maxLength={2} placeholder="Ej. 8" className="w-full bg-white p-4 rounded-2xl font-black text-black text-base outline-none" />
                                   </div>
                                   <div className="space-y-2">
                                     <label className="text-[11px] font-black uppercase text-black italic">Contacto</label>
