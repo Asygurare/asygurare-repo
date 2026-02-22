@@ -2,7 +2,6 @@ export const ROUTES = {
 
 }
 
-export type CustomerStatus = 'nuevo' | 'en seguimiento' | 'activo' | 'otro'
 export type PolicyStatus = 'vigente' | 'vencida' | 'cancelada' | 'renovada' | 'otro'
 export type PolicyCategory = 'Autos' | 'Vida' | 'GMM' | 'Hogar' | 'Otro'
 export type PolicyFrequency = 'mensual' | 'trimestral' | 'semestral' | 'anual' | 'otro'
@@ -94,4 +93,12 @@ export enum Currency {
     MXN = 'MXN',
     USD = 'USD',
     EUR = 'EUR',
+}
+
+// ——— Clientes only ———
+/** Estatus de cliente (campo status en WS_CUSTOMERS_2). */
+export enum CustomerStatus {
+    Activo = 'Activo',
+    EnRenovacion = 'En Renovación',
+    Descartado = 'Descartado',
 }

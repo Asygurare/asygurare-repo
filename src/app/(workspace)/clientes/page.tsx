@@ -1,12 +1,12 @@
 "use client"
 
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
-import { Currency, DATABASE, EducationLevel, Gender, InsuranceType, MaritalStatus, OriginSource } from '@/src/config'
+import { Currency, CustomerStatus, DATABASE, EducationLevel, Gender, InsuranceType, MaritalStatus, OriginSource } from '@/src/config'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Users, Search, X, UserPlus, Mail, Phone, Loader2, CheckCircle2,
   Building2, User, Trash2, Save, Calendar, MoreVertical, FileText, StickyNote,
-  Edit3, ChevronRight
+  Edit3, ChevronRight, ChevronUp, ChevronDown
 } from 'lucide-react'
 import { supabaseClient } from '@/src/lib/supabase/client'
 import { toast, Toaster } from 'sonner'
@@ -17,7 +17,7 @@ const INSURANCE_TYPES = Object.values(InsuranceType)
 const ORIGIN_SOURCES = Object.values(OriginSource)
 const MARITAL_STATUSES = Object.values(MaritalStatus)
 const GENDERS = Object.values(Gender)
-const STATUSES = ['nuevo', 'en seguimiento', 'activo', 'otro']
+const CUSTOMER_STATUSES = Object.values(CustomerStatus)
 const EDUCATION_LEVELS = Object.values(EducationLevel)
 const CURRENCIES = Object.values(Currency)
 
@@ -76,6 +76,11 @@ export default function ClientesPage() {
   })
   const [hasChildren, setHasChildren] = useState<'yes' | 'no' | ''>('')
   const [children, setChildren] = useState<Array<{ name: string; age: string; contact: string }>>([])
+  const [activeTab, setActiveTab] = useState<'activos' | 'descartados'>('activos')
+  const [includeDiscarded, setIncludeDiscarded] = useState(false)
+  const [statusFilter, setStatusFilter] = useState<string>('__all__')
+  const [sortKey, setSortKey] = useState<'name' | 'contact' | 'status' | 'insurance_type' | 'added_at'>('added_at')
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
 
   // 1. CARGA DE DATOS
   const fetchCustomers = useCallback(async () => {
@@ -174,7 +179,7 @@ export default function ClientesPage() {
     if (hasChildren !== 'yes') setChildren([])
   }, [hasChildren])
 
-  const filteredCustomers = useMemo(() => {
+  const filteredBySearch = useMemo(() => {
     const term = searchTerm.toLowerCase()
     return customers.filter(
       (c) =>
@@ -183,6 +188,79 @@ export default function ClientesPage() {
         c.phone?.toLowerCase().includes(term)
     )
   }, [customers, searchTerm])
+
+  const normalizedStatus = (c: any) => String(c?.status ?? '').trim()
+  const activeCustomers = useMemo(
+    () => filteredBySearch.filter((c) => normalizedStatus(c) !== CustomerStatus.Descartado),
+    [filteredBySearch]
+  )
+  const discardedCustomers = useMemo(
+    () => filteredBySearch.filter((c) => normalizedStatus(c) === CustomerStatus.Descartado),
+    [filteredBySearch]
+  )
+
+  const baseListForFilter = useMemo(() => {
+    if (activeTab === 'descartados') return discardedCustomers
+    if (includeDiscarded) return [...activeCustomers, ...discardedCustomers]
+    return activeCustomers
+  }, [activeTab, includeDiscarded, activeCustomers, discardedCustomers])
+
+  const filteredCustomers = useMemo(() => {
+    if (statusFilter === '__all__') return baseListForFilter
+    return baseListForFilter.filter((c) => normalizedStatus(c) === statusFilter)
+  }, [baseListForFilter, statusFilter])
+
+  const getCustomerAddedAt = (c: any) => {
+    const extra = c?.additional_fields && typeof c.additional_fields === 'object' ? c.additional_fields : {}
+    const converted = extra?.converted_at
+    if (converted) return converted
+    return c?.created_at ?? ''
+  }
+
+  const visibleCustomers = useMemo(() => {
+    const list = [...filteredCustomers]
+    const mult = sortDir === 'asc' ? 1 : -1
+    list.sort((a, b) => {
+      let va: string | number = ''
+      let vb: string | number = ''
+      switch (sortKey) {
+        case 'name':
+          va = getFullName(a).toLowerCase()
+          vb = getFullName(b).toLowerCase()
+          return mult * (va < vb ? -1 : va > vb ? 1 : 0)
+        case 'contact':
+          va = (a.email ?? a.phone ?? '').toString().toLowerCase()
+          vb = (b.email ?? b.phone ?? '').toString().toLowerCase()
+          return mult * (va < vb ? -1 : va > vb ? 1 : 0)
+        case 'status':
+          va = normalizedStatus(a)
+          vb = normalizedStatus(b)
+          return mult * va.localeCompare(vb)
+        case 'insurance_type':
+          va = (a.insurance_type ?? '').toLowerCase()
+          vb = (b.insurance_type ?? '').toLowerCase()
+          return mult * (va < vb ? -1 : va > vb ? 1 : 0)
+        case 'added_at':
+        default:
+          va = getCustomerAddedAt(a) || ''
+          vb = getCustomerAddedAt(b) || ''
+          return mult * (String(va).localeCompare(String(vb)))
+      }
+    })
+    return list
+  }, [filteredCustomers, sortKey, sortDir])
+
+  const getRowBorderClass = (c: any) => {
+    const s = normalizedStatus(c)
+    if (s === CustomerStatus.Descartado) return 'border-l-4 border-red-500'
+    if (s === CustomerStatus.EnRenovacion) return 'border-l-4 border-orange-500'
+    return ''
+  }
+
+  const toggleSort = (key: typeof sortKey) => {
+    setSortKey(key)
+    setSortDir((d) => (sortKey === key && d === 'desc' ? 'asc' : 'desc'))
+  }
 
   // 3. GUARDAR O ACTUALIZAR
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -247,7 +325,7 @@ export default function ClientesPage() {
         user_id: user.id,
         name,
         last_name: String(formData.get('last_name') || '').trim() || null,
-        status: String(formData.get('status') || '').trim() || 'nuevo',
+        status: String(formData.get('status') || '').trim() || CustomerStatus.Activo,
         source: String(formData.get('source') || '').trim() || null,
         insurance_type: String(formData.get('insurance_type') || '').trim() || null,
         estimated_value: selectedCustomer?.estimated_value ?? null,
@@ -343,8 +421,8 @@ export default function ClientesPage() {
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div className="bg-white p-8 rounded-[2.5rem] border border-black/5 shadow-sm">
-          <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">Cuentas Activas</p>
-          <h4 className="text-4xl font-black text-black mt-2">{customers.length}</h4>
+          <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">Clientes activos</p>
+          <h4 className="text-4xl font-black text-black mt-2">{activeCustomers.length}</h4>
         </div>
         {/* <div className="bg-black p-8 rounded-[2.5rem] shadow-sm text-white">
           <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">Retención</p>
@@ -369,64 +447,142 @@ export default function ClientesPage() {
         </div>
       </div>
 
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div className="bg-white p-2 rounded-[1.5rem] inline-flex items-center gap-2 border border-black/5 shadow-sm">
+          <button
+            type="button"
+            onClick={() => setActiveTab('activos')}
+            className={`px-6 py-3 rounded-[1rem] text-sm font-black uppercase tracking-widest transition-all ${
+              activeTab === 'activos' ? 'bg-black text-white' : 'text-black/60 hover:bg-black/5'
+            }`}
+          >
+            Clientes activos ({activeCustomers.length})
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('descartados')}
+            className={`px-6 py-3 rounded-[1rem] text-sm font-black uppercase tracking-widest transition-all ${
+              activeTab === 'descartados' ? 'bg-red-600 text-white' : 'text-black/60 hover:bg-black/5'
+            }`}
+          >
+            Descartados ({discardedCustomers.length})
+          </button>
+        </div>
+        <div className="flex flex-wrap items-center gap-4">
+          {activeTab === 'activos' && (
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-black uppercase tracking-widest text-black/70 whitespace-nowrap">Incluir descartados</span>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={includeDiscarded}
+                onClick={() => setIncludeDiscarded((v) => !v)}
+                className={`relative inline-flex h-7 w-12 shrink-0 rounded-full border-2 transition-colors focus:outline-none ${
+                  includeDiscarded ? 'bg-black border-black' : 'bg-black/10 border-black/20'
+                }`}
+              >
+                <span
+                  className={`pointer-events-none inline-block h-6 w-6 rounded-full bg-white shadow-sm transition-transform ${
+                    includeDiscarded ? 'translate-x-6' : 'translate-x-0.5'
+                  }`}
+                  style={{ marginTop: 2 }}
+                />
+              </button>
+            </div>
+          )}
+          <div className="flex items-center gap-2">
+            <label className="text-sm font-black uppercase tracking-widest text-black/70 whitespace-nowrap">Estatus</label>
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="bg-white border-2 border-black/10 rounded-xl px-4 py-3 text-sm font-black uppercase tracking-wide text-black outline-none focus:border-black/30 min-w-[180px] cursor-pointer"
+            >
+              <option value="__all__">Todos los estatus</option>
+              {CUSTOMER_STATUSES.map((s) => (
+                <option key={s} value={s}>{s}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+      </div>
+
       <div className="bg-white rounded-[2rem] sm:rounded-[3rem] border border-black/5 shadow-sm overflow-hidden min-h-[400px] min-w-0">
         {fetching ? (
           <div className="flex flex-col items-center justify-center h-[400px] gap-4">
             <Loader2 className="animate-spin text-black" size={40} />
           </div>
-        ) : filteredCustomers.length > 0 ? (
+        ) : visibleCustomers.length > 0 ? (
           <>
             <div className="md:hidden divide-y divide-gray-50">
-              {filteredCustomers.map((c) => {
-                const displayAge = c.age ?? (c.birthday ? calculateAge(c.birthday) : null)
-                return (
-                  <button
-                    key={c.id}
-                    type="button"
-                    onClick={() => openEdit(c)}
-                    className="w-full text-left p-4 active:bg-[#ece7e2]/40 transition-all"
-                  >
-                    <div className="flex items-start gap-3 min-w-0">
-                      <div className="w-10 h-10 bg-black text-white rounded-xl flex items-center justify-center shadow-lg shrink-0">
-                        {c.gender === 'Moral' ? <Building2 size={18} /> : <User size={18} />}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="font-black text-black text-sm uppercase tracking-tight truncate">{getFullName(c)}</p>
-                        <p className="mt-1 text-[11px] font-bold text-black/60 truncate">{c.email || '—'}</p>
-                        <p className="text-[11px] font-bold text-black/60 truncate">{c.phone || '—'}</p>
-                        <div className="mt-2 flex flex-wrap gap-2">
-                          <span className="text-[10px] font-black uppercase tracking-widest text-black/40">{formatDate(c.birthday)}</span>
-                          <span className="text-[10px] font-black uppercase tracking-widest text-black/40">
-                            {displayAge != null ? `${displayAge} años` : '—'}
-                          </span>
-                          <span className="text-[10px] font-black uppercase tracking-widest text-black/40">{c.insurance_type || '—'}</span>
-                        </div>
+              {visibleCustomers.map((c) => (
+                <button
+                  key={c.id}
+                  type="button"
+                  onClick={() => openEdit(c)}
+                  className={`w-full text-left p-4 active:bg-[#ece7e2]/40 transition-all ${getRowBorderClass(c)}`}
+                >
+                  <div className="flex items-start gap-3 min-w-0">
+                    <div className="w-10 h-10 bg-black text-white rounded-xl flex items-center justify-center shadow-lg shrink-0">
+                      {c.gender === 'Moral' ? <Building2 size={18} /> : <User size={18} />}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-black text-black text-sm uppercase tracking-tight truncate">{getFullName(c)}</p>
+                      <p className="mt-1 text-[11px] font-bold text-black/60 truncate">{c.email || '—'}</p>
+                      <p className="text-[11px] font-bold text-black/60 truncate">{c.phone || '—'}</p>
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        <span className="text-[10px] font-black uppercase tracking-widest text-black/40">{normalizedStatus(c) || '—'}</span>
+                        <span className="text-[10px] font-black uppercase tracking-widest text-black/40">{c.insurance_type || '—'}</span>
+                        <span className="text-[10px] font-black uppercase tracking-widest text-black/40">{formatDate(getCustomerAddedAt(c))}</span>
                       </div>
                     </div>
-                  </button>
-                )
-              })}
+                  </div>
+                </button>
+              ))}
             </div>
 
             <div className="hidden md:block overflow-x-auto">
-              <table className="w-full min-w-[980px] text-left">
+              <table className="w-full min-w-[800px] text-left">
                 <thead>
                   <tr className="bg-gray-50 border-b border-black/5">
-                    <th className="p-8 text-[10px] font-black text-black/40 uppercase tracking-widest">Nombre completo</th>
-                    <th className="p-8 text-[10px] font-black text-black/40 uppercase tracking-widest">Contacto</th>
-                    <th className="p-8 text-[10px] font-black text-black/40 uppercase tracking-widest">Fecha de nacimiento</th>
-                    <th className="p-8 text-[10px] font-black text-black/40 uppercase tracking-widest">Edad</th>
-                    <th className="p-8 text-[10px] font-black text-black/40 uppercase tracking-widest">Ocupación</th>
-                    <th className="p-8 text-[10px] font-black text-black/40 uppercase tracking-widest">Tipo de seguro</th>
+                    <th className="p-8 text-[10px] font-black text-black/40 uppercase tracking-widest">
+                      <button type="button" onClick={() => toggleSort('name')} className="flex items-center gap-1 hover:text-black">
+                        Nombre completo
+                        {sortKey === 'name' ? (sortDir === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />) : null}
+                      </button>
+                    </th>
+                    <th className="p-8 text-[10px] font-black text-black/40 uppercase tracking-widest">
+                      <button type="button" onClick={() => toggleSort('contact')} className="flex items-center gap-1 hover:text-black">
+                        Contacto
+                        {sortKey === 'contact' ? (sortDir === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />) : null}
+                      </button>
+                    </th>
+                    <th className="p-8 text-[10px] font-black text-black/40 uppercase tracking-widest">
+                      <button type="button" onClick={() => toggleSort('status')} className="flex items-center gap-1 hover:text-black">
+                        Estatus
+                        {sortKey === 'status' ? (sortDir === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />) : null}
+                      </button>
+                    </th>
+                    <th className="p-8 text-[10px] font-black text-black/40 uppercase tracking-widest">
+                      <button type="button" onClick={() => toggleSort('insurance_type')} className="flex items-center gap-1 hover:text-black">
+                        Tipo de seguro
+                        {sortKey === 'insurance_type' ? (sortDir === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />) : null}
+                      </button>
+                    </th>
+                    <th className="p-8 text-[10px] font-black text-black/40 uppercase tracking-widest">
+                      <button type="button" onClick={() => toggleSort('added_at')} className="flex items-center gap-1 hover:text-black">
+                        Se agregó
+                        {sortKey === 'added_at' ? (sortDir === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />) : null}
+                      </button>
+                    </th>
                     <th className="p-8 w-16"></th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50">
-                  {filteredCustomers.map((c) => (
+                  {visibleCustomers.map((c) => (
                     <tr
                       key={c.id}
                       onClick={() => openEdit(c)}
-                      className="hover:bg-[#ece7e2]/30 transition-all group cursor-pointer"
+                      className={`hover:bg-[#ece7e2]/30 transition-all group cursor-pointer ${getRowBorderClass(c)}`}
                     >
                       <td className="p-8">
                         <div className="flex items-center gap-4">
@@ -446,12 +602,9 @@ export default function ClientesPage() {
                           </p>
                         </div>
                       </td>
-                      <td className="p-8 text-sm font-black text-black uppercase">{formatDate(c.birthday)}</td>
-                      <td className="p-8 text-sm font-black text-black uppercase">
-                        {c.age != null ? c.age : c.birthday ? (calculateAge(c.birthday) ?? '—') : '—'}
-                      </td>
-                      <td className="p-8 text-sm font-black text-black uppercase">{c.ocupation || '—'}</td>
+                      <td className="p-8 text-sm font-black text-black uppercase">{normalizedStatus(c) || '—'}</td>
                       <td className="p-8 text-sm font-black text-black uppercase">{c.insurance_type || '—'}</td>
+                      <td className="p-8 text-sm font-black text-black uppercase">{formatDate(getCustomerAddedAt(c))}</td>
                       <td className="p-8 text-right" onClick={(e) => e.stopPropagation()}>
                         <div className="relative inline-block">
                           <button
@@ -617,7 +770,7 @@ export default function ClientesPage() {
                         </div>
                         <div className="space-y-2">
                           <label className="text-[12px] font-black uppercase text-black italic">Estatus</label>
-                          <SelectWithOther name="status" options={STATUSES} defaultValue={selectedCustomer?.status ?? 'nuevo'} otherOptionValue="otro" className="w-full bg-[#ece7e2] p-5 rounded-2xl font-black text-black text-lg outline-none appearance-none cursor-pointer" />
+                          <SelectWithOther name="status" options={CUSTOMER_STATUSES} defaultValue={selectedCustomer?.status ?? CustomerStatus.Activo} className="w-full bg-[#ece7e2] p-5 rounded-2xl font-black text-black text-lg outline-none appearance-none cursor-pointer" />
                         </div>
                       </div>
                       <div className="space-y-2">
