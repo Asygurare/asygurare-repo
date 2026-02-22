@@ -9,7 +9,7 @@ import {
 } from 'lucide-react'
 import { supabaseClient } from '@/src/lib/supabase/client'
 import { toast, Toaster } from 'sonner'
-import { getFullName } from '@/src/lib/utils/utils'
+import { getFullName, calculateAge } from '@/src/lib/utils/utils'
 import { SelectWithOther } from '@/src/components/ui/SelectWithOther'
 import { InsuranceType } from '@/src/config/constants'
 
@@ -49,6 +49,8 @@ export default function ClientesPage() {
   const [success, setSuccess] = useState(false)
   const [customers, setCustomers] = useState<any[]>([])
   const [searchTerm, setSearchTerm] = useState('')
+  const [formBirthday, setFormBirthday] = useState('')
+  const [formAge, setFormAge] = useState('')
 
   // 1. CARGA DE DATOS
   const fetchCustomers = useCallback(async () => {
@@ -81,6 +83,21 @@ export default function ClientesPage() {
     return () => document.removeEventListener('click', handleClick)
   }, [optionsRowId])
 
+  // Sincronizar fecha de nacimiento y edad al abrir el modal (edad editable solo si no hay birthday)
+  useEffect(() => {
+    if (isModalOpen) {
+      const b = selectedCustomer?.birthday ?? ''
+      setFormBirthday(b)
+      const age =
+        selectedCustomer?.age != null
+          ? String(selectedCustomer.age)
+          : b
+            ? String(calculateAge(b) ?? '')
+            : ''
+      setFormAge(age)
+    }
+  }, [isModalOpen, selectedCustomer?.id, selectedCustomer?.birthday, selectedCustomer?.age])
+
   const filteredCustomers = useMemo(() => {
     const term = searchTerm.toLowerCase()
     return customers.filter(
@@ -111,7 +128,8 @@ export default function ClientesPage() {
       const birthdayStr = String(formData.get('birthday') || '').trim()
       const birthday = birthdayStr || null
       const ageRaw = String(formData.get('age') || '').trim()
-      const age = ageRaw ? (Number.isFinite(parseInt(ageRaw, 10)) ? parseInt(ageRaw, 10) : null) : null
+      let age = ageRaw ? (Number.isFinite(parseInt(ageRaw, 10)) ? parseInt(ageRaw, 10) : null) : null
+      if (age == null && birthday) age = calculateAge(birthday) ?? null
       const valueStr = String(formData.get('estimated_value') || '').trim()
       const estimatedValue = valueStr ? (Number.isFinite(parseFloat(valueStr)) ? parseFloat(valueStr) : null) : null
 
@@ -243,29 +261,35 @@ export default function ClientesPage() {
         ) : filteredCustomers.length > 0 ? (
           <>
             <div className="md:hidden divide-y divide-gray-50">
-              {filteredCustomers.map((c) => (
-                <button
-                  key={c.id}
-                  type="button"
-                  onClick={() => openEdit(c)}
-                  className="w-full text-left p-4 active:bg-[#ece7e2]/40 transition-all"
-                >
-                  <div className="flex items-start gap-3 min-w-0">
-                    <div className="w-10 h-10 bg-black text-white rounded-xl flex items-center justify-center shadow-lg shrink-0">
-                      {c.gender === 'Moral' ? <Building2 size={18} /> : <User size={18} />}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-black text-black text-sm uppercase tracking-tight truncate">{getFullName(c)}</p>
-                      <p className="mt-1 text-[11px] font-bold text-black/60 truncate">{c.email || '—'}</p>
-                      <p className="text-[11px] font-bold text-black/60 truncate">{c.phone || '—'}</p>
-                      <div className="mt-2 flex flex-wrap gap-2">
-                        <span className="text-[10px] font-black uppercase tracking-widest text-black/40">{formatDate(c.birthday)}</span>
-                        <span className="text-[10px] font-black uppercase tracking-widest text-black/40">{c.insurance_type || '—'}</span>
+              {filteredCustomers.map((c) => {
+                const displayAge = c.age ?? (c.birthday ? calculateAge(c.birthday) : null)
+                return (
+                  <button
+                    key={c.id}
+                    type="button"
+                    onClick={() => openEdit(c)}
+                    className="w-full text-left p-4 active:bg-[#ece7e2]/40 transition-all"
+                  >
+                    <div className="flex items-start gap-3 min-w-0">
+                      <div className="w-10 h-10 bg-black text-white rounded-xl flex items-center justify-center shadow-lg shrink-0">
+                        {c.gender === 'Moral' ? <Building2 size={18} /> : <User size={18} />}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-black text-black text-sm uppercase tracking-tight truncate">{getFullName(c)}</p>
+                        <p className="mt-1 text-[11px] font-bold text-black/60 truncate">{c.email || '—'}</p>
+                        <p className="text-[11px] font-bold text-black/60 truncate">{c.phone || '—'}</p>
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          <span className="text-[10px] font-black uppercase tracking-widest text-black/40">{formatDate(c.birthday)}</span>
+                          <span className="text-[10px] font-black uppercase tracking-widest text-black/40">
+                            {displayAge != null ? `${displayAge} años` : '—'}
+                          </span>
+                          <span className="text-[10px] font-black uppercase tracking-widest text-black/40">{c.insurance_type || '—'}</span>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                </button>
-              ))}
+                  </button>
+                )
+              })}
             </div>
 
             <div className="hidden md:block overflow-x-auto">
@@ -275,6 +299,7 @@ export default function ClientesPage() {
                     <th className="p-8 text-[10px] font-black text-black/40 uppercase tracking-widest">Nombre completo</th>
                     <th className="p-8 text-[10px] font-black text-black/40 uppercase tracking-widest">Contacto</th>
                     <th className="p-8 text-[10px] font-black text-black/40 uppercase tracking-widest">Fecha de nacimiento</th>
+                    <th className="p-8 text-[10px] font-black text-black/40 uppercase tracking-widest">Edad</th>
                     <th className="p-8 text-[10px] font-black text-black/40 uppercase tracking-widest">Ocupación</th>
                     <th className="p-8 text-[10px] font-black text-black/40 uppercase tracking-widest">Tipo de seguro</th>
                     <th className="p-8 w-16"></th>
@@ -306,6 +331,9 @@ export default function ClientesPage() {
                         </div>
                       </td>
                       <td className="p-8 text-sm font-black text-black uppercase">{formatDate(c.birthday)}</td>
+                      <td className="p-8 text-sm font-black text-black uppercase">
+                        {c.age != null ? c.age : c.birthday ? (calculateAge(c.birthday) ?? '—') : '—'}
+                      </td>
                       <td className="p-8 text-sm font-black text-black uppercase">{c.ocupation || '—'}</td>
                       <td className="p-8 text-sm font-black text-black uppercase">{c.insurance_type || '—'}</td>
                       <td className="p-8 text-right" onClick={(e) => e.stopPropagation()}>
@@ -454,7 +482,12 @@ export default function ClientesPage() {
                       <input
                         name="birthday"
                         type="date"
-                        defaultValue={selectedCustomer?.birthday ?? ''}
+                        value={formBirthday}
+                        onChange={(e) => {
+                          const v = e.target.value
+                          setFormBirthday(v)
+                          setFormAge(v ? String(calculateAge(v) ?? '') : '')
+                        }}
                         className="w-full bg-white p-5 rounded-2xl font-black text-black text-lg outline-none"
                       />
                     </div>
@@ -465,9 +498,11 @@ export default function ClientesPage() {
                         type="number"
                         min={0}
                         max={120}
-                        defaultValue={selectedCustomer?.age ?? ''}
-                        placeholder="Ej. 32"
-                        className="w-full bg-white p-5 rounded-2xl font-black text-black text-lg outline-none"
+                        value={formAge}
+                        onChange={(e) => setFormAge(e.target.value)}
+                        readOnly={!!formBirthday}
+                        placeholder={formBirthday ? '' : 'Ej. 32'}
+                        className={`w-full p-5 rounded-2xl font-black text-black text-lg outline-none ${formBirthday ? 'bg-gray-100 cursor-not-allowed' : 'bg-white'}`}
                       />
                     </div>
                   </div>
@@ -659,7 +694,16 @@ export default function ClientesPage() {
                   <Row label="Email" value={detailCustomer.email} />
                   <Row label="Teléfono" value={detailCustomer.phone} />
                   <Row label="Fecha de nacimiento" value={formatDate(detailCustomer.birthday)} />
-                  <Row label="Edad" value={detailCustomer.age != null ? String(detailCustomer.age) : null} />
+                  <Row
+                    label="Edad"
+                    value={
+                      detailCustomer.age != null
+                        ? String(detailCustomer.age)
+                        : detailCustomer.birthday
+                          ? String(calculateAge(detailCustomer.birthday) ?? '')
+                          : null
+                    }
+                  />
                   <Row label="Género" value={detailCustomer.gender} />
                   <Row label="Estado civil" value={detailCustomer.marital_status} />
                   <Row label="Tipo de seguro" value={detailCustomer.insurance_type} />

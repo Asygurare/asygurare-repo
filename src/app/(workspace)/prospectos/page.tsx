@@ -10,6 +10,7 @@ import {
 } from 'lucide-react'
 import { supabaseClient } from '@/src/lib/supabase/client'
 import { toast, Toaster } from 'sonner'
+import { calculateAge } from '@/src/lib/utils/utils'
 import { SelectWithOther } from '@/src/components/ui/SelectWithOther'
 
 export default function ProspectosFinalUltraPage() {
@@ -45,6 +46,8 @@ export default function ProspectosFinalUltraPage() {
     financial_goals: '',
   })
   const [additionalLoading, setAdditionalLoading] = useState(false)
+  const [formBirthday, setFormBirthday] = useState('')
+  const [formAge, setFormAge] = useState('')
 
   const STAGES = ['Primer contacto', 'Cita agendada', 'Propuesta enviada', 'En negociación', 'Otro']
   const SOURCES = ['Referido', 'Redes Sociales', 'Llamada en Frío', 'Campaña Web', 'Cartera Antigua', 'Otro']
@@ -73,18 +76,6 @@ export default function ProspectosFinalUltraPage() {
     const last = String(lead?.last_name || '').trim()
     const merged = `${name} ${last}`.trim()
     return merged || 'Sin nombre'
-  }, [])
-
-  const computeAgeFromBirthday = useCallback((birthdayISO: string) => {
-    // birthdayISO: YYYY-MM-DD
-    const b = new Date(`${birthdayISO}T00:00:00`)
-    if (Number.isNaN(b.getTime())) return null
-    const now = new Date()
-    let age = now.getFullYear() - b.getFullYear()
-    const m = now.getMonth() - b.getMonth()
-    if (m < 0 || (m === 0 && now.getDate() < b.getDate())) age -= 1
-    if (age < 0 || age > 120) return null
-    return age
   }, [])
 
   const parseTriBool = useCallback((v: FormDataEntryValue | null): boolean | null => {
@@ -124,6 +115,21 @@ export default function ProspectosFinalUltraPage() {
       : {}
     return String(extra?.discard_stage || lead?.stage || '').trim()
   }, [])
+
+  // Sincronizar fecha de nacimiento y edad al abrir el modal (edad editable solo si no hay birthday)
+  useEffect(() => {
+    if (isModalOpen) {
+      const b = selectedLead?.birthday ?? ''
+      setFormBirthday(b)
+      const age =
+        selectedLead?.age != null
+          ? String(selectedLead.age)
+          : b
+            ? String(calculateAge(b) ?? '')
+            : ''
+      setFormAge(age)
+    }
+  }, [isModalOpen, selectedLead?.id, selectedLead?.birthday, selectedLead?.age])
 
   useEffect(() => {
     if (!isModalOpen) return
@@ -397,7 +403,7 @@ export default function ProspectosFinalUltraPage() {
     const ageRaw = String(formData.get('age') || '').trim()
     const age = ageRaw
       ? (Number.isFinite(parseInt(ageRaw, 10)) ? parseInt(ageRaw, 10) : null)
-      : (birthday ? computeAgeFromBirthday(birthday) : null)
+      : (birthday ? calculateAge(birthday) ?? null : null)
 
     const valueStr = String(formData.get('estimated_value') || '').trim()
     const estimatedValue = valueStr ? (Number.isFinite(parseFloat(valueStr)) ? parseFloat(valueStr) : null) : null
@@ -778,7 +784,7 @@ export default function ProspectosFinalUltraPage() {
                     </div>
 
                     <div className="space-y-2">
-                      <label className="text-[12px] font-black uppercase text-black italic">WhatsApp / Tel (opcional)</label>
+                      <label className="text-[12px] font-black uppercase text-black italic">WhatsApp / Tel</label>
                       <input
                         name="phone"
                         defaultValue={selectedLead?.phone || ''}
@@ -907,24 +913,31 @@ export default function ProspectosFinalUltraPage() {
                     <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-black/5 space-y-6">
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="space-y-2">
-                          <label className="text-[12px] font-black uppercase text-black italic">Cumpleaños (opcional)</label>
+                          <label className="text-[12px] font-black uppercase text-black italic">Cumpleaños</label>
                           <input
                             name="birthday"
                             type="date"
-                            defaultValue={selectedLead?.birthday || ''}
+                            value={formBirthday}
+                            onChange={(e) => {
+                              const v = e.target.value
+                              setFormBirthday(v)
+                              setFormAge(v ? String(calculateAge(v) ?? '') : '')
+                            }}
                             className="w-full bg-[#ece7e2] p-5 rounded-2xl font-black text-black text-lg outline-none"
                           />
                         </div>
                         <div className="space-y-2">
-                          <label className="text-[12px] font-black uppercase text-black italic">Edad (opcional)</label>
+                          <label className="text-[12px] font-black uppercase text-black italic">Edad</label>
                           <input
                             name="age"
                             type="number"
-                            defaultValue={selectedLead?.age ?? ''}
-                            placeholder="Ej. 32"
+                            value={formAge}
+                            onChange={(e) => setFormAge(e.target.value)}
+                            readOnly={!!formBirthday}
+                            placeholder={formBirthday ? '' : 'Ej. 32'}
                             min={0}
                             max={120}
-                            className="w-full bg-[#ece7e2] p-5 rounded-2xl font-black text-black text-lg outline-none"
+                            className={`w-full p-5 rounded-2xl font-black text-black text-lg outline-none ${formBirthday ? 'bg-gray-100 cursor-not-allowed' : 'bg-[#ece7e2]'}`}
                           />
                         </div>
                       </div>
