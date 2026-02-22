@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
-import { DATABASE } from '@/src/config'
+import { DATABASE, Gender, InsuranceType, MaritalStatus, OriginSource } from '@/src/config'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Users, Search, X, UserPlus, Mail, Phone, Loader2, CheckCircle2,
@@ -11,13 +11,12 @@ import { supabaseClient } from '@/src/lib/supabase/client'
 import { toast, Toaster } from 'sonner'
 import { getFullName, calculateAge } from '@/src/lib/utils/utils'
 import { SelectWithOther } from '@/src/components/ui/SelectWithOther'
-import { InsuranceType } from '@/src/config/constants'
 
 const INSURANCE_TYPES = Object.values(InsuranceType)
+const ORIGIN_SOURCES = Object.values(OriginSource)
+const MARITAL_STATUSES = Object.values(MaritalStatus)
+const GENDERS = Object.values(Gender)
 const STATUSES = ['nuevo', 'en seguimiento', 'activo', 'otro']
-const SOURCES = ['Referido', 'Redes Sociales', 'Llamada en Frío', 'Campaña Web', 'Cartera Antigua', 'Otro']
-const MARITAL_STATUSES = ['Soltero/a', 'Casado/a', 'Unión libre', 'Divorciado/a', 'Viudo/a', 'Otro']
-const GENDERS = ['Masculino', 'Femenino', 'Otro']
 
 function parseTriBool(v: FormDataEntryValue | null): boolean | null {
   const s = String(v || '').trim()
@@ -212,7 +211,6 @@ export default function ClientesPage() {
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
         <div>
           <h2 className="text-4xl font-black text-black tracking-tighter italic uppercase">Cartera.</h2>
-          <p className="text-black font-bold text-[10px] uppercase tracking-[0.3em] mt-1 opacity-50">Base de Datos Maestra</p>
         </div>
         <button
           onClick={() => {
@@ -501,7 +499,7 @@ export default function ClientesPage() {
                         value={formAge}
                         onChange={(e) => setFormAge(e.target.value)}
                         readOnly={!!formBirthday}
-                        placeholder={formBirthday ? '' : 'Ej. 32'}
+                        placeholder={formBirthday ? '' : 'Ej. 32 (editable si no hay fecha)'}
                         className={`w-full p-5 rounded-2xl font-black text-black text-lg outline-none ${formBirthday ? 'bg-gray-100 cursor-not-allowed' : 'bg-white'}`}
                       />
                     </div>
@@ -558,9 +556,10 @@ export default function ClientesPage() {
                       <label className="text-[12px] font-black uppercase text-black italic">Origen</label>
                       <SelectWithOther
                         name="source"
-                        options={SOURCES}
+                        options={ORIGIN_SOURCES}
                         defaultValue={selectedCustomer?.source ?? ''}
                         emptyOption="Selecciona..."
+                        otherOptionValue="Personalizado"
                         className="w-full bg-white p-5 rounded-2xl font-black text-black text-lg outline-none appearance-none cursor-pointer"
                       />
                     </div>
