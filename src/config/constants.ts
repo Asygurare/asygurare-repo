@@ -10,6 +10,9 @@ export type PolicyPaymentMethod = 'efectivo' | 'transferencia' | 'cheque' | 'tar
 export type PolicyPaymentStatus = 'pendiente' | 'pagado' | 'vencido' | 'otro'
 export type PolicyPaymentType = 'mensual' | 'trimestral' | 'semestral' | 'anual' | 'otro'
 
+/** Prima mínima (MXN) para considerar una póliza como "Cliente VIP". Valor por defecto si no está configurado en PROFILES.vip_premium_min. */
+export const VIP_PREMIUM_MIN_DEFAULT = 50000
+
 export enum InsuranceType {
     Vida = 'Vida',
     Autos = 'Auto',
@@ -93,7 +96,7 @@ export enum Currency {
     EUR = 'EUR',
 }
 
-/** Método de pago para pólizas (campo metodo_pago en WS_POLICIES). */
+/** Método de pago para pólizas (campo payment_method en WS_POLICIES). */
 export enum PolicyMetodoPago {
   TarjetaCredito = 'Tarjeta de Crédito',
   Debito = 'Débito',

@@ -276,8 +276,8 @@ export function PolicyCaptureModal({
                   </label>
                   <select
                     required
-                    name="metodo_pago"
-                    defaultValue={(selectedPolicy as any)?.metodo_pago ?? PolicyMetodoPago.TarjetaCredito}
+                    name="payment_method"
+                    defaultValue={(selectedPolicy as any)?.payment_method ?? PolicyMetodoPago.TarjetaCredito}
                     className="w-full bg-transparent text-black font-black text-lg outline-none cursor-pointer appearance-none uppercase"
                   >
                     {PAYMENT_METHODS.map((opt) => (

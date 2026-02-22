@@ -893,8 +893,8 @@ export default function ClientesPage() {
 
                   <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border-2 border-black/10 space-y-4">
                     <div>
-                      <label className="text-[12px] font-black uppercase text-black italic">Intereses del cliente</label>
-                      <p className="text-[11px] text-black/60 mt-1.5 max-w-xl">
+                      <label className="text-base font-black uppercase text-black italic">Intereses del cliente</label>
+                      <p className="text-sm text-black/60 mt-1.5 max-w-xl">
                         Estos datos ayudan a nuestro asistente de IA a personalizar la conversación. Escribe enunciados o párrafos y agrégalos con Enter o el botón.
                       </p>
                     </div>
