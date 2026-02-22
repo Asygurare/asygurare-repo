@@ -3,6 +3,7 @@
 ### Custom ###
 /scripts
 /schemas
+/docs
 
 ### Default ###
 # dependencies
