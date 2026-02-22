@@ -1,10 +1,12 @@
 "use client"
 
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
+import { useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   DATABASE,
   Currency,
+  CustomerStatus,
   EducationLevel,
   Gender,
   InsuranceType,
@@ -17,7 +19,7 @@ import {
 import { 
   Zap, Target, X, Mail, Phone, Loader2, CheckCircle2, 
   TrendingUp, DollarSign, UserCheck, Trash2, Edit3, 
-  Search, Clock, Info, Share2, MessageSquare, ChevronRight
+  Search, Clock, Info, Share2, MessageSquare, ChevronRight, User, FileCheck
 } from 'lucide-react'
 import { supabaseClient } from '@/src/lib/supabase/client'
 import { toast, Toaster } from 'sonner'
@@ -69,6 +71,8 @@ export default function ProspectosFinalUltraPage() {
   const [editingInterestDraft, setEditingInterestDraft] = useState('')
   const [formDirty, setFormDirty] = useState(false)
   const formRef = useRef<HTMLFormElement>(null)
+  const [convertedCustomerId, setConvertedCustomerId] = useState<string | null>(null)
+  const router = useRouter()
 
   const LEAD_FORM_STAGES = Object.values(LeadFormStage)
   const STATUSES = Object.values(LeadStatus)
@@ -378,12 +382,14 @@ export default function ProspectosFinalUltraPage() {
         : {}
 
     // 1. Insertar en clientes (WS_CUSTOMERS_2, schema alineado con Prospectos)
-    const { error: insertError } = await supabaseClient.from(DATABASE.TABLES.WS_CUSTOMERS_2).insert({
-      user_id: user.id,
-      name,
-      last_name: lead?.last_name || null,
-      status: lead?.status || 'nuevo',
-      source: lead?.source || null,
+    const { data: newCustomer, error: insertError } = await supabaseClient
+      .from(DATABASE.TABLES.WS_CUSTOMERS_2)
+      .insert({
+        user_id: user.id,
+        name,
+        last_name: lead?.last_name || null,
+        status: CustomerStatus.Activo,
+        source: lead?.source || null,
       insurance_type: lead?.insurance_type || null,
       estimated_value: lead?.estimated_value ?? null,
       email: lead?.email || null,
@@ -403,8 +409,10 @@ export default function ProspectosFinalUltraPage() {
       postal_code: lead?.postal_code || null,
       address: lead?.address || null,
       // Marker so Metas/Analytics can measure conversions lead -> customer
-      additional_fields: { ...baseExtra, converted_from_lead_id: String(lead?.id || ''), converted_at: nowIso },
-    })
+        additional_fields: { ...baseExtra, converted_from_lead_id: String(lead?.id || ''), converted_at: nowIso },
+      })
+      .select('id')
+      .single()
 
     if (insertError) {
       toast.error("Error al convertir: " + insertError.message)
@@ -414,6 +422,7 @@ export default function ProspectosFinalUltraPage() {
       toast.success("¡FELICIDADES! Venta cerrada y movida a Clientes.")
       setIsModalOpen(false)
       fetchData()
+      if (newCustomer?.id) setConvertedCustomerId(newCustomer.id)
     }
     setLoading(false)
   }
@@ -1613,6 +1622,72 @@ export default function ProspectosFinalUltraPage() {
                   >
                     Reactivar
                   </button>
+                </div>
+              </motion.div>
+            </div>
+          </>
+        )}
+      </AnimatePresence>
+
+      {/* Modal: Prospecto convertido en cliente — Ir a cliente / Capturar póliza / Volver */}
+      <AnimatePresence>
+        {convertedCustomerId && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setConvertedCustomerId(null)}
+              className="fixed inset-0 bg-black/60 backdrop-blur-md z-[60]"
+            />
+            <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
+              <motion.div
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="convert-success-title"
+                initial={{ opacity: 0, scale: 0.97 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.98 }}
+                onClick={(e) => e.stopPropagation()}
+                className="w-full max-w-md bg-white rounded-[2rem] shadow-2xl border border-black/5 overflow-hidden"
+              >
+                <div className="p-8 text-center">
+                  <div className="mx-auto w-14 h-14 rounded-full bg-emerald-100 flex items-center justify-center mb-4">
+                    <CheckCircle2 className="text-emerald-600" size={28} />
+                  </div>
+                  <h3 id="convert-success-title" className="text-xl font-black text-black uppercase tracking-tighter mb-2">
+                    ¡Venta cerrada!
+                  </h3>
+                  <p className="text-sm text-black/60 mb-6">El prospecto ya es cliente. ¿Qué deseas hacer ahora?</p>
+                  <div className="flex flex-col gap-3">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        router.push(`/clientes?openId=${convertedCustomerId}`)
+                        setConvertedCustomerId(null)
+                      }}
+                      className="flex items-center justify-center gap-2 px-6 py-4 rounded-xl font-black text-sm uppercase bg-black text-white hover:bg-black/90 transition-all"
+                    >
+                      <User size={18} /> Ir a actualizar información del cliente
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        router.push(`/polizas?customerId=${convertedCustomerId}`)
+                        setConvertedCustomerId(null)
+                      }}
+                      className="flex items-center justify-center gap-2 px-6 py-4 rounded-xl font-black text-sm uppercase border-2 border-black/20 text-black hover:bg-black/5 transition-all"
+                    >
+                      <FileCheck size={18} /> Capturar póliza
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setConvertedCustomerId(null)}
+                      className="px-6 py-4 rounded-xl font-black text-sm uppercase text-black/60 hover:bg-black/5 transition-all"
+                    >
+                      Volver a prospectos
+                    </button>
+                  </div>
                 </div>
               </motion.div>
             </div>

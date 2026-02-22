@@ -1,6 +1,7 @@
 "use client"
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react'
+import { useSearchParams, useRouter } from 'next/navigation'
 import { AnimatePresence } from 'framer-motion'
 import { Search, Plus, Loader2, RefreshCw, Filter, X } from 'lucide-react'
 import { toast, Toaster } from 'sonner'
@@ -25,17 +26,19 @@ import { PolicyCaptureModal } from '@/src/components/workspace/polizas/PolicyCap
 // Nota: Ya no importamos CustomerOption de aquí
 
 export default function PolizasPage() {
+  const searchParams = useSearchParams()
+  const router = useRouter()
+
   // --- ESTADOS DE UI ---
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
+  /** Cliente preseleccionado al llegar desde /clientes o /prospectos (query customerId) */
+  const [preselectedCustomerId, setPreselectedCustomerId] = useState<string | null>(null)
 
   // --- ESTADOS DE DATOS ---
   const [policies, setPolicies] = useState<PolicyWithCustomer[]>([])
-  
-  // CORRECCIÓN: Usamos 'Customer[]' en lugar de 'CustomerOption[]'
-  const [customers, setCustomers] = useState<Customer[]>([]) 
-  
+  const [customers, setCustomers] = useState<Customer[]>([])
   const [selectedPolicy, setSelectedPolicy] = useState<PolicyFormData | null>(null)
 
   // --- FILTROS ---
@@ -86,6 +89,24 @@ export default function PolizasPage() {
   }, [])
 
   useEffect(() => { fetchData() }, [fetchData])
+
+  // Si llegamos con ?customerId=, refrescar datos para tener al cliente recién creado
+  useEffect(() => {
+    const id = searchParams.get('customerId')
+    if (id) fetchData(true)
+  }, [searchParams, fetchData])
+
+  // Abrir modal con cliente preseleccionado cuando ya está en la lista
+  useEffect(() => {
+    const id = searchParams.get('customerId')
+    if (!id || loading) return
+    const found = customers.some((c) => c.id === id)
+    if (found) {
+      setPreselectedCustomerId(id)
+      setIsModalOpen(true)
+      router.replace('/polizas', { scroll: false })
+    }
+  }, [searchParams, customers, loading, router])
 
   // --- 2. LÓGICA DE FILTRADO ---
   const filteredPolicies = useMemo(() => {
@@ -143,6 +164,12 @@ export default function PolizasPage() {
     fetchData(true)
     setIsModalOpen(false)
     setSelectedPolicy(null)
+    setPreselectedCustomerId(null)
+  }
+
+  const handleModalClose = () => {
+    setIsModalOpen(false)
+    setPreselectedCustomerId(null)
   }
 
   // Submit en la página (como clientes/prospectos): usamos selectedPolicy del estado para update vs insert
@@ -283,9 +310,10 @@ export default function PolizasPage() {
       {/* MODAL: submit lo maneja la página (selectedPolicy del estado) como en clientes/prospectos */}
       <PolicyCaptureModal
         isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
+        onClose={handleModalClose}
         customers={customers}
         selectedPolicy={selectedPolicy}
+        preselectedCustomer={preselectedCustomerId ? customers.find((c) => c.id === preselectedCustomerId) ?? null : null}
         onSubmit={handlePolicySubmit}
         onSuccess={handleModalSuccess}
       />

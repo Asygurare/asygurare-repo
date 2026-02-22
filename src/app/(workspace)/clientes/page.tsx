@@ -1,12 +1,13 @@
 "use client"
 
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { Currency, CustomerStatus, DATABASE, EducationLevel, Gender, InsuranceType, MaritalStatus, OriginSource } from '@/src/config'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Users, Search, X, UserPlus, Mail, Phone, Loader2, CheckCircle2,
   Building2, User, Trash2, Save, Calendar, MoreVertical, FileText, StickyNote,
-  Edit3, ChevronRight, ChevronUp, ChevronDown
+  Edit3, ChevronRight, ChevronUp, ChevronDown, FileCheck
 } from 'lucide-react'
 import { supabaseClient } from '@/src/lib/supabase/client'
 import { toast, Toaster } from 'sonner'
@@ -81,6 +82,9 @@ export default function ClientesPage() {
   const [statusFilter, setStatusFilter] = useState<string>('__all__')
   const [sortKey, setSortKey] = useState<'name' | 'contact' | 'status' | 'insurance_type' | 'added_at'>('added_at')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
+  const [postCreateCustomerId, setPostCreateCustomerId] = useState<string | null>(null)
+  const router = useRouter()
+  const searchParams = useSearchParams()
 
   // 1. CARGA DE DATOS
   const fetchCustomers = useCallback(async () => {
@@ -103,6 +107,24 @@ export default function ClientesPage() {
   useEffect(() => {
     fetchCustomers()
   }, [fetchCustomers])
+
+  // Al llegar con ?openId= (ej. desde prospectos), refrescar lista para tener el cliente recién convertido
+  useEffect(() => {
+    const openId = searchParams.get('openId')
+    if (openId) fetchCustomers()
+  }, [searchParams, fetchCustomers])
+
+  // Abrir expediente cuando se llega con ?openId= y ya está el cliente en la lista
+  useEffect(() => {
+    const openId = searchParams.get('openId')
+    if (!openId || fetching || !customers.length) return
+    const customer = customers.find((c) => c.id === openId)
+    if (customer) {
+      setSelectedCustomer(customer)
+      setIsModalOpen(true)
+      router.replace('/clientes', { scroll: false })
+    }
+  }, [searchParams, customers, fetching, router])
 
   useEffect(() => {
     if (!optionsRowId) return
@@ -358,11 +380,19 @@ export default function ClientesPage() {
         setFormDirty(false)
         toast.success('Expediente actualizado')
       } else {
-        const { error } = await supabaseClient
+        const { data: inserted, error } = await supabaseClient
           .from(DATABASE.TABLES.WS_CUSTOMERS_2)
           .insert([payload])
+          .select('id')
+          .single()
         if (error) throw error
         toast.success('Cliente registrado')
+        await fetchCustomers()
+        setIsModalOpen(false)
+        setSelectedCustomer(null)
+        if (inserted?.id) setPostCreateCustomerId(inserted.id)
+        setLoading(false)
+        return
       }
 
       setSuccess(true)
@@ -1117,6 +1147,62 @@ export default function ClientesPage() {
                   >
                     Editar expediente
                   </button>
+                </div>
+              </motion.div>
+            </div>
+          </>
+        )}
+      </AnimatePresence>
+
+      {/* Modal: Cliente creado — Capturar póliza o Volver a Clientes */}
+      <AnimatePresence>
+        {postCreateCustomerId && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setPostCreateCustomerId(null)}
+              className="fixed inset-0 bg-black/60 backdrop-blur-md z-[60]"
+            />
+            <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
+              <motion.div
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="post-create-title"
+                initial={{ opacity: 0, scale: 0.97 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.98 }}
+                onClick={(e) => e.stopPropagation()}
+                className="w-full max-w-md bg-white rounded-[2rem] shadow-2xl border border-black/5 overflow-hidden"
+              >
+                <div className="p-8 text-center">
+                  <div className="mx-auto w-14 h-14 rounded-full bg-green-100 flex items-center justify-center mb-4">
+                    <CheckCircle2 className="text-green-600" size={28} />
+                  </div>
+                  <h3 id="post-create-title" className="text-xl font-black text-black uppercase tracking-tighter mb-2">
+                    Cliente creado
+                  </h3>
+                  <p className="text-sm text-black/60 mb-6">¿Qué deseas hacer ahora?</p>
+                  <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        router.push(`/polizas?customerId=${postCreateCustomerId}`)
+                        setPostCreateCustomerId(null)
+                      }}
+                      className="flex items-center justify-center gap-2 px-6 py-4 rounded-xl font-black text-sm uppercase bg-black text-white hover:bg-black/90 transition-all"
+                    >
+                      <FileCheck size={18} /> Capturar datos de póliza
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPostCreateCustomerId(null)}
+                      className="px-6 py-4 rounded-xl font-black text-sm uppercase border-2 border-black/20 text-black hover:bg-black/5 transition-all"
+                    >
+                      Volver a Clientes
+                    </button>
+                  </div>
                 </div>
               </motion.div>
             </div>
