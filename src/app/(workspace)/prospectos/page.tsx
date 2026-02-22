@@ -397,6 +397,11 @@ export default function ProspectosFinalUltraPage() {
       gender: lead?.gender || null,
       client_interests: lead?.client_interests || null,
       notes: lead?.notes || null,
+      country: lead?.country || null,
+      state: lead?.state || null,
+      city: lead?.city || null,
+      postal_code: lead?.postal_code || null,
+      address: lead?.address || null,
       // Marker so Metas/Analytics can measure conversions lead -> customer
       additional_fields: { ...baseExtra, converted_from_lead_id: String(lead?.id || ''), converted_at: nowIso },
     })

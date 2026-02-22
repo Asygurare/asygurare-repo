@@ -1,11 +1,12 @@
 "use client"
 
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
-import { DATABASE, Gender, InsuranceType, MaritalStatus, OriginSource } from '@/src/config'
+import { Currency, DATABASE, EducationLevel, Gender, InsuranceType, MaritalStatus, OriginSource } from '@/src/config'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Users, Search, X, UserPlus, Mail, Phone, Loader2, CheckCircle2,
-  Building2, User, Trash2, Save, Calendar, MoreVertical, FileText, StickyNote
+  Building2, User, Trash2, Save, Calendar, MoreVertical, FileText, StickyNote,
+  Edit3, ChevronRight
 } from 'lucide-react'
 import { supabaseClient } from '@/src/lib/supabase/client'
 import { toast, Toaster } from 'sonner'
@@ -17,6 +18,8 @@ const ORIGIN_SOURCES = Object.values(OriginSource)
 const MARITAL_STATUSES = Object.values(MaritalStatus)
 const GENDERS = Object.values(Gender)
 const STATUSES = ['nuevo', 'en seguimiento', 'activo', 'otro']
+const EDUCATION_LEVELS = Object.values(EducationLevel)
+const CURRENCIES = Object.values(Currency)
 
 function parseTriBool(v: FormDataEntryValue | null): boolean | null {
   const s = String(v || '').trim()
@@ -50,6 +53,29 @@ export default function ClientesPage() {
   const [searchTerm, setSearchTerm] = useState('')
   const [formBirthday, setFormBirthday] = useState('')
   const [formAge, setFormAge] = useState('')
+  const [formDirty, setFormDirty] = useState(false)
+  const formRef = useRef<HTMLFormElement>(null)
+  const [clientInterestsList, setClientInterestsList] = useState<string[]>([])
+  const [clientInterestInput, setClientInterestInput] = useState('')
+  const [editingInterestIndex, setEditingInterestIndex] = useState<number | null>(null)
+  const [editingInterestDraft, setEditingInterestDraft] = useState('')
+  const [additionalLoading, setAdditionalLoading] = useState(false)
+  const [additionalForm, setAdditionalForm] = useState({
+    contact_date: '',
+    economic_dependents: '',
+    education_level: '',
+    sector: '',
+    monthly_income_estimated: '',
+    currency: '',
+    financial_goals: '',
+    country: '',
+    state: '',
+    city: '',
+    postal_code: '',
+    address: '',
+  })
+  const [hasChildren, setHasChildren] = useState<'yes' | 'no' | ''>('')
+  const [children, setChildren] = useState<Array<{ name: string; age: string; contact: string }>>([])
 
   // 1. CARGA DE DATOS
   const fetchCustomers = useCallback(async () => {
@@ -97,6 +123,57 @@ export default function ClientesPage() {
     }
   }, [isModalOpen, selectedCustomer?.id, selectedCustomer?.birthday, selectedCustomer?.age])
 
+  useEffect(() => {
+    if (isModalOpen) {
+      const raw = String(selectedCustomer?.client_interests ?? '').trim()
+      setClientInterestsList(raw ? raw.split(/\n/).map((s) => s.trim()).filter(Boolean) : [])
+      setClientInterestInput('')
+      setEditingInterestIndex(null)
+      setEditingInterestDraft('')
+    } else {
+      setClientInterestsList([])
+      setClientInterestInput('')
+    }
+  }, [isModalOpen, selectedCustomer?.id, selectedCustomer?.client_interests])
+
+  useEffect(() => {
+    if (isModalOpen) setFormDirty(false)
+  }, [isModalOpen])
+
+  useEffect(() => {
+    if (!isModalOpen) return
+    setAdditionalLoading(true)
+    const extra = selectedCustomer?.additional_fields && typeof selectedCustomer.additional_fields === 'object'
+      ? selectedCustomer.additional_fields
+      : {}
+    setHasChildren(extra?.has_children === 'yes' ? 'yes' : extra?.has_children === 'no' ? 'no' : '')
+    const rawChildren = Array.isArray(extra?.children) ? extra.children : []
+    setChildren(rawChildren.map((c: any) => ({
+      name: String(c?.name ?? ''),
+      age: String(c?.age ?? ''),
+      contact: String(c?.contact ?? ''),
+    })))
+    setAdditionalForm({
+      contact_date: extra?.contact_date != null ? String(extra.contact_date) : '',
+      economic_dependents: extra?.economic_dependents != null ? String(extra.economic_dependents) : '',
+      education_level: String(extra?.education_level ?? ''),
+      sector: String(extra?.sector ?? ''),
+      monthly_income_estimated: extra?.monthly_income_estimated != null ? String(extra.monthly_income_estimated) : '',
+      currency: String(extra?.currency ?? ''),
+      financial_goals: String(extra?.financial_goals ?? ''),
+      country: String(selectedCustomer?.country ?? extra?.country ?? ''),
+      state: String(selectedCustomer?.state ?? extra?.state ?? ''),
+      city: String(selectedCustomer?.city ?? extra?.city ?? ''),
+      postal_code: String(selectedCustomer?.postal_code ?? extra?.postal_code ?? ''),
+      address: String(selectedCustomer?.address ?? extra?.address ?? ''),
+    })
+    setAdditionalLoading(false)
+  }, [isModalOpen, selectedCustomer?.id, selectedCustomer?.additional_fields, selectedCustomer?.country, selectedCustomer?.state, selectedCustomer?.city, selectedCustomer?.postal_code, selectedCustomer?.address])
+
+  useEffect(() => {
+    if (hasChildren !== 'yes') setChildren([])
+  }, [hasChildren])
+
   const filteredCustomers = useMemo(() => {
     const term = searchTerm.toLowerCase()
     return customers.filter(
@@ -129,8 +206,42 @@ export default function ClientesPage() {
       const ageRaw = String(formData.get('age') || '').trim()
       let age = ageRaw ? (Number.isFinite(parseInt(ageRaw, 10)) ? parseInt(ageRaw, 10) : null) : null
       if (age == null && birthday) age = calculateAge(birthday) ?? null
-      const valueStr = String(formData.get('estimated_value') || '').trim()
-      const estimatedValue = valueStr ? (Number.isFinite(parseFloat(valueStr)) ? parseFloat(valueStr) : null) : null
+
+      const clientInterests =
+        clientInterestsList.length > 0
+          ? clientInterestsList.map((s) => s.trim()).filter(Boolean).join('\n').trim() || null
+          : null
+
+      const toIntOrNull = (s: string) => {
+        const t = String(s || '').trim()
+        if (!t) return null
+        const n = parseInt(t, 10)
+        return Number.isFinite(n) ? n : null
+      }
+      const toFloatOrNull = (s: string) => {
+        const t = String(s || '').trim()
+        if (!t) return null
+        const n = parseFloat(t)
+        return Number.isFinite(n) ? n : null
+      }
+      const childrenList = (hasChildren === 'yes' ? children : []).filter((c) => c.name || c.age || c.contact)
+      const additionalPayload: Record<string, unknown> = {
+        contact_date: additionalForm.contact_date.trim() || null,
+        has_children: hasChildren || null,
+        economic_dependents: toIntOrNull(additionalForm.economic_dependents),
+        education_level: additionalForm.education_level.trim() || null,
+        sector: additionalForm.sector.trim() || null,
+        monthly_income_estimated: toFloatOrNull(additionalForm.monthly_income_estimated),
+        currency: additionalForm.currency.trim() || null,
+        financial_goals: additionalForm.financial_goals.trim() || null,
+        children: childrenList.length ? childrenList : null,
+      }
+      Object.keys(additionalPayload).forEach((k) => {
+        const v = additionalPayload[k]
+        if (v === null || v === undefined || (typeof v === 'string' && v.trim() === '') || (Array.isArray(v) && v.length === 0))
+          delete additionalPayload[k]
+      })
+      const additional_fields = Object.keys(additionalPayload).length > 0 ? additionalPayload : null
 
       const payload = {
         user_id: user.id,
@@ -139,7 +250,7 @@ export default function ClientesPage() {
         status: String(formData.get('status') || '').trim() || 'nuevo',
         source: String(formData.get('source') || '').trim() || null,
         insurance_type: String(formData.get('insurance_type') || '').trim() || null,
-        estimated_value: estimatedValue,
+        estimated_value: selectedCustomer?.estimated_value ?? null,
         email: String(formData.get('email') || '').trim() || null,
         phone: String(formData.get('phone') || '').trim() || null,
         birthday,
@@ -149,8 +260,14 @@ export default function ClientesPage() {
         marital_status: String(formData.get('marital_status') || '').trim() || null,
         ocupation: String(formData.get('ocupation') || '').trim() || null,
         gender: String(formData.get('gender') || '').trim() || null,
-        client_interests: String(formData.get('client_interests') || '').trim() || null,
+        client_interests: clientInterests,
         notes: String(formData.get('notes') || '').trim() || null,
+        country: additionalForm.country.trim() || null,
+        state: additionalForm.state.trim() || null,
+        city: additionalForm.city.trim() || null,
+        postal_code: additionalForm.postal_code.trim() || null,
+        address: additionalForm.address.trim() || null,
+        additional_fields,
         updated_at: new Date().toISOString(),
       }
 
@@ -160,6 +277,7 @@ export default function ClientesPage() {
           .update(payload)
           .eq('id', selectedCustomer.id)
         if (error) throw error
+        setFormDirty(false)
         toast.success('Expediente actualizado')
       } else {
         const { error } = await supabaseClient
@@ -356,7 +474,7 @@ export default function ClientesPage() {
                                   setDetailCustomer(c)
                                   setOptionsRowId(null)
                                 }}
-                                className="w-full px-4 py-3 text-left text-sm font-black uppercase tracking-tighter flex items-center gap-2 hover:bg-[#ece7e2]/50 transition-colors"
+                                className="w-full px-4 py-3 text-left text-sm font-black uppercase tracking-tighter flex items-center gap-2 text-gray-600 hover:bg-[#ece7e2]/50 transition-colors"
                               >
                                 <FileText size={18} /> Ver toda la información
                               </button>
@@ -365,7 +483,7 @@ export default function ClientesPage() {
                                   setNotesCustomer(c)
                                   setOptionsRowId(null)
                                 }}
-                                className="w-full px-4 py-3 text-left text-sm font-black uppercase tracking-tighter flex items-center gap-2 hover:bg-[#ece7e2]/50 transition-colors"
+                                className="w-full px-4 py-3 text-left text-sm font-black uppercase tracking-tighter flex items-center gap-2 text-gray-600 hover:bg-[#ece7e2]/50 transition-colors"
                               >
                                 <StickyNote size={18} /> Notas
                               </button>
@@ -415,223 +533,282 @@ export default function ClientesPage() {
                 animate={{ opacity: 1, scale: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.98, y: 10 }}
                 transition={{ type: 'spring', damping: 25 }}
-                className="w-full max-w-4xl bg-[#ece7e2] shadow-2xl rounded-[2.5rem] overflow-hidden border border-white/20"
+                className="w-full max-w-7xl bg-[#ece7e2] shadow-2xl rounded-[2.5rem] overflow-hidden border border-white/20"
               >
-                <div className="p-8 bg-white flex justify-between items-center border-b-2 border-black/5 shadow-sm">
+                <div className="p-8 bg-white flex flex-wrap justify-between items-center gap-4 border-b-2 border-black/5 shadow-sm">
                   <div>
                     <h3 className="text-3xl font-black italic text-black uppercase tracking-tighter">
                       {selectedCustomer ? 'Expediente Cliente' : 'Alta de Cuenta'}
                     </h3>
                     <p className="text-[11px] font-bold text-black/50 uppercase tracking-widest mt-1">Asygurare</p>
                   </div>
-                  <button onClick={() => setIsModalOpen(false)} className="p-3 hover:bg-gray-100 rounded-full text-black transition-all">
-                    <X size={32} />
-                  </button>
+                  <div className="flex items-center gap-2">
+                    {selectedCustomer && (
+                      <button
+                        type="button"
+                        disabled={!formDirty || loading}
+                        onClick={() => formRef.current?.requestSubmit()}
+                        className="px-5 py-3 rounded-2xl bg-black text-white font-black text-sm uppercase tracking-wide shadow-md hover:opacity-95 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
+                      >
+                        {loading ? <Loader2 className="animate-spin" size={20} /> : 'Guardar cambios'}
+                      </button>
+                    )}
+                    <button onClick={() => setIsModalOpen(false)} className="p-3 hover:bg-gray-100 rounded-full text-black transition-all" aria-label="Cerrar">
+                      <X size={32} />
+                    </button>
+                  </div>
                 </div>
 
-                <form onSubmit={handleSubmit} className="max-h-[80vh] overflow-y-auto p-8 space-y-8">
+                <form ref={formRef} onSubmit={handleSubmit} onChange={() => setFormDirty(true)} className="max-h-[80vh] overflow-y-auto p-8 space-y-8">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="space-y-2">
-                      <label className="text-[12px] font-black uppercase text-black italic">Nombre</label>
-                      <input
-                        name="name"
-                        required
-                        defaultValue={selectedCustomer?.name ?? selectedCustomer?.full_name ?? ''}
-                        placeholder="Ej. Alejandro"
-                        className="w-full bg-white p-5 rounded-2xl font-black text-black text-lg outline-none border-2 border-transparent focus:border-black/20"
-                      />
+                    <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-black/5 space-y-6">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <label className="text-[12px] font-black uppercase text-black italic">Nombre</label>
+                          <input name="name" required defaultValue={selectedCustomer?.name ?? selectedCustomer?.full_name ?? ''} placeholder="Ej. Alejandro" className="w-full bg-[#ece7e2] p-5 rounded-2xl font-black text-black text-lg outline-none border-2 border-transparent focus:border-black/20" />
+                        </div>
+                        <div className="space-y-2">
+                          <label className="text-[12px] font-black uppercase text-black italic">Apellido</label>
+                          <input name="last_name" defaultValue={selectedCustomer?.last_name ?? ''} placeholder="Ej. Smith" className="w-full bg-[#ece7e2] p-5 rounded-2xl font-black text-black text-lg outline-none border-2 border-transparent focus:border-black/20" />
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-[12px] font-black uppercase text-black italic">Email</label>
+                        <input name="email" type="email" defaultValue={selectedCustomer?.email ?? ''} placeholder="correo@ejemplo.com" className="w-full bg-[#ece7e2] p-5 rounded-2xl font-black text-black text-lg outline-none" />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-[12px] font-black uppercase text-black italic">Teléfono</label>
+                        <input name="phone" defaultValue={selectedCustomer?.phone ?? ''} placeholder="+52..." className="w-full bg-[#ece7e2] p-5 rounded-2xl font-black text-black text-lg outline-none" />
+                      </div>
+                      <div className="bg-[#ece7e2] p-6 rounded-[2rem] border border-black/5 space-y-4">
+                        <div className="flex items-center justify-between gap-4">
+                          <p className="text-[12px] font-black uppercase text-black italic">Ubicación</p>
+                          <p className="text-[10px] font-bold text-black/40 uppercase tracking-widest">Opcional</p>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <label className="text-[11px] font-black uppercase text-black/60 italic">País</label>
+                            <input value={additionalForm.country} onChange={(e) => setAdditionalForm((p) => ({ ...p, country: e.target.value }))} placeholder="Ej. México" className="w-full bg-white p-4 rounded-2xl font-black text-black text-base outline-none" />
+                          </div>
+                          <div className="space-y-2">
+                            <label className="text-[11px] font-black uppercase text-black/60 italic">Ciudad</label>
+                            <input value={additionalForm.city} onChange={(e) => setAdditionalForm((p) => ({ ...p, city: e.target.value }))} placeholder="Ej. Guadalajara" className="w-full bg-white p-4 rounded-2xl font-black text-black text-base outline-none" />
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <label className="text-[11px] font-black uppercase text-black/60 italic">Estado</label>
+                            <input value={additionalForm.state} onChange={(e) => setAdditionalForm((p) => ({ ...p, state: e.target.value }))} placeholder="Ej. Jalisco" className="w-full bg-white p-4 rounded-2xl font-black text-black text-base outline-none" />
+                          </div>
+                          <div className="space-y-2">
+                            <label className="text-[11px] font-black uppercase text-black/60 italic">Código postal</label>
+                            <input value={additionalForm.postal_code} onChange={(e) => setAdditionalForm((p) => ({ ...p, postal_code: e.target.value }))} placeholder="Ej. 44100" className="w-full bg-white p-4 rounded-2xl font-black text-black text-base outline-none" />
+                          </div>
+                        </div>
+                        <div className="space-y-2">
+                          <label className="text-[11px] font-black uppercase text-black/60 italic">Dirección</label>
+                          <input value={additionalForm.address} onChange={(e) => setAdditionalForm((p) => ({ ...p, address: e.target.value }))} placeholder="Calle, número, colonia…" className="w-full bg-white p-4 rounded-2xl font-black text-black text-base outline-none" />
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <label className="text-[12px] font-black uppercase text-black italic">Origen</label>
+                          <SelectWithOther name="source" options={ORIGIN_SOURCES} defaultValue={selectedCustomer?.source ?? ''} emptyOption="Selecciona..." otherOptionValue="Personalizado" className="w-full bg-[#ece7e2] p-5 rounded-2xl font-black text-black text-lg outline-none appearance-none cursor-pointer" />
+                        </div>
+                        <div className="space-y-2">
+                          <label className="text-[12px] font-black uppercase text-black italic">Estatus</label>
+                          <SelectWithOther name="status" options={STATUSES} defaultValue={selectedCustomer?.status ?? 'nuevo'} otherOptionValue="otro" className="w-full bg-[#ece7e2] p-5 rounded-2xl font-black text-black text-lg outline-none appearance-none cursor-pointer" />
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-[12px] font-black uppercase text-black italic">Ocupación</label>
+                        <input name="ocupation" defaultValue={selectedCustomer?.ocupation ?? ''} placeholder="Ej. Contador/a" className="w-full bg-[#ece7e2] p-5 rounded-2xl font-black text-black text-lg outline-none" />
+                      </div>
                     </div>
-                    <div className="space-y-2">
-                      <label className="text-[12px] font-black uppercase text-black italic">Apellido</label>
-                      <input
-                        name="last_name"
-                        defaultValue={selectedCustomer?.last_name ?? ''}
-                        placeholder="Ej. Smith"
-                        className="w-full bg-white p-5 rounded-2xl font-black text-black text-lg outline-none border-2 border-transparent focus:border-black/20"
-                      />
-                    </div>
-                  </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="space-y-2">
-                      <label className="text-[12px] font-black uppercase text-black italic">Email</label>
-                      <input
-                        name="email"
-                        type="email"
-                        defaultValue={selectedCustomer?.email ?? ''}
-                        placeholder="correo@ejemplo.com"
-                        className="w-full bg-white p-5 rounded-2xl font-black text-black text-lg outline-none"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-[12px] font-black uppercase text-black italic">Teléfono</label>
-                      <input
-                        name="phone"
-                        defaultValue={selectedCustomer?.phone ?? ''}
-                        placeholder="+52..."
-                        className="w-full bg-white p-5 rounded-2xl font-black text-black text-lg outline-none"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="space-y-2">
-                      <label className="text-[12px] font-black uppercase text-black italic">Fecha de nacimiento</label>
-                      <input
-                        name="birthday"
-                        type="date"
-                        value={formBirthday}
-                        onChange={(e) => {
-                          const v = e.target.value
-                          setFormBirthday(v)
-                          setFormAge(v ? String(calculateAge(v) ?? '') : '')
-                        }}
-                        className="w-full bg-white p-5 rounded-2xl font-black text-black text-lg outline-none"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-[12px] font-black uppercase text-black italic">Edad</label>
-                      <input
-                        name="age"
-                        type="number"
-                        min={0}
-                        max={120}
-                        value={formAge}
-                        onChange={(e) => setFormAge(e.target.value)}
-                        readOnly={!!formBirthday}
-                        placeholder={formBirthday ? '' : 'Ej. 32 (editable si no hay fecha)'}
-                        className={`w-full p-5 rounded-2xl font-black text-black text-lg outline-none ${formBirthday ? 'bg-gray-100 cursor-not-allowed' : 'bg-white'}`}
-                      />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="space-y-2">
-                      <label className="text-[12px] font-black uppercase text-black italic">Género</label>
-                      <SelectWithOther
-                        name="gender"
-                        options={GENDERS}
-                        defaultValue={selectedCustomer?.gender ?? ''}
-                        emptyOption="Sin especificar"
-                        className="w-full bg-white p-5 rounded-2xl font-black text-black text-lg outline-none appearance-none cursor-pointer"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-[12px] font-black uppercase text-black italic">Estado civil</label>
-                      <SelectWithOther
-                        name="marital_status"
-                        options={MARITAL_STATUSES}
-                        defaultValue={selectedCustomer?.marital_status ?? ''}
-                        emptyOption="Sin especificar"
-                        className="w-full bg-white p-5 rounded-2xl font-black text-black text-lg outline-none appearance-none cursor-pointer"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="space-y-2">
-                      <label className="text-[12px] font-black uppercase text-black italic">Tipo de seguro</label>
-                      <SelectWithOther
-                        name="insurance_type"
-                        options={INSURANCE_TYPES}
-                        defaultValue={selectedCustomer?.insurance_type ?? ''}
-                        emptyOption="Selecciona..."
-                        className="w-full bg-white p-5 rounded-2xl font-black text-black text-lg outline-none appearance-none cursor-pointer"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-[12px] font-black uppercase text-black italic">Estatus</label>
-                      <SelectWithOther
-                        name="status"
-                        options={STATUSES}
-                        defaultValue={selectedCustomer?.status ?? 'nuevo'}
-                        otherOptionValue="otro"
-                        className="w-full bg-white p-5 rounded-2xl font-black text-black text-lg outline-none appearance-none cursor-pointer"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="space-y-2">
-                      <label className="text-[12px] font-black uppercase text-black italic">Origen</label>
-                      <SelectWithOther
-                        name="source"
-                        options={ORIGIN_SOURCES}
-                        defaultValue={selectedCustomer?.source ?? ''}
-                        emptyOption="Selecciona..."
-                        otherOptionValue="Personalizado"
-                        className="w-full bg-white p-5 rounded-2xl font-black text-black text-lg outline-none appearance-none cursor-pointer"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-[12px] font-black uppercase text-black italic">Ocupación</label>
-                      <input
-                        name="ocupation"
-                        defaultValue={selectedCustomer?.ocupation ?? ''}
-                        placeholder="Ej. Contador/a"
-                        className="w-full bg-white p-5 rounded-2xl font-black text-black text-lg outline-none"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="space-y-2">
-                      <label className="text-[12px] font-black uppercase text-black italic">Prima estimada</label>
-                      <input
-                        name="estimated_value"
-                        type="number"
-                        step="0.01"
-                        defaultValue={selectedCustomer?.estimated_value ?? ''}
-                        placeholder="Ej. 12000"
-                        className="w-full bg-white p-5 rounded-2xl font-black text-black text-lg outline-none"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-[12px] font-black uppercase text-black italic">Fuma / Toma</label>
-                      <div className="flex gap-4">
-                        <select
-                          name="smoking"
-                          defaultValue={selectedCustomer?.smoking === true ? 'yes' : selectedCustomer?.smoking === false ? 'no' : ''}
-                          className="flex-1 bg-white p-4 rounded-2xl font-black text-black text-sm outline-none cursor-pointer"
-                        >
-                          <option value="">Fuma —</option>
-                          <option value="no">No</option>
-                          <option value="yes">Sí</option>
-                        </select>
-                        <select
-                          name="drinking"
-                          defaultValue={selectedCustomer?.drinking === true ? 'yes' : selectedCustomer?.drinking === false ? 'no' : ''}
-                          className="flex-1 bg-white p-4 rounded-2xl font-black text-black text-sm outline-none cursor-pointer"
-                        >
-                          <option value="">Toma —</option>
-                          <option value="no">No</option>
-                          <option value="yes">Sí</option>
-                        </select>
+                    <div className="space-y-6">
+                      <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-black/5 space-y-6">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <label className="text-[12px] font-black uppercase text-black italic">Fecha de nacimiento</label>
+                            <input name="birthday" type="date" value={formBirthday} onChange={(e) => { const v = e.target.value; setFormBirthday(v); setFormAge(v ? String(calculateAge(v) ?? '') : ''); }} className="w-full bg-[#ece7e2] p-5 rounded-2xl font-black text-black text-lg outline-none" />
+                          </div>
+                          <div className="space-y-2">
+                            <label className="text-[12px] font-black uppercase text-black italic">Edad</label>
+                            <input name="age" type="number" min={0} max={120} value={formAge} onChange={(e) => setFormAge(e.target.value)} readOnly={!!formBirthday} placeholder={formBirthday ? '' : 'Editable si no hay fecha'} className={`w-full p-5 rounded-2xl font-black text-black text-lg outline-none ${formBirthday ? 'bg-gray-100 cursor-not-allowed' : 'bg-[#ece7e2]'}`} />
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <label className="text-[12px] font-black uppercase text-black italic">Género</label>
+                            <SelectWithOther name="gender" options={GENDERS} defaultValue={selectedCustomer?.gender ?? ''} emptyOption="Sin especificar" className="w-full bg-[#ece7e2] p-5 rounded-2xl font-black text-black text-lg outline-none appearance-none cursor-pointer" />
+                          </div>
+                          <div className="space-y-2">
+                            <label className="text-[12px] font-black uppercase text-black italic">Estado civil</label>
+                            <SelectWithOther name="marital_status" options={MARITAL_STATUSES} defaultValue={selectedCustomer?.marital_status ?? ''} emptyOption="Sin especificar" className="w-full bg-[#ece7e2] p-5 rounded-2xl font-black text-black text-lg outline-none appearance-none cursor-pointer" />
+                          </div>
+                        </div>
+                        <div className="space-y-2">
+                          <label className="text-[12px] font-black uppercase text-black italic">Tipo de seguro</label>
+                          <SelectWithOther name="insurance_type" options={INSURANCE_TYPES} defaultValue={selectedCustomer?.insurance_type ?? ''} emptyOption="Selecciona..." className="w-full bg-[#ece7e2] p-5 rounded-2xl font-black text-black text-lg outline-none appearance-none cursor-pointer" />
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <label className="text-[12px] font-black uppercase text-black italic">Fuma</label>
+                            <select name="smoking" defaultValue={selectedCustomer?.smoking === true ? 'yes' : selectedCustomer?.smoking === false ? 'no' : ''} className="w-full bg-[#ece7e2] p-5 rounded-2xl font-black text-black text-lg outline-none appearance-none cursor-pointer">
+                              <option value="">Sin especificar</option>
+                              <option value="no">No</option>
+                              <option value="yes">Sí</option>
+                            </select>
+                          </div>
+                          <div className="space-y-2">
+                            <label className="text-[12px] font-black uppercase text-black italic">Toma</label>
+                            <select name="drinking" defaultValue={selectedCustomer?.drinking === true ? 'yes' : selectedCustomer?.drinking === false ? 'no' : ''} className="w-full bg-[#ece7e2] p-5 rounded-2xl font-black text-black text-lg outline-none appearance-none cursor-pointer">
+                              <option value="">Sin especificar</option>
+                              <option value="no">No</option>
+                              <option value="yes">Sí</option>
+                            </select>
+                          </div>
+                        </div>
+                        <div className="space-y-2">
+                          <label className="text-[12px] font-black uppercase text-black italic">Notas / Bitácora</label>
+                          <textarea name="notes" defaultValue={selectedCustomer?.notes ?? ''} rows={4} placeholder="Acuerdos, próximos pasos..." className="w-full bg-[#ece7e2] p-6 rounded-2xl font-black text-black text-base outline-none resize-none" />
+                        </div>
                       </div>
                     </div>
                   </div>
 
-                  <div className="space-y-2">
-                    <label className="text-[12px] font-black uppercase text-black italic">Intereses del cliente</label>
-                    <textarea
-                      name="client_interests"
-                      defaultValue={selectedCustomer?.client_interests ?? ''}
-                      rows={2}
-                      placeholder="Hobbies, preferencias..."
-                      className="w-full bg-white p-5 rounded-2xl font-black text-black text-base outline-none resize-none"
-                    />
+                  <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border-2 border-black/10 space-y-4">
+                    <div>
+                      <label className="text-[12px] font-black uppercase text-black italic">Intereses del cliente</label>
+                      <p className="text-[11px] text-black/60 mt-1.5 max-w-xl">
+                        Estos datos ayudan a nuestro asistente de IA a personalizar la conversación. Escribe enunciados o párrafos y agrégalos con Enter o el botón.
+                      </p>
+                    </div>
+                    <div className="space-y-3">
+                      <div className="flex flex-col sm:flex-row gap-2">
+                        <input type="text" value={clientInterestInput} onChange={(e) => setClientInterestInput(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); const v = clientInterestInput.trim(); if (v) { setClientInterestsList((prev) => [...prev, v]); setClientInterestInput(''); } } }} placeholder="Escribe un interés y presiona Enter para agregar" className="flex-1 bg-[#ece7e2] p-5 rounded-2xl font-black text-black text-base outline-none placeholder:text-black/30 border-2 border-transparent focus:border-black/20" />
+                        <button type="button" onClick={() => { const v = clientInterestInput.trim(); if (v) { setClientInterestsList((prev) => [...prev, v]); setClientInterestInput(''); } }} className="px-6 py-5 rounded-2xl bg-black text-white font-black text-sm uppercase tracking-wide hover:opacity-95 transition-opacity shrink-0">Agregar</button>
+                      </div>
+                      {clientInterestsList.length > 0 && (
+                        <ul className="list-disc list-outside space-y-3 mt-4 pl-6 text-black font-bold text-sm [list-style-type:disc]">
+                          {clientInterestsList.map((item, i) => (
+                            <li key={`${i}-${item.slice(0, 30)}`} className="pl-1">
+                              {editingInterestIndex === i ? (
+                                <div className="flex flex-col gap-2">
+                                  <textarea value={editingInterestDraft} onChange={(e) => setEditingInterestDraft(e.target.value)} rows={4} className="w-full bg-[#ece7e2] p-4 rounded-xl font-black text-black text-sm outline-none resize-y border-2 border-black/20" placeholder="Edita el enunciado..." />
+                                  <div className="flex gap-2">
+                                    <button type="button" onClick={() => { const v = editingInterestDraft.trim(); if (v) setClientInterestsList((prev) => prev.map((s, j) => (j === i ? v : s))); else setClientInterestsList((prev) => prev.filter((_, j) => j !== i)); setEditingInterestIndex(null); setEditingInterestDraft(''); }} className="px-4 py-2 rounded-xl bg-black text-white font-black text-xs uppercase">Guardar</button>
+                                    <button type="button" onClick={() => { setEditingInterestIndex(null); setEditingInterestDraft(''); }} className="px-4 py-2 rounded-xl border border-black/20 text-black font-black text-xs uppercase hover:bg-black/5">Cancelar</button>
+                                  </div>
+                                </div>
+                              ) : (
+                                <div className="flex items-start gap-2">
+                                  <span className="flex-1 min-w-0">{item}</span>
+                                  <div className="flex items-center gap-1 shrink-0">
+                                    <button type="button" onClick={() => { setEditingInterestIndex(i); setEditingInterestDraft(item); }} className="p-2 rounded-lg text-black/50 hover:text-black hover:bg-black/10 transition-colors" aria-label="Editar"><Edit3 size={18} /></button>
+                                    <button type="button" onClick={() => setClientInterestsList((prev) => prev.filter((_, j) => j !== i))} className="p-2 rounded-lg text-black/50 hover:text-red-600 hover:bg-red-50 transition-colors" aria-label="Quitar"><X size={18} /></button>
+                                  </div>
+                                </div>
+                              )}
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
                   </div>
 
-                  <div className="space-y-2">
-                    <label className="text-[12px] font-black uppercase text-black italic">Notas / Bitácora</label>
-                    <textarea
-                      name="notes"
-                      defaultValue={selectedCustomer?.notes ?? ''}
-                      rows={4}
-                      placeholder="Acuerdos, próximos pasos..."
-                      className="w-full bg-white p-5 rounded-2xl font-black text-black text-base outline-none resize-none"
-                    />
-                  </div>
+                  <details className="group bg-white p-8 rounded-[2.5rem] shadow-sm border border-black/5">
+                    <summary className="list-none cursor-pointer select-none flex items-center justify-between">
+                      <div>
+                        <p className="text-[12px] font-black uppercase text-black italic">Campos adicionales</p>
+                        <p className="text-[11px] font-bold text-black/40 uppercase tracking-widest mt-1">Información financiera y familiar (opcional)</p>
+                        {additionalLoading && <p className="text-[10px] font-black text-black/60 uppercase tracking-widest mt-2">Cargando…</p>}
+                      </div>
+                      <ChevronRight className="text-black/40 transition-transform group-open:rotate-90" size={22} />
+                    </summary>
+                    <div className="mt-8 space-y-8">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <label className="text-[12px] font-black uppercase text-black italic">Fecha de contacto</label>
+                          <input type="date" value={additionalForm.contact_date} onChange={(e) => setAdditionalForm((p) => ({ ...p, contact_date: e.target.value }))} className="w-full bg-[#ece7e2] p-5 rounded-2xl font-black text-black text-lg outline-none" />
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <label className="text-[12px] font-black uppercase text-black italic">Dependientes económicos</label>
+                          <input type="number" min={0} value={additionalForm.economic_dependents} onChange={(e) => setAdditionalForm((p) => ({ ...p, economic_dependents: e.target.value }))} placeholder="Ej. 2" className="w-full bg-[#ece7e2] p-5 rounded-2xl font-black text-black text-lg outline-none" />
+                        </div>
+                        <div className="space-y-2">
+                          <label className="text-[12px] font-black uppercase text-black italic">Nivel de estudios</label>
+                          <SelectWithOther name="education_level" options={EDUCATION_LEVELS} value={additionalForm.education_level} onChange={(v) => setAdditionalForm((p) => ({ ...p, education_level: v }))} emptyOption="Sin especificar" className="w-full bg-[#ece7e2] p-5 rounded-2xl font-black text-black text-lg outline-none appearance-none cursor-pointer" />
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <label className="text-[12px] font-black uppercase text-black italic">Sector</label>
+                          <input value={additionalForm.sector} onChange={(e) => setAdditionalForm((p) => ({ ...p, sector: e.target.value }))} placeholder="Ej. Salud, Tecnología..." className="w-full bg-[#ece7e2] p-5 rounded-2xl font-black text-black text-lg outline-none" />
+                        </div>
+                      </div>
+                      <div className="bg-black p-8 rounded-[2.5rem] shadow-xl space-y-6">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <label className="text-[12px] font-black uppercase text-white/80 italic">Ingresos mensuales estimados</label>
+                            <input type="number" step="0.01" min={0} value={additionalForm.monthly_income_estimated} onChange={(e) => setAdditionalForm((p) => ({ ...p, monthly_income_estimated: e.target.value }))} placeholder="Ej. 45000" className="w-full bg-white p-6 rounded-2xl font-black text-black text-3xl outline-none" />
+                          </div>
+                          <div className="space-y-2">
+                            <label className="text-[12px] font-black uppercase text-white/80 italic">Moneda</label>
+                            <select value={additionalForm.currency} onChange={(e) => setAdditionalForm((p) => ({ ...p, currency: e.target.value }))} className="w-full bg-white p-5 rounded-2xl font-black text-black text-lg outline-none appearance-none cursor-pointer">
+                              {CURRENCIES.map((c) => <option key={c} value={c}>{c}</option>)}
+                            </select>
+                          </div>
+                        </div>
+                        <div className="space-y-2">
+                          <label className="text-[12px] font-black uppercase text-white/80 italic">Objetivos financieros</label>
+                          <textarea value={additionalForm.financial_goals} onChange={(e) => setAdditionalForm((p) => ({ ...p, financial_goals: e.target.value }))} rows={3} placeholder="Ej. Retiro, educación, protección familiar..." className="w-full bg-white p-6 rounded-2xl font-black text-black text-base outline-none resize-none placeholder:text-black/30" />
+                        </div>
+                      </div>
+                      <div className="bg-white p-8 rounded-[2.5rem] border border-black/5">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <label className="text-[12px] font-black uppercase text-black italic">¿Tiene hijos?</label>
+                            <select value={hasChildren} onChange={(e) => setHasChildren(e.target.value as 'yes' | 'no' | '')} className="w-full bg-[#ece7e2] p-5 rounded-2xl font-black text-black text-lg outline-none appearance-none cursor-pointer">
+                              <option value="">Sin especificar</option>
+                              <option value="no">No</option>
+                              <option value="yes">Sí</option>
+                            </select>
+                          </div>
+                        </div>
+                        {hasChildren === 'yes' && (
+                          <div className="mt-6 space-y-4">
+                            {children.map((child, idx) => (
+                              <div key={idx} className="bg-[#ece7e2] rounded-[1.5rem] p-5 border border-black/5">
+                                <div className="flex justify-between gap-4 mb-4">
+                                  <p className="text-[11px] font-black uppercase text-black/50 tracking-widest">Hijo #{idx + 1}</p>
+                                  <button type="button" onClick={() => setChildren((prev) => prev.filter((_, i) => i !== idx))} className="px-4 py-2 rounded-xl bg-black text-white font-black text-[11px] uppercase hover:bg-red-600 transition-all">Eliminar</button>
+                                </div>
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                  <div className="space-y-2">
+                                    <label className="text-[11px] font-black uppercase text-black italic">Nombre</label>
+                                    <input value={child.name} onChange={(e) => setChildren((prev) => prev.map((c, i) => (i === idx ? { ...c, name: e.target.value } : c)))} placeholder="Ej. Sofía" className="w-full bg-white p-4 rounded-2xl font-black text-black text-base outline-none" />
+                                  </div>
+                                  <div className="space-y-2">
+                                    <label className="text-[11px] font-black uppercase text-black italic">Edad</label>
+                                    <input value={child.age} onChange={(e) => setChildren((prev) => prev.map((c, i) => (i === idx ? { ...c, age: e.target.value } : c)))} type="number" min={0} max={120} placeholder="Ej. 8" className="w-full bg-white p-4 rounded-2xl font-black text-black text-base outline-none" />
+                                  </div>
+                                  <div className="space-y-2">
+                                    <label className="text-[11px] font-black uppercase text-black italic">Contacto</label>
+                                    <input value={child.contact} onChange={(e) => setChildren((prev) => prev.map((c, i) => (i === idx ? { ...c, contact: e.target.value } : c)))} placeholder="Tel/Email" className="w-full bg-white p-4 rounded-2xl font-black text-black text-base outline-none" />
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                            <button type="button" onClick={() => setChildren((prev) => [...prev, { name: '', age: '', contact: '' }])} className="w-full py-4 bg-black text-white rounded-[1.5rem] font-black text-sm uppercase tracking-widest hover:opacity-90">Agregar hijo</button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </details>
 
                   <button
                     type="submit"
