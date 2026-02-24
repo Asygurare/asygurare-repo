@@ -7,6 +7,7 @@ import { DEFAULT_AUTOMATIONS, isAutomationKey } from '@/src/services/automations
 import { getGmailAccessTokenForUser } from '@/src/services/gmail/accessToken'
 import { buildRawMessage } from '@/src/services/gmail/message'
 import { getCalendlyAccessTokenForUser } from '@/src/services/calendly/accessToken'
+import { getCalComAccessTokenForUser } from '@/src/services/calcom/accessToken'
 
 // ─── Context passed from the route ───
 type ToolCtx = {
@@ -176,9 +177,270 @@ export function buildChatTools(ctx: ToolCtx) {
         fn.obtenerContextoOperativoWorkspaceConCache(supabase, { tz, nowIso }),
     }),
 
+    crearTarea: tool({
+      description:
+        'Crea una nueva tarea/recordatorio. Ideal para "recuérdame llamar a X mañana". Requiere confirmación explícita.',
+      inputSchema: z.object({
+        title: z.string().min(1).max(200),
+        due_at: z.string().optional().describe('Fecha/hora ISO de vencimiento'),
+        priority: z.enum(['alta', 'media', 'baja']).optional(),
+        kind: z.string().optional().describe("Tipo: 'llamada', 'correo', 'reunion', 'seguimiento', 'otro'"),
+        entity_type: z.string().optional().describe("'cliente' | 'prospecto' | null"),
+        entity_id: z.string().optional().describe('ID del cliente o prospecto asociado'),
+        confirm: z.boolean(),
+      }),
+      execute: async (args) => {
+        if (!args.confirm) {
+          return { ok: false, requires_confirmation: true, message: 'Falta confirmación explícita para crear tarea.' }
+        }
+
+        const { data: authData } = await supabase.auth.getUser()
+        const userId = authData.user?.id
+        if (!userId) return { ok: false, error: 'No autorizado' }
+
+        const dueAt = args.due_at ? new Date(args.due_at) : null
+        if (dueAt && Number.isNaN(dueAt.getTime())) return { ok: false, error: 'Fecha inválida.' }
+
+        const payload = {
+          user_id: userId,
+          title: String(args.title).trim(),
+          due_at: dueAt?.toISOString() || null,
+          status: 'pendiente',
+          priority: args.priority || 'media',
+          kind: args.kind || 'otro',
+          entity_type: args.entity_type || null,
+          entity_id: args.entity_id || null,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        }
+
+        const { data, error } = await supabase
+          .from(DATABASE.TABLES.WS_TASKS)
+          .insert([payload])
+          .select('id,title,due_at,status,priority,kind')
+          .single()
+        if (error) return { ok: false, error: error.message }
+        return { ok: true, task: data }
+      },
+    }),
+
+    obtenerDetalleCliente: tool({
+      description:
+        'Obtiene el perfil completo de un cliente: datos personales, sus pólizas y tareas pendientes, todo en una sola llamada.',
+      inputSchema: z.object({
+        client_id: z.string().min(1).describe('ID del cliente'),
+      }),
+      execute: async (args) => {
+        const { data: authData } = await supabase.auth.getUser()
+        const userId = authData.user?.id
+        if (!userId) return { ok: false, error: 'No autorizado' }
+
+        const { data: client, error: clientErr } = await supabase
+          .from(DATABASE.TABLES.WS_CUSTOMERS_2)
+          .select('id,name,last_name,full_name,email,phone,age,birthday,status,insurance_type,ocupation,notes,created_at')
+          .eq('id', args.client_id)
+          .eq('user_id', userId)
+          .maybeSingle()
+        if (clientErr) return { ok: false, error: clientErr.message }
+        if (!client) return { ok: false, error: 'Cliente no encontrado.' }
+
+        const { data: policies } = await supabase
+          .from(DATABASE.TABLES.WS_POLICIES)
+          .select('id,policy_number,insurance_company,category,status,total_premium,frecuencia_pago,effective_date,expiry_date')
+          .eq('customer_id', args.client_id)
+          .eq('user_id', userId)
+          .order('expiry_date', { ascending: true })
+          .limit(20)
+
+        const { data: tasks } = await supabase
+          .from(DATABASE.TABLES.WS_TASKS)
+          .select('id,title,due_at,status,priority,kind')
+          .eq('entity_type', 'cliente')
+          .eq('entity_id', args.client_id)
+          .eq('user_id', userId)
+          .order('due_at', { ascending: true })
+          .limit(10)
+
+        return {
+          ok: true,
+          client,
+          policies: policies || [],
+          pending_tasks: (tasks || []).filter((t: Record<string, unknown>) => t.status !== 'completada' && t.status !== 'done'),
+        }
+      },
+    }),
+
+    crearCliente: tool({
+      description:
+        'Crea un nuevo cliente. Requiere confirmación explícita del usuario.',
+      inputSchema: z.object({
+        name: z.string().min(1),
+        last_name: z.string().optional(),
+        email: z.string().email().optional(),
+        phone: z.string().optional(),
+        age: z.number().optional(),
+        birthday: z.string().optional(),
+        status: z.string().optional(),
+        insurance_type: z.string().optional(),
+        ocupation: z.string().optional(),
+        notes: z.string().optional(),
+        confirm: z.boolean(),
+      }),
+      execute: async (args) => {
+        if (!args.confirm) {
+          return { ok: false, requires_confirmation: true, message: 'Falta confirmación explícita para crear cliente.' }
+        }
+
+        const { data: authData } = await supabase.auth.getUser()
+        const userId = authData.user?.id
+        if (!userId) return { ok: false, error: 'No autorizado' }
+
+        const first = String(args.name).trim()
+        const last = String(args.last_name || '').trim()
+        const payload = {
+          user_id: userId,
+          name: first,
+          last_name: last || null,
+          full_name: `${first} ${last}`.trim(),
+          email: args.email ? normalizeEmail(args.email) : null,
+          phone: String(args.phone || '').trim() || null,
+          age: args.age ?? null,
+          birthday: args.birthday || null,
+          status: String(args.status || '').trim() || 'activo',
+          insurance_type: String(args.insurance_type || '').trim() || null,
+          ocupation: String(args.ocupation || '').trim() || null,
+          notes: String(args.notes || '').trim() || null,
+          updated_at: new Date().toISOString(),
+        }
+
+        const { data, error } = await supabase
+          .from(DATABASE.TABLES.WS_CUSTOMERS_2)
+          .insert([payload])
+          .select('id,name,last_name,full_name,email,phone,status,insurance_type')
+          .single()
+        if (error) return { ok: false, error: error.message }
+        return { ok: true, client: data }
+      },
+    }),
+
+    editarCliente: tool({
+      description:
+        'Edita un cliente existente (nombre, correo, teléfono, notas, etc.). Requiere confirmación explícita.',
+      inputSchema: z.object({
+        id: z.string().min(1),
+        name: z.string().optional(),
+        last_name: z.string().optional(),
+        email: z.string().email().optional(),
+        phone: z.string().optional(),
+        age: z.number().optional(),
+        birthday: z.string().optional(),
+        status: z.string().optional(),
+        insurance_type: z.string().optional(),
+        ocupation: z.string().optional(),
+        notes: z.string().optional(),
+        confirm: z.boolean(),
+      }),
+      execute: async (args) => {
+        if (!args.confirm) {
+          return { ok: false, requires_confirmation: true, message: 'Falta confirmación explícita para editar cliente.' }
+        }
+
+        const { data: authData } = await supabase.auth.getUser()
+        const userId = authData.user?.id
+        if (!userId) return { ok: false, error: 'No autorizado' }
+
+        const patch: Record<string, unknown> = { updated_at: new Date().toISOString() }
+        if (args.name !== undefined) patch.name = String(args.name).trim() || null
+        if (args.last_name !== undefined) patch.last_name = String(args.last_name).trim() || null
+        if (args.name !== undefined || args.last_name !== undefined) {
+          const n = args.name !== undefined ? String(args.name).trim() : ''
+          const l = args.last_name !== undefined ? String(args.last_name).trim() : ''
+          if (n || l) patch.full_name = `${n} ${l}`.trim()
+        }
+        if (args.email !== undefined) patch.email = args.email ? normalizeEmail(args.email) : null
+        if (args.phone !== undefined) patch.phone = String(args.phone).trim() || null
+        if (args.age !== undefined) patch.age = args.age
+        if (args.birthday !== undefined) patch.birthday = args.birthday || null
+        if (args.status !== undefined) patch.status = String(args.status).trim() || null
+        if (args.insurance_type !== undefined) patch.insurance_type = String(args.insurance_type).trim() || null
+        if (args.ocupation !== undefined) patch.ocupation = String(args.ocupation).trim() || null
+        if (args.notes !== undefined) patch.notes = String(args.notes).trim() || null
+
+        const { data, error } = await supabase
+          .from(DATABASE.TABLES.WS_CUSTOMERS_2)
+          .update(patch)
+          .eq('id', args.id)
+          .eq('user_id', userId)
+          .select('id,name,last_name,full_name,email,phone,status,insurance_type')
+          .maybeSingle()
+        if (error) return { ok: false, error: error.message }
+        if (!data) return { ok: false, error: 'Cliente no encontrado.' }
+        return { ok: true, client: data }
+      },
+    }),
+
+    promoverProspectoACliente: tool({
+      description:
+        'Convierte un prospecto en cliente: copia sus datos a clientes y marca el prospecto como "convertido". Requiere confirmación explícita.',
+      inputSchema: z.object({
+        lead_id: z.string().min(1),
+        insurance_type: z.string().optional(),
+        notes: z.string().optional(),
+        confirm: z.boolean(),
+      }),
+      execute: async (args) => {
+        if (!args.confirm) {
+          return { ok: false, requires_confirmation: true, message: 'Falta confirmación para promover prospecto a cliente.' }
+        }
+
+        const { data: authData } = await supabase.auth.getUser()
+        const userId = authData.user?.id
+        if (!userId) return { ok: false, error: 'No autorizado' }
+
+        const { data: lead, error: leadErr } = await supabase
+          .from(DATABASE.TABLES.WS_LEADS)
+          .select('id,name,last_name,email,phone,insurance_type,notes')
+          .eq('id', args.lead_id)
+          .eq('user_id', userId)
+          .maybeSingle()
+        if (leadErr) return { ok: false, error: leadErr.message }
+        if (!lead) return { ok: false, error: 'Prospecto no encontrado.' }
+
+        const first = String((lead as Record<string, unknown>).name || '').trim()
+        const last = String((lead as Record<string, unknown>).last_name || '').trim()
+        const clientPayload = {
+          user_id: userId,
+          name: first,
+          last_name: last || null,
+          full_name: `${first} ${last}`.trim(),
+          email: (lead as Record<string, unknown>).email ? normalizeEmail(String((lead as Record<string, unknown>).email)) : null,
+          phone: String((lead as Record<string, unknown>).phone || '').trim() || null,
+          status: 'activo',
+          insurance_type: args.insurance_type || String((lead as Record<string, unknown>).insurance_type || '').trim() || null,
+          notes: args.notes || String((lead as Record<string, unknown>).notes || '').trim() || null,
+          updated_at: new Date().toISOString(),
+        }
+
+        const { data: newClient, error: insertErr } = await supabase
+          .from(DATABASE.TABLES.WS_CUSTOMERS_2)
+          .insert([clientPayload])
+          .select('id,name,last_name,full_name,email,phone,status')
+          .single()
+        if (insertErr) return { ok: false, error: insertErr.message }
+
+        await supabase
+          .from(DATABASE.TABLES.WS_LEADS)
+          .update({ stage: 'Convertido', status: 'convertido', updated_at: new Date().toISOString() })
+          .eq('id', args.lead_id)
+          .eq('user_id', userId)
+
+        return { ok: true, client: newClient, message: 'Prospecto convertido a cliente exitosamente.' }
+      },
+    }),
+
     crearProspecto: tool({
       description:
-        'Crea un nuevo prospecto (lead) en WS_LEADS. Requiere confirmación explícita del usuario.',
+        'Crea un nuevo prospecto (lead). Requiere confirmación explícita del usuario.',
       inputSchema: z.object({
         name: z.string().min(1),
         last_name: z.string().optional(),
@@ -226,7 +488,7 @@ export function buildChatTools(ctx: ToolCtx) {
 
     editarProspecto: tool({
       description:
-        'Edita un prospecto existente en WS_LEADS (por ejemplo correo, teléfono, etapa o notas). Requiere confirmación explícita.',
+        'Edita un prospecto existente (por ejemplo correo, teléfono, etapa o notas). Requiere confirmación explícita.',
       inputSchema: z.object({
         id: z.string().min(1),
         name: z.string().optional(),
@@ -931,6 +1193,206 @@ export function buildChatTools(ctx: ToolCtx) {
           .limit(limit)
         if (error) return { ok: false, error: error.message }
         return { ok: true, logs: data || [] }
+      },
+    }),
+
+    verificarConexionCalCom: tool({
+      description: 'Verifica si el usuario tiene Cal.com conectado y devuelve info de la conexión.',
+      inputSchema: z.object({}),
+      execute: async () => {
+        const { data: authData } = await supabase.auth.getUser()
+        const userId = authData.user?.id
+        if (!userId) return { ok: false, error: 'No autorizado' }
+
+        const { data, error } = await supabase
+          .from(DATABASE.TABLES.WS_CALCOM_CONNECTIONS)
+          .select('provider_email,calcom_username')
+          .eq('user_id', userId)
+          .maybeSingle<{ provider_email: string | null; calcom_username: string | null }>()
+        if (error) return { ok: false, error: error.message }
+        if (!data) return { ok: true, connected: false, message: 'Cal.com no está conectado. Puede conectarlo desde la sección de Calendario.' }
+        return {
+          ok: true,
+          connected: true,
+          email: data.provider_email || null,
+          username: data.calcom_username || null,
+        }
+      },
+    }),
+
+    obtenerLinkCalCom: tool({
+      description: 'Obtiene el link de agenda de Cal.com del usuario para compartir con prospectos/clientes. Devuelve la URL de scheduling.',
+      inputSchema: z.object({}),
+      execute: async () => {
+        const { data: authData } = await supabase.auth.getUser()
+        const userId = authData.user?.id
+        if (!userId) return { ok: false, error: 'No autorizado' }
+
+        const { data, error } = await supabase
+          .from(DATABASE.TABLES.WS_CALCOM_CONNECTIONS)
+          .select('calcom_username,provider_email')
+          .eq('user_id', userId)
+          .maybeSingle<{ calcom_username: string | null; provider_email: string | null }>()
+        if (error) return { ok: false, error: error.message }
+        if (!data || !data.calcom_username) {
+          return { ok: false, error: 'Cal.com no está conectado o no se encontró el nombre de usuario. Puede conectarlo desde la sección de Calendario.' }
+        }
+
+        let accessToken: string
+        try {
+          const token = await getCalComAccessTokenForUser(supabase, userId)
+          accessToken = token.accessToken
+        } catch (e) {
+          return {
+            ok: true,
+            link: `https://cal.com/${data.calcom_username}`,
+            username: data.calcom_username,
+            event_types: [],
+            note: 'No se pudieron obtener los tipos de evento específicos.',
+          }
+        }
+
+        try {
+          const res = await fetch(`https://api.cal.com/v2/event-types?username=${encodeURIComponent(data.calcom_username)}`, {
+            headers: {
+              Authorization: `Bearer ${accessToken}`,
+              'cal-api-version': '2024-08-13',
+            },
+            cache: 'no-store',
+          })
+
+          if (res.ok) {
+            const json = (await res.json()) as {
+              data?: Array<{ id?: number; slug?: string; title?: string; length?: number }>
+            }
+            const eventTypes = (json.data ?? []).map((et) => ({
+              title: et.title || 'Evento',
+              duration: et.length || null,
+              link: et.slug ? `https://cal.com/${data.calcom_username}/${et.slug}` : null,
+            }))
+
+            return {
+              ok: true,
+              link: `https://cal.com/${data.calcom_username}`,
+              username: data.calcom_username,
+              event_types: eventTypes,
+            }
+          }
+        } catch {
+          // Fall through to basic link
+        }
+
+        return {
+          ok: true,
+          link: `https://cal.com/${data.calcom_username}`,
+          username: data.calcom_username,
+          event_types: [],
+        }
+      },
+    }),
+
+    buscarReunionesCalCom: tool({
+      description: 'Lista próximas reuniones/bookings de Cal.com del usuario.',
+      inputSchema: z.object({
+        limit: z.number().optional().describe('Máximo de bookings (default 10, max 50)'),
+      }),
+      execute: async (args) => {
+        const { data: authData } = await supabase.auth.getUser()
+        const userId = authData.user?.id
+        if (!userId) return { ok: false, error: 'No autorizado' }
+
+        const { data: conn } = await supabase
+          .from(DATABASE.TABLES.WS_CALCOM_CONNECTIONS)
+          .select('provider_email')
+          .eq('user_id', userId)
+          .maybeSingle<{ provider_email: string | null }>()
+        if (!conn) return { ok: false, error: 'Cal.com no está conectado. Puede conectarlo desde la sección de Calendario.' }
+
+        let accessToken: string
+        try {
+          const token = await getCalComAccessTokenForUser(supabase, userId)
+          accessToken = token.accessToken
+        } catch (e) {
+          return { ok: false, error: e instanceof Error ? e.message : 'Error obteniendo token de Cal.com' }
+        }
+
+        const max = Math.max(1, Math.min(50, Number(args.limit || 10)))
+        const params = new URLSearchParams()
+        params.set('afterStart', new Date().toISOString())
+        params.set('take', String(max))
+        params.set('sortStart', 'asc')
+
+        const res = await fetch(`https://api.cal.com/v2/bookings?${params.toString()}`, {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            'cal-api-version': '2024-08-13',
+          },
+          cache: 'no-store',
+        })
+
+        if (!res.ok) {
+          const detail = await res.text().catch(() => '')
+          return { ok: false, error: 'calcom_api_failed', detail: detail.slice(0, 600) }
+        }
+
+        const json = (await res.json()) as {
+          data?: Array<{
+            id?: number
+            uid?: string
+            title?: string
+            status?: string
+            start?: string
+            end?: string
+            location?: string
+            meetingUrl?: string
+          }>
+        }
+
+        const bookings = (json.data ?? []).map((b) => ({
+          id: b.uid ?? String(b.id ?? ''),
+          title: b.title ?? 'Evento Cal.com',
+          status: b.status ?? 'accepted',
+          start: b.start ?? null,
+          end: b.end ?? null,
+          location: b.location ?? b.meetingUrl ?? null,
+        }))
+
+        return { ok: true, bookings }
+      },
+    }),
+
+    sincronizarCalComATareas: tool({
+      description: 'Sincroniza los bookings de Cal.com como tareas en Asygurare. Requiere confirmación explícita.',
+      inputSchema: z.object({
+        confirm: z.boolean(),
+      }),
+      execute: async (args) => {
+        if (!args.confirm) {
+          return { ok: false, requires_confirmation: true, message: 'Falta confirmación para sincronizar Cal.com.' }
+        }
+
+        const { data: authData } = await supabase.auth.getUser()
+        const userId = authData.user?.id
+        if (!userId) return { ok: false, error: 'No autorizado' }
+
+        try {
+          const res = await fetch(`${process.env.NEXT_PUBLIC_SITE_URL || ''}/api/cal-com/sync/tasks`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+          })
+
+          if (!res.ok) {
+            return { ok: false, error: 'Error al sincronizar Cal.com con tareas.' }
+          }
+
+          const data = (await res.json()) as { created?: number; updated?: number; canceled?: number; total?: number }
+          return {
+            ok: true,
+            message: `Sincronización completada: ${data.created ?? 0} creadas, ${data.updated ?? 0} actualizadas, ${data.canceled ?? 0} canceladas.`,
+          }
+        } catch {
+          return { ok: false, error: 'No se pudo conectar con el servicio de sincronización.' }
+        }
       },
     }),
   }

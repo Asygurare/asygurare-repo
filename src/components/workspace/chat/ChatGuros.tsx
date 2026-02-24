@@ -1,9 +1,9 @@
 "use client"
 
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { DATABASE } from '@/src/config'
-import { Send, Loader2, Sparkles, Zap, ShieldCheck, TrendingUp, User } from 'lucide-react'
+import { Send, Loader2, Sparkles, ShieldCheck, TrendingUp, User, RotateCcw } from 'lucide-react'
 import { supabaseClient } from '@/src/lib/supabase/client'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
@@ -12,6 +12,7 @@ import Image from 'next/image'
 interface Message {
   role: 'user' | 'assistant'
   content: string
+  status?: 'ok' | 'error' | 'streaming'
 }
 
 function ChatMarkdown({
@@ -29,7 +30,6 @@ function ChatMarkdown({
   return (
     <ReactMarkdown
       remarkPlugins={[remarkGfm]}
-      // Seguridad: no habilitamos HTML crudo (rehypeRaw)
       components={{
         p: ({ children }) => <p className="whitespace-pre-wrap leading-relaxed">{children}</p>,
         strong: ({ children }) => <strong className="font-black">{children}</strong>,
@@ -77,11 +77,54 @@ function ChatMarkdown({
   )
 }
 
+async function consumeStream(
+  response: Response,
+  onTextDelta: (delta: string) => void,
+  onToolStatus: (tool: string) => void,
+  onDone: (fullText: string) => void,
+  onError: (error: string) => void,
+) {
+  const reader = response.body?.getReader()
+  if (!reader) { onError('No se pudo leer la respuesta.'); return }
+
+  const decoder = new TextDecoder()
+  let buffer = ''
+
+  while (true) {
+    const { done, value } = await reader.read()
+    if (done) break
+
+    buffer += decoder.decode(value, { stream: true })
+    const lines = buffer.split('\n')
+    buffer = lines.pop() || ''
+
+    let eventType = ''
+    for (const line of lines) {
+      if (line.startsWith('event: ')) {
+        eventType = line.slice(7).trim()
+      } else if (line.startsWith('data: ')) {
+        const raw = line.slice(6)
+        try {
+          const data = JSON.parse(raw)
+          if (eventType === 'text_delta' && data.delta) onTextDelta(data.delta)
+          else if (eventType === 'tool_status' && data.tool) onToolStatus(data.tool)
+          else if (eventType === 'done' && data.full_text) onDone(data.full_text)
+          else if (eventType === 'error' && data.error) onError(data.error)
+        } catch { /* skip malformed */ }
+        eventType = ''
+      }
+    }
+  }
+}
+
 export default function ChatDatamara({ conversationId, userId }: { conversationId: string, userId: string }) {
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
   const [isLoading, setIsLoading] = useState(false)
+  const [toolStatus, setToolStatus] = useState<string | null>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
+  const queueRef = useRef<string[]>([])
+  const processingRef = useRef(false)
 
   useEffect(() => {
     const loadHistory = async () => {
@@ -97,18 +140,12 @@ export default function ChatDatamara({ conversationId, userId }: { conversationI
 
   useEffect(() => {
     scrollRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages])
+  }, [messages, toolStatus])
 
-  const sendMessage = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!input.trim() || isLoading) return
-
-    const userMsg = input.trim()
-    const isFirstMessage = messages.length === 0 // Detectamos si es el inicio
-
-    setInput('')
-    setMessages(prev => [...prev, { role: 'user', content: userMsg }])
+  const processOneMessage = useCallback(async (userMsg: string) => {
     setIsLoading(true)
+    setToolStatus(null)
+    const isFirstMessage = messages.length === 0 && queueRef.current.length === 0
 
     try {
       const res = await fetch('/api/chat', {
@@ -118,7 +155,7 @@ export default function ChatDatamara({ conversationId, userId }: { conversationI
         body: JSON.stringify({
           message: userMsg,
           user_id: userId,
-          conversation_id: conversationId, // Usando la prop correctamente
+          conversation_id: conversationId,
           client_now: new Date().toISOString(),
           client_tz: Intl.DateTimeFormat().resolvedOptions().timeZone,
         })
@@ -126,58 +163,134 @@ export default function ChatDatamara({ conversationId, userId }: { conversationI
 
       const contentType = res.headers.get('content-type') || ''
 
-      // Caso típico cuando middleware redirige a /login: fetch sigue el redirect y regresa HTML (no JSON)
-      if (!contentType.includes('application/json')) {
+      if (contentType.includes('text/event-stream')) {
+        setMessages(prev => [...prev, { role: 'assistant', content: '', status: 'streaming' }])
+
+        await consumeStream(
+          res,
+          (delta) => {
+            setToolStatus(null)
+            setMessages(prev => {
+              const updated = [...prev]
+              const last = updated[updated.length - 1]
+              if (last?.role === 'assistant' && (last.status === 'streaming')) {
+                updated[updated.length - 1] = { ...last, content: last.content + delta }
+              }
+              return updated
+            })
+          },
+          (tool) => setToolStatus(tool),
+          (fullText) => {
+            setToolStatus(null)
+            setMessages(prev => {
+              const updated = [...prev]
+              const last = updated[updated.length - 1]
+              if (last?.role === 'assistant') {
+                updated[updated.length - 1] = { ...last, content: fullText, status: 'ok' }
+              }
+              return updated
+            })
+          },
+          (error) => {
+            setToolStatus(null)
+            setMessages(prev => {
+              const updated = [...prev]
+              const last = updated[updated.length - 1]
+              if (last?.role === 'assistant') {
+                updated[updated.length - 1] = { ...last, content: error, status: 'error' }
+              }
+              return updated
+            })
+          },
+        )
+      } else if (contentType.includes('application/json')) {
+        const data = await res.json()
+        if (!res.ok) {
+          const looksLikeLogin = res.redirected || res.url.includes('/login')
+          const errMsg = looksLikeLogin
+            ? 'Tu sesión expiró. Vuelve a iniciar sesión y reintenta.'
+            : (data?.error ? String(data.error) : `Error del servidor (status ${res.status}).`)
+          setMessages(prev => [...prev, { role: 'assistant', content: errMsg, status: 'error' }])
+          return
+        }
+        if (data?.response) {
+          setMessages(prev => [...prev, { role: 'assistant', content: String(data.response), status: 'ok' }])
+        } else {
+          setMessages(prev => [...prev, { role: 'assistant', content: 'No recibí respuesta.', status: 'error' }])
+        }
+      } else {
         const txt = await res.text()
         const looksLikeLogin = res.redirected || res.url.includes('/login') || txt.includes('/login')
         const msg = looksLikeLogin
           ? 'Tu sesión expiró. Vuelve a iniciar sesión y reintenta.'
           : `No pude leer la respuesta del servidor (status ${res.status}).`
-        setMessages(prev => [...prev, { role: 'assistant', content: msg }])
+        setMessages(prev => [...prev, { role: 'assistant', content: msg, status: 'error' }])
         return
       }
 
-      const data = await res.json()
+      if (isFirstMessage) {
+        const newTitle = userMsg.length > 30
+          ? userMsg.substring(0, 30).toUpperCase() + "..."
+          : userMsg.toUpperCase();
 
-      if (!res.ok) {
-        const errMsg = (data?.error ? String(data.error) : `Error del servidor (status ${res.status}).`)
-        setMessages(prev => [...prev, { role: 'assistant', content: errMsg }])
-        return
-      }
-
-      if (data?.response) {
-        setMessages(prev => [...prev, { role: 'assistant', content: String(data.response) }])
-
-        // --- LÓGICA DE RENOMBRADO AUTOMÁTICO ---
-        // Si es el primer mensaje, actualizamos el título de la conversación
-        if (isFirstMessage) {
-          const newTitle = userMsg.length > 30 
-            ? userMsg.substring(0, 30).toUpperCase() + "..." 
-            : userMsg.toUpperCase();
-
-          await supabaseClient
-            .from(DATABASE.TABLES.WS_IA_CONVERSATIONS)
-            .update({ title: newTitle })
-            .eq('id', conversationId);
-            
-          // Nota: Para que el Sidebar se entere del cambio de nombre al instante,
-          // lo ideal sería pasarle una función 'refresh' por props al componente.
-        }
-      } else {
-        setMessages(prev => [...prev, { role: 'assistant', content: 'No recibí respuesta. Reintenta.' }])
+        await supabaseClient
+          .from(DATABASE.TABLES.WS_IA_CONVERSATIONS)
+          .update({ title: newTitle })
+          .eq('id', conversationId);
       }
     } catch (err) {
       console.error("Error en chat UI:", err)
-      setMessages(prev => [...prev, { role: 'assistant', content: 'Error de red al enviar el mensaje. Reintenta.' }])
+      setMessages(prev => [...prev, { role: 'assistant', content: 'Error de red al enviar el mensaje.', status: 'error' }])
     } finally {
       setIsLoading(false)
+      setToolStatus(null)
     }
+  }, [conversationId, userId, messages.length])
+
+  const processQueue = useCallback(async () => {
+    if (processingRef.current) return
+    processingRef.current = true
+
+    while (queueRef.current.length > 0) {
+      const nextMsg = queueRef.current.shift()!
+      await processOneMessage(nextMsg)
+    }
+
+    processingRef.current = false
+  }, [processOneMessage])
+
+  const sendMessage = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!input.trim()) return
+
+    const userMsg = input.trim()
+    setInput('')
+    setMessages(prev => [...prev, { role: 'user', content: userMsg }])
+
+    queueRef.current.push(userMsg)
+    processQueue()
   }
+
+  const retryLastMessage = useCallback(() => {
+    setMessages(prev => {
+      const lastAssistant = prev.length - 1
+      if (lastAssistant < 1 || prev[lastAssistant]?.role !== 'assistant') return prev
+      const lastUserIdx = lastAssistant - 1
+      if (prev[lastUserIdx]?.role !== 'user') return prev
+
+      const userMsg = prev[lastUserIdx].content
+      const withoutLast = prev.slice(0, lastAssistant)
+
+      queueRef.current.push(userMsg)
+      setTimeout(() => processQueue(), 0)
+
+      return withoutLast
+    })
+  }, [processQueue])
 
   return (
     <div className="flex flex-col h-full w-full bg-[#f8f6f4] rounded-[2rem] sm:rounded-[3rem] border border-black/[0.08] shadow-2xl overflow-hidden relative">
       
-      {/* HEADER DINÁMICO */}
       <header className="p-4 sm:p-6 bg-white border-b border-black/[0.05] flex justify-between items-center z-10">
         <div className="flex items-center gap-4">
           <div className="relative">
@@ -196,7 +309,6 @@ export default function ChatDatamara({ conversationId, userId }: { conversationI
         </div>
       </header>
 
-      {/* ÁREA DE CHAT CON GRADIENTE */}
       <div className="flex-1 overflow-y-auto p-4 sm:p-6 md:p-10 space-y-6 sm:space-y-8 custom-scrollbar relative bg-gradient-to-b from-transparent to-black/[0.02]">
         
         <AnimatePresence>
@@ -205,7 +317,7 @@ export default function ChatDatamara({ conversationId, userId }: { conversationI
                 <div className="bg-white p-6 sm:p-8 rounded-[2rem] sm:rounded-[3rem] border border-black/5 shadow-sm max-w-sm">
                     <Sparkles className="text-(--accents) mx-auto mb-4" size={32} />
                     <p className="text-[11px] font-black uppercase tracking-[0.2em] text-black">Inicia la conversación</p>
-                    <p className="text-xs text-black/40 mt-2 font-bold leading-relaxed">Prueba con: "¿Cómo me preparo para una reunión con un prospecto?" o "Resumen de leads pendientes".</p>
+                    <p className="text-xs text-black/40 mt-2 font-bold leading-relaxed">Prueba con: &quot;¿Cómo me preparo para una reunión con un prospecto?&quot; o &quot;Resumen de leads pendientes&quot;.</p>
                 </div>
             </motion.div>
           )}
@@ -217,44 +329,69 @@ export default function ChatDatamara({ conversationId, userId }: { conversationI
               key={i}
               className={`flex items-start gap-4 ${m.role === 'user' ? 'flex-row-reverse' : 'flex-row'}`}
             >
-              {/* Avatar Icon */}
               <div className={`w-7 h-7 sm:w-8 sm:h-8 rounded-lg sm:rounded-xl flex items-center justify-center shrink-0 mt-2 ${m.role === 'user' ? 'bg-black text-white' : 'bg-white text-black'}`}>
                 {m.role === 'user' ? <User size={14} /> : <Image src="/avatar/avatar.png" alt="logo" width={44} height={44} />}
               </div>
 
-              {/* Burbuja */}
-              <div className={`relative p-4 sm:p-6 rounded-[2rem] sm:rounded-[2.5rem] text-[13px] sm:text-sm leading-relaxed shadow-sm max-w-[92%] sm:max-w-[70%] font-medium ${
-                m.role === 'user' 
-                ? 'bg-black text-white rounded-tr-none' 
-                : 'bg-white text-black border border-black/5 rounded-tl-none'
-              }`}>
-                <div className="space-y-2">
-                  <ChatMarkdown content={m.content} variant={m.role} />
+              <div className="flex flex-col gap-1 max-w-[92%] sm:max-w-[70%]">
+                <div className={`relative p-4 sm:p-6 rounded-[2rem] sm:rounded-[2.5rem] text-[13px] sm:text-sm leading-relaxed shadow-sm font-medium ${
+                  m.role === 'user'
+                  ? 'bg-black text-white rounded-tr-none'
+                  : 'bg-white text-black border border-black/5 rounded-tl-none'
+                }`}>
+                  {m.content ? (
+                    <div className="space-y-2">
+                      <ChatMarkdown content={m.content} variant={m.role} />
+                    </div>
+                  ) : m.status === 'streaming' ? (
+                    <span className="text-[10px] text-black/40 font-black uppercase tracking-widest animate-pulse">Pensando...</span>
+                  ) : null}
+
+                  <span className={`hidden sm:inline text-[8px] absolute bottom-[-18px] font-black uppercase tracking-widest ${m.role === 'user' ? 'right-2 text-black/20' : 'left-2 text-black/20'}`}>
+                    {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </span>
                 </div>
-                
-                {/* Timestamp sutil */}
-                <span className={`hidden sm:inline text-[8px] absolute bottom-[-18px] font-black uppercase tracking-widest ${m.role === 'user' ? 'right-2 text-black/20' : 'left-2 text-black/20'}`}>
-                  {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                </span>
+
+                {m.role === 'assistant' && m.status === 'error' && i === messages.length - 1 && !isLoading && (
+                  <button
+                    type="button"
+                    onClick={retryLastMessage}
+                    className="flex items-center gap-1.5 text-[10px] font-bold text-red-500 hover:text-red-700 transition-colors ml-2 mt-1"
+                  >
+                    <RotateCcw size={12} />
+                    Reintentar
+                  </button>
+                )}
               </div>
             </motion.div>
           ))}
         </AnimatePresence>
 
-        {isLoading && (
+        {isLoading && !messages.some(m => m.status === 'streaming') && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex justify-start items-center gap-4">
             <div className="w-8 h-8 rounded-xl bg-black text-black flex items-center justify-center">
               <Loader2 className="animate-spin text-white" size={14} />
             </div>
             <div className="bg-white px-6 py-4 rounded-[2rem] rounded-tl-none border border-black/5 shadow-sm">
-              <span className="text-[10px] text-black font-black uppercase tracking-widest animate-pulse">Escribiendo...</span>
+              <span className="text-[10px] text-black font-black uppercase tracking-widest animate-pulse">Conectando...</span>
             </div>
           </motion.div>
         )}
+
+        {toolStatus && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex justify-start items-center gap-4">
+            <div className="w-8 h-8 rounded-xl bg-black flex items-center justify-center">
+              <Loader2 className="animate-spin text-white" size={14} />
+            </div>
+            <div className="bg-white px-6 py-4 rounded-[2rem] rounded-tl-none border border-black/5 shadow-sm">
+              <span className="text-[10px] text-black font-black uppercase tracking-widest animate-pulse">{toolStatus}...</span>
+            </div>
+          </motion.div>
+        )}
+
         <div ref={scrollRef} className="h-4" />
       </div>
 
-      {/* INPUT CON ÁREA TÉCNICA */}
       <div className="p-4 sm:p-6 bg-white border-t border-black/[0.05]">
         <div className="max-w-3xl mx-auto relative group">
           <form onSubmit={sendMessage} className="relative flex items-center">
@@ -270,7 +407,7 @@ export default function ChatDatamara({ conversationId, userId }: { conversationI
             />
             <button
               type="submit"
-              disabled={isLoading || !input.trim()}
+              disabled={!input.trim()}
               className="absolute right-2 sm:right-3 p-3 sm:p-4 bg-black text-(--accents) rounded-2xl hover:scale-105 active:scale-95 transition-all disabled:opacity-20 shadow-lg"
             >
               <Send size={18} />

@@ -1,100 +1,173 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { generateText, stepCountIs } from 'ai'
+import { streamText, stepCountIs } from 'ai'
 import { google } from '@ai-sdk/google'
 import { createClient } from '@/src/lib/supabase/server'
 import { DATABASE } from '@/src/config'
 import { buildChatTools } from '@/src/services/chat/tools'
+import * as fn from '@/src/lib/utils/functions'
 
 export const runtime = 'nodejs'
 
-// ─── System prompt: role + schema knowledge ───
+const MAX_RETRIES = 2
+const RETRY_DELAY_MS = 1_500
+
+const TOOL_LABELS: Record<string, string> = {
+  buscarClientes: 'Buscando clientes',
+  buscarProspectos: 'Buscando prospectos',
+  buscarPolizas: 'Buscando pólizas',
+  consultarTabla: 'Consultando datos',
+  contarRegistros: 'Contando registros',
+  listarClientes: 'Listando clientes',
+  contarClientes: 'Contando clientes',
+  calcularEdadPromedioClientes: 'Calculando estadísticas',
+  obtenerContextoOperativo: 'Cargando contexto del negocio',
+  crearProspecto: 'Creando prospecto',
+  editarProspecto: 'Editando prospecto',
+  crearCliente: 'Creando cliente',
+  editarCliente: 'Editando cliente',
+  promoverProspectoACliente: 'Promoviendo prospecto a cliente',
+  crearTarea: 'Creando tarea',
+  obtenerDetalleCliente: 'Cargando detalle del cliente',
+  enviarCorreo: 'Enviando correo',
+  programarCorreo: 'Programando correo',
+  listarPlantillasCorreo: 'Cargando plantillas',
+  obtenerFirmaCorreo: 'Cargando firma',
+  buscarReunionesGoogle: 'Buscando reuniones',
+  agendarReunionGoogle: 'Agendando reunión',
+  editarReunionGoogle: 'Editando reunión',
+  cancelarReunionGoogle: 'Cancelando reunión',
+  listarTiposEventoCalendly: 'Cargando Calendly',
+  crearLinkCalendly: 'Generando link de Calendly',
+  verificarConexionCalCom: 'Verificando Cal.com',
+  obtenerLinkCalCom: 'Obteniendo link de Cal.com',
+  buscarReunionesCalCom: 'Buscando reuniones Cal.com',
+  sincronizarCalComATareas: 'Sincronizando Cal.com',
+  listarAutomatizaciones: 'Cargando automatizaciones',
+  configurarAutomatizacion: 'Configurando automatización',
+  listarNotificacionesAutomatizacion: 'Cargando notificaciones',
+}
+
 const SYSTEM = `Eres el copiloto estratégico de un agente de seguros mexicano dentro de la plataforma Asygurare.
 No eres solo un buscador de datos: eres un asesor experto en ventas de seguros, retención de clientes y estrategia comercial.
 
 TU ROL:
 - Consultar y analizar los datos del negocio del agente (clientes, prospectos, pólizas, tareas).
-- Generar estrategias accionables de captación, retención y cross-selling basadas en los datos reales.
-- Aconsejar sobre cómo comunicarse con cada cliente/prospecto según su perfil.
+- Generar estrategias accionables de captación, retención y cross-selling basadas en datos reales.
+- Aconsejar sobre comunicación con cada cliente/prospecto según su perfil.
 - Proponer acciones concretas y priorizadas que el agente pueda ejecutar hoy.
-- Ser proactivo: si ves oportunidades en los datos (pólizas por vencer, leads sin seguimiento, clientes sin renovación), señálalas sin que te lo pidan.
+- Ser proactivo: si ves oportunidades (pólizas por vencer, leads sin seguimiento), señálalas sin que te lo pidan.
+- Guiar al usuario sobre cómo usar la plataforma Asygurare cuando lo necesite.
 
 CONOCIMIENTO DE INDUSTRIA DE SEGUROS:
-- La comunicación varía drásticamente según la edad del cliente:
-  · Jóvenes (18-30): tono cercano, digital, enfocado en protección básica y ahorro. Canales: WhatsApp, redes sociales.
-  · Adultos (31-50): tono profesional, enfocado en protección familiar, educación de hijos, patrimonio. Canales: llamada, WhatsApp, email.
-  · Seniors (51+): tono cálido y respetuoso, enfocado en salud, retiro, herencia. Canales: llamada telefónica, presencial.
+- La comunicación varía según la edad del cliente:
+  · Jóvenes (18-30): tono cercano, digital, protección básica y ahorro. WhatsApp, redes.
+  · Adultos (31-50): tono profesional, protección familiar, patrimonio. Llamada, WhatsApp, email.
+  · Seniors (51+): tono cálido y respetuoso, salud, retiro, herencia. Llamada, presencial.
 - Tipos de seguro comunes: vida, gastos médicos, auto, hogar, ahorro/inversión, empresarial.
-- El cross-selling es clave: un cliente con seguro de auto puede necesitar seguro de hogar o vida.
-- La renovación es más rentable que la captación nueva; prioriza siempre la retención.
-- Las pólizas próximas a vencer son oportunidades urgentes de contacto.
+- Cross-selling clave: cliente con auto puede necesitar hogar o vida.
+- Renovación más rentable que captación nueva; prioriza retención.
+- Pólizas próximas a vencer = oportunidades urgentes de contacto.
 
-ESQUEMA DE BASE DE DATOS (tablas lógicas que puedes consultar):
+DATOS QUE PUEDES CONSULTAR (usa solo nombres lógicos):
 
-1. **clientes** (WS_CUSTOMERS_2)
-   Columnas: id, name, last_name, full_name, email, phone, age, birthday, status, insurance_type, ocupation, notes, created_at, updated_at
+1. **clientes**
+   Campos: id, name, last_name, full_name, email, phone, age, birthday, status, insurance_type, ocupation, notes, created_at, updated_at
 
-2. **leads / prospectos** (WS_LEADS)
-   Columnas: id, name, last_name, full_name, email, phone, stage, status, insurance_type, estimated_value, notes, created_at, updated_at
+2. **leads / prospectos**
+   Campos: id, name, last_name, full_name, email, phone, stage, status, insurance_type, estimated_value, notes, created_at, updated_at
 
-3. **polizas** (WS_POLICIES)
-   Columnas: id, policy_number, insurance_company, category, status, total_premium, frecuencia_pago, effective_date, expiry_date, customer_id, created_at
+3. **polizas**
+   Campos: id, policy_number, insurance_company, category, status, total_premium, frecuencia_pago, effective_date, expiry_date, customer_id, created_at
    Relación: customer_id → clientes.id
 
-4. **tareas** (WS_TASKS)
-   Columnas: id, title, due_at, status, kind, priority, entity_type, entity_id, created_at, updated_at
+4. **tareas**
+   Campos: id, title, due_at, status, kind, priority, entity_type, entity_id, created_at, updated_at
+
+SEGURIDAD — REGLA ESTRICTA:
+- NUNCA reveles nombres internos de tablas, columnas técnicas, identificadores de esquema ni estructura de la base de datos al usuario.
+- Si el usuario pregunta por nombres de tablas, esquema, o estructura de base de datos, responde que esa información es confidencial y ofrece ayudarle con lo que necesite en lenguaje de negocio.
+- Usa siempre lenguaje de negocio: "clientes", "prospectos", "pólizas", "tareas" — nunca nombres técnicos como WS_CUSTOMERS_2, WS_LEADS, etc.
+- NUNCA muestres nombres de columnas internas, queries SQL, ni detalles de implementación.
+
+NAVEGACIÓN EN ASYGURARE — GUÍA PARA EL USUARIO:
+Cuando el usuario pregunte dónde encontrar algo o cómo hacer algo en la plataforma, guíalo como si le señalaras la pantalla. NUNCA uses rutas técnicas (como /dashboard, /clientes, etc.). Habla en términos de clics y secciones visibles en el menú lateral.
+
+Secciones del menú lateral (de arriba a abajo):
+- **Dashboard**: "Haz clic en **Dashboard** en el menú de la izquierda". Vista general del negocio con métricas y actividad reciente.
+- **Clientes**: "Haz clic en **Clientes**". Aquí puede agregar, editar, buscar y filtrar sus clientes.
+- **Prospectos**: "Haz clic en **Prospectos**". Pipeline de leads con etapas de seguimiento.
+- **Pólizas**: "Haz clic en **Pólizas**". Gestión de pólizas, vencimientos y renovaciones.
+- **Calendario**: "Haz clic en **Calendario**". Vista de calendario con Google Calendar, Calendly y Cal.com. Las tareas también se ven aquí.
+- **Email**: "Haz clic en **Email**". Desde ahí puede:
+  · Enviar correos → clic en **Enviar**
+  · Ver y crear plantillas → clic en **Plantillas**
+  · Configurar su firma → clic en **Firma electrónica**
+  · Conectar su cuenta de Gmail → clic en **Conecta tu email**
+- **IA**: "Estás aquí ahora mismo, en la sección de **IA**". Es este chat, tu copiloto.
+- **Metas**: "Haz clic en **Metas**". Para establecer y dar seguimiento a objetivos comerciales.
+- **Analytics**: "Haz clic en **Analytics**". Análisis y reportes del negocio.
+- **Automatizaciones**: "Haz clic en **Automatizar**". Para configurar emails automáticos de cumpleaños y renovaciones.
+- **Pagos**: "Haz clic en **Pagos**". Gestión de pagos y facturación.
+- **Configuración**: "Haz clic en **Configuración** (ícono de engrane)". Ajustes de cuenta y preferencias.
+- **Soporte**: "Haz clic en **Soporte**". Centro de ayuda y contacto.
+
+REGLA CLAVE DE NAVEGACIÓN:
+- SIEMPRE guía con lenguaje visual: "haz clic en...", "ve a...", "abre...", "busca el botón de...".
+- NUNCA muestres URLs, rutas técnicas ni paths (como /clientes, /email/plantillas, etc.).
+- Si hay sub-secciones, describe la navegación paso a paso: "Primero haz clic en **Email**, luego en **Conecta tu email**".
+- Sé breve: 1-2 frases máximo para indicar dónde ir.
 
 REGLAS DE USO DE HERRAMIENTAS:
-- Para buscar un contacto por nombre/teléfono/email: usa buscarClientes o buscarProspectos.
-- Para consultar datos con filtros específicos (status, fechas, etc.): usa consultarTabla.
-- Para contar registros con filtros: usa contarRegistros.
-- Para un resumen general del negocio: usa obtenerContextoOperativo.
-- Para dar de alta prospectos: usa crearProspecto.
-- Para editar prospectos (correo/teléfono/etapa/notas): usa editarProspecto.
-- Para enviar correos reales: usa enviarCorreo (solo con confirmación explícita).
-- Para programar correos (ej. en 5 minutos): usa programarCorreo (solo con confirmación explícita).
-- Para plantillas y firma de email: usa listarPlantillasCorreo y obtenerFirmaCorreo cuando aplique.
-- Para Google Calendar: usa buscarReunionesGoogle para localizar reuniones, agendarReunionGoogle para crear, editarReunionGoogle para editar y cancelarReunionGoogle para cancelar (con confirmación explícita en cambios).
-- Para Calendly: usa listarTiposEventoCalendly y crearLinkCalendly para generar links de agenda.
-- Para gestionar automatizaciones del workspace: usa listarAutomatizaciones y configurarAutomatizacion.
-- Para revisar resultados de automatizaciones: usa listarNotificacionesAutomatizacion.
+- Para buscar contacto por nombre/teléfono/email: buscarClientes o buscarProspectos.
+- Para consultar datos con filtros (status, fechas, etc.): consultarTabla.
+- Para contar registros con filtros: contarRegistros.
+- Para resumen general del negocio: obtenerContextoOperativo.
+- Para dar de alta prospectos: crearProspecto. Para editar: editarProspecto.
+- Para dar de alta clientes: crearCliente. Para editar: editarCliente.
+- Para convertir un prospecto en cliente: promoverProspectoACliente.
+- Para crear tareas/recordatorios: crearTarea. Para ver el perfil completo de un cliente con pólizas y tareas: obtenerDetalleCliente.
+- Para enviar correos reales: enviarCorreo (solo con confirmación explícita).
+- Para programar correos: programarCorreo (solo con confirmación explícita).
+- Para plantillas y firma de email: listarPlantillasCorreo y obtenerFirmaCorreo.
+- Para Google Calendar: buscarReunionesGoogle, agendarReunionGoogle, editarReunionGoogle, cancelarReunionGoogle.
+- Para Calendly: listarTiposEventoCalendly y crearLinkCalendly.
+- Para Cal.com: verificarConexionCalCom (ver si está conectado), obtenerLinkCalCom (obtener link de agenda para compartir), buscarReunionesCalCom (listar bookings) y sincronizarCalComATareas (sincronizar bookings como tareas).
+- Para automatizaciones: listarAutomatizaciones y configurarAutomatizacion.
+- Para notificaciones de automatizaciones: listarNotificacionesAutomatizacion.
 - Puedes encadenar herramientas: primero buscar un cliente, luego consultar sus pólizas con filtro customer_id.
-- Cuando el usuario pida una estrategia o consejo, PRIMERO consulta los datos relevantes con las herramientas, LUEGO genera la estrategia basada en datos reales (no inventes números).
+- Cuando el usuario pida estrategia, PRIMERO consulta datos con herramientas, LUEGO genera estrategia basada en datos reales.
 
-FLUJO CONVERSACIONAL (IMPORTANTE):
-- Mantén un tono humano, cálido y ameno; evita sonar robótico o excesivamente formal.
-- No te adelantes ni afirmes acciones/datos que no estén confirmados por el usuario.
-- Si el usuario dice algo ambiguo como "a mi prospecto", primero aclara con una pregunta breve antes de asumir identidad.
-- Cuando haya posibles coincidencias, presenta opciones cortas y pide confirmación: "¿Te refieres a ...?".
-- En envío de correos, sigue este orden:
-  1) identificar destinatario con confirmación del usuario,
-  2) pedir o proponer asunto/cuerpo (y opcionalmente plantilla/firma),
-  3) pedir confirmación explícita final,
-  4) ejecutar envío.
-- Si ya tienes un candidato probable, exprésalo como confirmación (no como hecho): "Encontré a X, ¿quieres que sea ese contacto?".
-- Evita contradicciones dentro del mismo hilo (por ejemplo, no decir "ya encontré" y luego "necesito que me lo des" sin explicar por qué).
+FLUJO CONVERSACIONAL:
+- Tono humano, cálido y ameno; nunca robótico.
+- No afirmes acciones/datos no confirmados.
+- Ante ambigüedad ("a mi prospecto"), aclara con pregunta breve.
+- Con posibles coincidencias, presenta opciones cortas y pide confirmación.
+- Para correos: 1) identificar destinatario, 2) proponer asunto/cuerpo, 3) confirmación explícita, 4) enviar.
+- Expresa candidatos como confirmación: "Encontré a X, ¿es ese?".
+- Evita contradicciones en el hilo.
+- Después de completar una acción (enviar correo, crear tarea, agendar reunión), sugiere brevemente el siguiente paso lógico. Ejemplo: "Correo enviado. ¿Quieres que cree una tarea de seguimiento para mañana?"
 
-CÓMO GENERAR ESTRATEGIAS:
-1. Consulta los datos primero (contexto operativo, clientes, leads, pólizas).
-2. Identifica patrones y oportunidades (segmentos de edad, tipos de seguro, leads estancados, pólizas por vencer).
-3. Propón acciones concretas con prioridad (alta/media/baja).
-4. Para cada acción, sugiere el canal y tono de comunicación adecuado según el perfil del contacto.
-5. Si es posible, incluye un ejemplo de mensaje o guion que el agente pueda usar directamente.
+WHATSAPP — MENSAJES LISTOS PARA COPIAR:
+Cuando sugieras contactar por WhatsApp, genera el mensaje completo listo para copiar-pegar. Adapta según el perfil:
+- Jóvenes (18-30): mensaje corto, cercano, con 1-2 emojis máximo. Ej: "¡Hola Ana! 👋 Soy [nombre], tu asesor de seguros. Vi que tu póliza de auto vence pronto, ¿te parece si platicamos opciones esta semana?"
+- Adultos (31-50): profesional pero cálido, sin emojis excesivos. Ej: "Buen día Carlos, soy [nombre] de Asygurare. Me gustaría platicar sobre la renovación de su seguro de gastos médicos. ¿Le viene bien una llamada esta semana?"
+- Seniors (51+): respetuoso, formal pero cercano. Ej: "Buen día Don Roberto, le saluda [nombre]. Quería platicar con usted sobre su seguro de vida. ¿Cuándo le resulta más cómodo que lo contacte?"
+Siempre pon el mensaje entre comillas o en un bloque para facilitar el copiado.
 
-FORMATO DE RESPUESTA:
+FORMATO DE RESPUESTA — SÉ BREVE:
 - Responde siempre en español.
-- Sé conciso y directo. Usa markdown (negritas, listas, tablas) para organizar datos.
-- En conversaciones operativas (ej. enviar correo), prioriza preguntas cortas y naturales de 1-2 frases.
-- Nunca muestres JSON crudo al usuario; transforma los datos en texto legible.
-- Nunca muestres IDs internos (UUIDs/ids técnicos) de registros al usuario final.
-- Si no encuentras resultados, dilo claramente y sugiere alternativas.
-- Para cambios de configuración o acciones sensibles, pide y respeta confirmación explícita del usuario.
-- Sí puedes crear y editar prospectos cuando el usuario lo solicite.
-- Sí puedes enviar y programar correos cuando el usuario lo solicite y confirme.
-- Sí puedes agendar, editar y cancelar reuniones en Google Calendar cuando el usuario lo solicite y confirme.
-- Sí puedes crear links de Calendly para compartir agenda.
-- Cuando des estrategias, usa estructura clara: Objetivo → Datos → Acciones → Ejemplo de comunicación.`
+- **Sé conciso**: máximo 2-4 oraciones por respuesta operativa. Usa viñetas si hay más de 3 items.
+- Para datos: usa tablas markdown compactas o listas breves.
+- En conversaciones operativas (enviar correo, buscar contacto), responde en 1-2 frases.
+- Para estrategias, usa máximo: Objetivo → 3-5 acciones → 1 ejemplo de mensaje.
+- Nunca muestres JSON crudo; transforma en texto legible.
+- Nunca muestres IDs internos (UUIDs/ids técnicos).
+- Si no encuentras resultados, dilo en 1 frase y sugiere alternativa.
+- Para acciones sensibles, pide confirmación explícita breve.
+- Evita párrafos largos, preámbulos innecesarios y repeticiones.
+- NO repitas lo que el usuario dijo ni hagas resúmenes de su pregunta.`
 
-function buildSystemWithRuntimeDate(nowIso: string, tz: string) {
+function buildSystemWithRuntimeDate(nowIso: string, tz: string, contextSnapshot?: string) {
   const safeNow = Number.isNaN(new Date(nowIso).getTime()) ? new Date().toISOString() : nowIso
   let localNow = safeNow
   try {
@@ -115,26 +188,49 @@ function buildSystemWithRuntimeDate(nowIso: string, tz: string) {
   }
 
   const today = localNow.slice(0, 10)
-  return `${SYSTEM}
+  let sys = `${SYSTEM}
 
 CONTEXTO DE FECHA Y ZONA HORARIA:
 - Toma como fecha/hora actual de referencia: ${localNow}
 - Today date: ${today}
 - Zona horaria del usuario: ${tz}
 - Si el usuario usa expresiones relativas ("hoy", "manana", "en 2 horas"), interpretalas usando esta referencia.`
+
+  if (contextSnapshot) {
+    sys += `
+
+CONTEXTO OPERATIVO PRE-CARGADO (datos reales del negocio del usuario):
+${contextSnapshot}
+Usa estos datos como base. Solo consulta herramientas si necesitas datos más específicos o actualizados.`
+  }
+
+  return sys
 }
 
+const INTERNAL_TABLE_NAMES = [
+  'WS_CUSTOMERS_2', 'WS_CUSTOMERS', 'WS_LEADS', 'WS_POLICIES', 'WS_TASKS',
+  'WS_PAYMENTS', 'WS_USER_GOALS', 'WS_GOALS', 'WS_IA_CONVERSATIONS',
+  'WS_IA_MESSAGES', 'WS_GMAIL_CONNECTIONS', 'WS_GMAIL_SENT_EMAILS',
+  'WS_SCHEDULED_EMAILS', 'WS_EMAIL_SIGNATURES', 'WS_EMAIL_TEMPLATES',
+  'WS_CALENDLY_CONNECTIONS', 'WS_CALENDLY_EVENT_TASKS',
+  'WS_CALCOM_CONNECTIONS', 'WS_CALCOM_EVENT_TASKS',
+  'WS_AUTOMATIONS', 'WS_AUTOMATION_LOGS', 'PROFILES',
+]
+
 function redactInternalIds(text: string) {
-  return text.replace(
+  let cleaned = text.replace(
     /\b[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\b/gi,
     '[id oculto]',
   )
+  for (const name of INTERNAL_TABLE_NAMES) {
+    cleaned = cleaned.replaceAll(name, '[tabla interna]')
+  }
+  return cleaned
 }
 
-// ─── POST handler ───
+// ─── POST handler with streaming ───
 export async function POST(req: NextRequest) {
   try {
-    // 1. Parse body
     const body = await req.json()
     const { message, user_id, conversation_id, client_now, client_tz } = body as {
       message?: string
@@ -151,7 +247,6 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    // 2. Auth
     const supabase = await createClient()
     const { data: { user }, error: authErr } = await supabase.auth.getUser()
 
@@ -159,63 +254,151 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'No autorizado.' }, { status: 401 })
     }
 
-    // 3. Load conversation history (last 30 messages)
     const { data: history } = await supabase
       .from(DATABASE.TABLES.WS_IA_MESSAGES)
       .select('role, content')
       .eq('conversation_id', conversation_id)
       .order('created_at', { ascending: true })
-      .limit(30)
+      .limit(40)
 
-    const messages: Array<{ role: 'user' | 'assistant'; content: string }> = [
-      ...((history as Array<{ role: 'user' | 'assistant'; content: string }>) ?? []),
-      { role: 'user', content: message.trim() },
-    ]
+    const isFirstMessage = !history || history.length === 0
+    const rawHistory = (history as Array<{ role: 'user' | 'assistant'; content: string }>) ?? []
 
-    // 4. Build tools & call Gemini
+    const RECENT_KEEP = 10
+    let contextMessages: Array<{ role: 'user' | 'assistant'; content: string }>
+
+    if (rawHistory.length > RECENT_KEEP) {
+      const olderMessages = rawHistory.slice(0, rawHistory.length - RECENT_KEEP)
+      const recentMessages = rawHistory.slice(rawHistory.length - RECENT_KEEP)
+
+      const summaryParts = olderMessages.map(m => `${m.role === 'user' ? 'Usuario' : 'Asistente'}: ${m.content.slice(0, 200)}`).join('\n')
+      const summary = `[Resumen de conversación anterior (${olderMessages.length} mensajes):\n${summaryParts.slice(0, 1500)}\n--- Fin del resumen ---]`
+
+      contextMessages = [
+        { role: 'assistant', content: summary },
+        ...recentMessages,
+        { role: 'user', content: message.trim() },
+      ]
+    } else {
+      contextMessages = [
+        ...rawHistory,
+        { role: 'user', content: message.trim() },
+      ]
+    }
+
+    const messages = contextMessages
+
     const tz = client_tz || 'America/Mexico_City'
     const nowIso = client_now || new Date().toISOString()
     const tools = buildChatTools({ supabase, tz, nowIso })
 
-    const systemWithRuntimeDate = buildSystemWithRuntimeDate(nowIso, tz)
-
-    const result = await generateText({
-      model: google('gemini-2.5-flash'),
-      system: systemWithRuntimeDate,
-      messages,
-      tools,
-      stopWhen: stepCountIs(5),
-    })
-
-    const assistantText = redactInternalIds(result.text || 'No pude generar una respuesta. Reintenta.')
-
-    // 5. Persist both 
-    const now = new Date().toISOString()
-    const { error: insertErr } = await supabase
-      .from(DATABASE.TABLES.WS_IA_MESSAGES)
-      .insert([
-        {
-          conversation_id,
-          user_id,
-          role: 'user',
-          content: message.trim(),
-          created_at: now,
-        },
-        {
-          conversation_id,
-          user_id,
-          role: 'assistant',
-          content: assistantText,
-          created_at: new Date(Date.now() + 1).toISOString(), // +1ms to keep order
-        },
-      ])
-
-    if (insertErr) {
-      console.error('[/api/chat] Error guardando mensajes:', insertErr.message)
+    let contextSnapshot: string | undefined
+    if (isFirstMessage) {
+      try {
+        const ctx = await fn.obtenerContextoOperativoWorkspaceConCache(supabase, { tz, nowIso })
+        contextSnapshot = JSON.stringify(ctx)
+      } catch {
+        // Non-critical, proceed without context
+      }
     }
 
-    // 6. Return response
-    return NextResponse.json({ response: assistantText })
+    const systemWithRuntimeDate = buildSystemWithRuntimeDate(nowIso, tz, contextSnapshot)
+
+    const encoder = new TextEncoder()
+    let fullText = ''
+
+    const stream = new ReadableStream({
+      async start(controller) {
+        let lastError: unknown = null
+
+        for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+          try {
+            const result = streamText({
+              model: google('gemini-2.5-flash'),
+              system: systemWithRuntimeDate,
+              messages,
+              tools,
+              stopWhen: stepCountIs(10),
+              onStepFinish: ({ toolCalls }) => {
+                if (toolCalls && toolCalls.length > 0) {
+                  for (const tc of toolCalls) {
+                    const label = TOOL_LABELS[tc.toolName] || tc.toolName
+                    const event = `event: tool_status\ndata: ${JSON.stringify({ tool: label })}\n\n`
+                    controller.enqueue(encoder.encode(event))
+                  }
+                }
+              },
+            })
+
+            for await (const chunk of result.textStream) {
+              if (chunk) {
+                fullText += chunk
+                const event = `event: text_delta\ndata: ${JSON.stringify({ delta: chunk })}\n\n`
+                controller.enqueue(encoder.encode(event))
+              }
+            }
+
+            lastError = null
+            break
+          } catch (err) {
+            lastError = err
+            console.error(`[/api/chat] Stream attempt ${attempt + 1} failed:`, err instanceof Error ? err.message : err)
+            if (attempt < MAX_RETRIES) {
+              await new Promise((r) => setTimeout(r, RETRY_DELAY_MS * (attempt + 1)))
+            }
+          }
+        }
+
+        if (lastError) {
+          const errMsg = lastError instanceof Error ? lastError.message : 'Error al generar respuesta.'
+          const event = `event: error\ndata: ${JSON.stringify({ error: errMsg })}\n\n`
+          controller.enqueue(encoder.encode(event))
+        }
+
+        if (!fullText.trim() && !lastError) {
+          fullText = 'No pude generar una respuesta. ¿Podrías intentar de otra forma?'
+          const event = `event: text_delta\ndata: ${JSON.stringify({ delta: fullText })}\n\n`
+          controller.enqueue(encoder.encode(event))
+        }
+
+        const cleanedText = redactInternalIds(fullText || 'No pude generar una respuesta.')
+        const doneEvent = `event: done\ndata: ${JSON.stringify({ full_text: cleanedText })}\n\n`
+        controller.enqueue(encoder.encode(doneEvent))
+
+        const now = new Date().toISOString()
+        await supabase
+          .from(DATABASE.TABLES.WS_IA_MESSAGES)
+          .insert([
+            {
+              conversation_id,
+              user_id,
+              role: 'user',
+              content: message.trim(),
+              created_at: now,
+            },
+            {
+              conversation_id,
+              user_id,
+              role: 'assistant',
+              content: cleanedText,
+              created_at: new Date(Date.now() + 1).toISOString(),
+            },
+          ])
+          .then(({ error: insertErr }) => {
+            if (insertErr) console.error('[/api/chat] Error guardando mensajes:', insertErr.message)
+          })
+
+        controller.close()
+      },
+    })
+
+    return new Response(stream, {
+      headers: {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        Connection: 'keep-alive',
+      },
+    })
   } catch (err: unknown) {
     console.error('[/api/chat] Error:', err)
     const msg = err instanceof Error ? err.message : 'Error interno del servidor.'
