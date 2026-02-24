@@ -1514,7 +1514,7 @@ export default function CalendarioPage() {
             ) : null}
           </div>
 
-          {/* <div className="bg-white p-4 rounded-[1.5rem] border border-black/5 shadow-sm flex flex-col gap-4 min-h-[280px]">
+         <div className="bg-white p-4 rounded-[1.5rem] border border-black/5 shadow-sm flex flex-col gap-4 min-h-[280px]">
             <div className="flex items-center gap-4 min-w-0">
               <div className="h-16 w-16 rounded-2xl bg-white border border-black/5 flex items-center justify-center shrink-0 shadow-sm">
               <Image
@@ -1595,7 +1595,7 @@ export default function CalendarioPage() {
                 </div>
               </a>
             ) : null}
-          </div> */}
+          </div> 
 
           <div className="bg-white p-4 rounded-[1.5rem] border border-black/5 shadow-sm flex flex-col gap-4 min-h-[280px]">
             <div className="flex items-center gap-4 min-w-0">

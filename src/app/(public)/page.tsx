@@ -1,9 +1,18 @@
 "use client"
 
 import Link from 'next/link'
+import Image from 'next/image'
 import { motion } from 'framer-motion'
-import { Shield, BarChart3, Bot, ChevronRight, CheckCircle2 } from 'lucide-react'
+import { Shield, BarChart3, Bot, Mail, Calendar, Video, Sparkles } from 'lucide-react'
 import TechDashboard from '@/src/components/landing/Dashboard/TechnoDashboard'
+
+const INTEGRATIONS = [
+  { name: 'Gmail', src: '/logo_integrations/logo_gmail.png', alt: 'Gmail' },
+  { name: 'Google Calendar', src: '/logo_integrations/google_calendar.png', alt: 'Google Calendar' },
+  { name: 'Calendly', src: '/logo_integrations/calendly_logo.png', alt: 'Calendly' },
+  { name: 'Cal.com', src: '/logo_integrations/cal_logo.png', alt: 'Cal.com' },
+  { name: 'Google Meet', src: '/logo_integrations/meet_logo.jpg', alt: 'Google Meet' },
+]
 
 // Animaciones constantes tipo GSAP
 const transition = { duration: 0.8, ease: [0.76, 0, 0.24, 1] }
@@ -41,6 +50,102 @@ export default function Home() {
                 Ver Funciones
               </button>
               </Link>
+            </div>
+          </motion.div>
+        </div>
+      </section>
+
+      {/* --- AUTOMATIZA TU TRABAJO DE ASESOR --- */}
+      <section className="py-16 md:py-24 px-4 sm:px-7 bg-gradient-to-b from-(--bg) to-white/80 overflow-hidden">
+        <div className="max-w-6xl mx-auto">
+          <motion.div
+            initial={{ opacity: 0, y: 24 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, margin: "-50px" }}
+            transition={{ duration: 0.6, ease: [0.76, 0, 0.24, 1] }}
+            className="text-center mb-12 md:mb-16"
+          >
+            <h2 className="text-3xl sm:text-4xl md:text-5xl font-medium text-(--text) tracking-tight mb-4 md:mb-6">
+              Automatiza tu trabajo de asesor
+            </h2>
+            <p className="text-base sm:text-lg md:text-xl text-gray-600 max-w-2xl mx-auto leading-relaxed">
+              Manda correos, crea reuniones en tu calendario y coordina videollamadas — todo con IA. Menos tareas repetitivas, más tiempo para asesorar.
+            </p>
+          </motion.div>
+
+          {/* Feature pills - responsive grid */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, margin: "-30px" }}
+            transition={{ duration: 0.5, delay: 0.1 }}
+            className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-14 md:mb-20"
+          >
+            {[
+              { icon: Mail, label: "Correos automáticos", desc: "Redacta y envía emails con IA" },
+              { icon: Calendar, label: "Calendario inteligente", desc: "Crea y gestiona reuniones" },
+              { icon: Video, label: "Videollamadas", desc: "Integra Google Meet" },
+              { icon: Bot, label: "Copiloto 24/7", desc: "Asistente siempre disponible" },
+            ].map((item, i) => (
+              <div
+                key={item.label}
+                className="group flex items-start gap-3 sm:gap-4 p-4 sm:p-5 rounded-2xl bg-white/80 border border-black/5 hover:border-(--main)/20 hover:shadow-lg hover:shadow-(--main)/5 transition-all duration-300"
+              >
+                <div className="flex-shrink-0 p-2.5 sm:p-3 rounded-xl bg-(--main)/10 text-(--main) group-hover:bg-(--main)/15 transition-colors">
+                  <item.icon className="w-5 h-5 sm:w-6 sm:h-6" />
+                </div>
+                <div className="min-w-0">
+                  <p className="font-semibold text-(--text) text-sm sm:text-base">{item.label}</p>
+                  <p className="text-xs sm:text-sm text-gray-500 mt-0.5">{item.desc}</p>
+                </div>
+              </div>
+            ))}
+          </motion.div>
+
+          {/* Integrations logos */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, margin: "-30px" }}
+            transition={{ duration: 0.5, delay: 0.2 }}
+          >
+            <p className="text-center text-sm font-medium text-gray-500 mb-6 md:mb-8">
+              Integraciones que ya usas
+            </p>
+            {/* Mobile: grid wrap | Desktop: marquee */}
+            <div className="md:hidden flex flex-wrap justify-center gap-4 sm:gap-6 py-4 px-2">
+              {INTEGRATIONS.map((logo) => (
+                <div
+                  key={logo.name}
+                  className="flex items-center justify-center w-14 h-14 sm:w-16 sm:h-16 rounded-xl bg-white border border-black/5 shadow-sm hover:shadow-md hover:border-(--main)/15 transition-all duration-300 p-2.5 sm:p-3"
+                >
+                  <Image
+                    src={logo.src}
+                    alt={logo.alt}
+                    width={64}
+                    height={64}
+                    className="w-full h-full object-contain"
+                  />
+                </div>
+              ))}
+            </div>
+            <div className="hidden md:block overflow-hidden py-4">
+              <div className="flex animate-marquee gap-8">
+                {[...INTEGRATIONS, ...INTEGRATIONS].map((logo, i) => (
+                  <div
+                    key={`${logo.name}-${i}`}
+                    className="flex-shrink-0 flex items-center justify-center w-20 h-20 rounded-2xl bg-white border border-black/5 shadow-sm hover:shadow-md hover:border-(--main)/15 transition-all duration-300 p-4"
+                  >
+                    <Image
+                      src={logo.src}
+                      alt={logo.alt}
+                      width={64}
+                      height={64}
+                      className="w-full h-full object-contain"
+                    />
+                  </div>
+                ))}
+              </div>
             </div>
           </motion.div>
         </div>
