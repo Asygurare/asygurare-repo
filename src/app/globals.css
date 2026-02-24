@@ -50,6 +50,24 @@ body {
   box-shadow: 0 0 10px rgba(74, 119, 102, 0.5);
 }
 
+/* Hide scrollbar for horizontal logo strip */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+/* Marquee animation for integration logos */
+@keyframes marquee {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+.animate-marquee {
+  animation: marquee 25s linear infinite;
+}
+
 /* Smooth scroll behavior */
 html {
   scroll-behavior: smooth;
