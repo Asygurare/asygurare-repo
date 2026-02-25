@@ -733,7 +733,11 @@ export default function MetasPage() {
                     className="w-full py-4 rounded-2xl bg-(--accents) text-white font-black text-sm uppercase tracking-widest flex items-center justify-center gap-2 hover:opacity-90 transition-opacity disabled:opacity-60 cursor-pointer"
                   >
                     <Plus size={18} />
-                    Agregar 1 llamada manualmente
+                    {goal.metric === "leads.new_count"
+                      ? "Agregar registro de prospecto manualmente"
+                      : goal.metric === "leads.converted_to_customers"
+                        ? "Agregar registro de cliente nuevo manualmente"
+                        : "Agregar 1 llamada manualmente"}
                   </button>
                   <button
                     type="button"
