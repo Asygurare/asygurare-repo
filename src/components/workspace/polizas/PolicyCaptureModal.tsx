@@ -1,23 +1,26 @@
 "use client"
 
-import React, { useState, Fragment } from 'react'
+import React, { useState, Fragment, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
-  X, Loader2, CheckCircle2, DollarSign, Repeat, AlertCircle,
+  X, Loader2, CheckCircle2, DollarSign, Repeat, AlertCircle, User, FileText,
 } from 'lucide-react'
 import { getFullName } from '@/src/lib/utils/utils'
 import { toast } from 'sonner'
 import { type Customer, type PolicyFormData } from '@/src/types/policy'
 import { SelectWithOther } from '@/src/components/ui/SelectWithOther'
-import { InsuranceType } from '@/src/config/constants'
+import { InsuranceType, PolicyMetodoPago } from '@/src/config/constants'
 const INSURANCE_TYPES = Object.values(InsuranceType)
+const PAYMENT_METHODS = Object.values(PolicyMetodoPago)
 
 type PolicyCaptureModalProps = {
   isOpen: boolean
   onClose: () => void
   customers: Customer[]
   selectedPolicy?: PolicyFormData | null
-  /** La página hace el update/insert usando su estado selectedPolicy (como clientes/prospectos) */
+  /** Si viene desde Clientes/Prospectos, el titular ya está elegido y se muestra en solo lectura */
+  preselectedCustomer?: Customer | null
   onSubmit: (formData: FormData) => Promise<void>
   onSuccess: () => void
 }
@@ -27,11 +30,18 @@ export function PolicyCaptureModal({
   onClose,
   customers,
   selectedPolicy = null,
+  preselectedCustomer = null,
   onSubmit,
   onSuccess,
 }: PolicyCaptureModalProps) {
+  const router = useRouter()
   const [loading, setLoading] = useState(false)
   const [success, setSuccess] = useState(false)
+  const [showPostCreateChoice, setShowPostCreateChoice] = useState(false)
+
+  useEffect(() => {
+    if (!isOpen) setShowPostCreateChoice(false)
+  }, [isOpen])
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
@@ -40,16 +50,30 @@ export function PolicyCaptureModal({
     try {
       await onSubmit(formData)
       setSuccess(true)
-      onSuccess()
-      setTimeout(() => {
-        setSuccess(false)
-        onClose()
-      }, 1000)
+      if (selectedPolicy) {
+        onSuccess()
+        setTimeout(() => { setSuccess(false); onClose() }, 1000)
+      } else {
+        setShowPostCreateChoice(true)
+      }
     } catch (err: any) {
       toast.error(err?.message || 'Error al guardar')
     } finally {
       setLoading(false)
     }
+  }
+
+  const handleVerPolizas = () => {
+    setSuccess(false)
+    setShowPostCreateChoice(false)
+    onSuccess()
+  }
+
+  const handleVolverAClientes = () => {
+    setSuccess(false)
+    setShowPostCreateChoice(false)
+    onSuccess()
+    router.push('/clientes')
   }
 
   return (
@@ -101,17 +125,34 @@ export function PolicyCaptureModal({
                 01. Responsable del Riesgo
               </label>
               <div className="bg-white p-8 rounded-[2.5rem] border border-black/5 shadow-sm">
-                <select
-                  required
-                  name="customerId"
-                  defaultValue={selectedPolicy?.customer_id ?? ''}
-                  className="w-full bg-[#ece7e2] text-black font-black py-5 px-6 rounded-2xl outline-none appearance-none cursor-pointer text-lg border-2 border-transparent focus:border-black/20"
-                >
-                  <option value="">Seleccionar Titular...</option>
-                  {customers.map((c) => (
-                    <option key={c.id} value={c.id}>{getFullName(c)}</option>
-                  ))}
-                </select>
+                {preselectedCustomer ? (
+                  <>
+                    <input type="hidden" name="customerId" value={preselectedCustomer.id} />
+                    <div className="flex items-center gap-3 text-black">
+                      <div className="w-12 h-12 rounded-full bg-[#ece7e2] flex items-center justify-center">
+                        <User size={24} className="text-black/60" />
+                      </div>
+                      <div>
+                        <p className="font-black text-lg uppercase tracking-tight">{getFullName(preselectedCustomer)}</p>
+                        {preselectedCustomer.email && (
+                          <p className="text-[10px] font-bold text-black/50 uppercase">{preselectedCustomer.email}</p>
+                        )}
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <select
+                    required
+                    name="customerId"
+                    defaultValue={selectedPolicy?.customer_id ?? ''}
+                    className="w-full bg-[#ece7e2] text-black font-black py-5 px-6 rounded-2xl outline-none appearance-none cursor-pointer text-lg border-2 border-transparent focus:border-black/20"
+                  >
+                    <option value="">Seleccionar Titular...</option>
+                    {customers.map((c) => (
+                      <option key={c.id} value={c.id}>{getFullName(c)}</option>
+                    ))}
+                  </select>
+                )}
               </div>
             </div>
 
@@ -189,7 +230,7 @@ export function PolicyCaptureModal({
               <label className="text-[11px] font-black text-black uppercase tracking-widest italic">
                 03. Estructura Financiera
               </label>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="bg-black p-8 rounded-[2.5rem] shadow-2xl relative overflow-hidden group">
                   <DollarSign
                     className="absolute -right-4 -top-4 text-(--accents)/20 group-hover:scale-110 transition-transform"
@@ -203,8 +244,10 @@ export function PolicyCaptureModal({
                     name="premium"
                     type="number"
                     step="0.01"
+                    min={0}
                     defaultValue={selectedPolicy?.total_premium ?? ''}
                     placeholder="0.00"
+                    onInput={(e) => { const n = parseFloat((e.target as HTMLInputElement).value); if (!Number.isNaN(n) && n < 0) (e.target as HTMLInputElement).value = '0'; }}
                     className="w-full bg-transparent text-white text-4xl font-black outline-none relative z-10 placeholder:text-white/40"
                   />
                 </div>
@@ -227,6 +270,21 @@ export function PolicyCaptureModal({
                     <option value="Contado">Contado (1)</option>
                   </select>
                 </div>
+                <div className="bg-white p-8 rounded-[2.5rem] border-2 border-black/5 flex flex-col justify-center">
+                  <label className="text-[10px] font-black text-black/40 uppercase block mb-2 tracking-widest italic">
+                    Método de pago
+                  </label>
+                  <select
+                    required
+                    name="payment_method"
+                    defaultValue={(selectedPolicy as any)?.payment_method ?? PolicyMetodoPago.TarjetaCredito}
+                    className="w-full bg-transparent text-black font-black text-lg outline-none cursor-pointer appearance-none uppercase"
+                  >
+                    {PAYMENT_METHODS.map((opt) => (
+                      <option key={opt} value={opt}>{opt}</option>
+                    ))}
+                  </select>
+                </div>
               </div>
               {!selectedPolicy && (
                 <div className="bg-blue-50 p-6 rounded-2xl flex items-start gap-4 border border-blue-100">
@@ -239,6 +297,33 @@ export function PolicyCaptureModal({
               )}
             </div>
 
+            {showPostCreateChoice ? (
+            <div className="space-y-6">
+              <div className="bg-green-50 border border-green-200 rounded-2xl p-6 flex items-center gap-4">
+                <CheckCircle2 className="text-green-600 shrink-0" size={40} />
+                <div>
+                  <p className="font-black text-black uppercase tracking-tight">Póliza emitida</p>
+                  <p className="text-sm text-black/60">¿Qué deseas hacer ahora?</p>
+                </div>
+              </div>
+              <div className="flex flex-col sm:flex-row gap-3">
+                <button
+                  type="button"
+                  onClick={handleVerPolizas}
+                  className="flex-1 flex items-center justify-center gap-2 py-5 rounded-[2.5rem] font-black text-lg bg-black text-white hover:bg-black/90 transition-all"
+                >
+                  <FileText size={22} /> Ver pólizas
+                </button>
+                <button
+                  type="button"
+                  onClick={handleVolverAClientes}
+                  className="flex-1 py-5 rounded-[2.5rem] font-black text-lg border-2 border-black/20 text-black hover:bg-black/5 transition-all"
+                >
+                  Volver a clientes
+                </button>
+              </div>
+            </div>
+          ) : (
             <button
               type="submit"
               disabled={loading || success}
@@ -258,6 +343,7 @@ export function PolicyCaptureModal({
                 'EMITIR PÓLIZA'
               )}
             </button>
+          )}
           </form>
         </motion.div>
       </div>

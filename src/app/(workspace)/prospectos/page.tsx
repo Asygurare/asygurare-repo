@@ -1,16 +1,31 @@
 "use client"
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react'
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
+import { useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
-import { DATABASE, Gender, InsuranceType, MaritalStatus } from '@/src/config'
+import {
+  DATABASE,
+  Currency,
+  CustomerStatus,
+  EducationLevel,
+  Gender,
+  InsuranceType,
+  LeadFormStage,
+  LeadStatus,
+  MaritalStatus,
+  OriginSource,
+  PipelineStage,
+} from '@/src/config'
 import { 
   Zap, Target, X, Mail, Phone, Loader2, CheckCircle2, 
   TrendingUp, DollarSign, UserCheck, Trash2, Edit3, 
-  Search, Clock, Info, Share2, MessageSquare, ChevronRight
+  Search, Clock, Info, Share2, MessageSquare, ChevronRight, User, FileCheck
 } from 'lucide-react'
 import { supabaseClient } from '@/src/lib/supabase/client'
 import { toast, Toaster } from 'sonner'
+import { calculateAge } from '@/src/lib/utils/utils'
 import { SelectWithOther } from '@/src/components/ui/SelectWithOther'
+import { RefreshButton } from '@/src/components/workspace/RefreshButton'
 
 export default function ProspectosFinalUltraPage() {
   const [leads, setLeads] = useState<any[]>([])
@@ -20,8 +35,12 @@ export default function ProspectosFinalUltraPage() {
   const [activeTab, setActiveTab] = useState<'activos' | 'descartados'>('activos')
   const [discardModalLead, setDiscardModalLead] = useState<any>(null)
   const [discardReason, setDiscardReason] = useState('')
-  const [discardStage, setDiscardStage] = useState('Primer contacto')
+  const [discardStage, setDiscardStage] = useState(LeadFormStage.PrimerContacto)
   const [discardReasonFilter, setDiscardReasonFilter] = useState('__all__')
+  const [stageFilter, setStageFilter] = useState<string>('__all__')
+  const [includeDiscarded, setIncludeDiscarded] = useState(false)
+  const [reactivateModalLead, setReactivateModalLead] = useState<any>(null)
+  const [reactivateStage, setReactivateStage] = useState<string>(LeadFormStage.PrimerContacto)
   const [monthlyGoal, setMonthlyGoal] = useState(0)
   const [searchTerm, setSearchTerm] = useState('')
   const [loading, setLoading] = useState(false)
@@ -45,25 +64,35 @@ export default function ProspectosFinalUltraPage() {
     financial_goals: '',
   })
   const [additionalLoading, setAdditionalLoading] = useState(false)
+  const [formBirthday, setFormBirthday] = useState('')
+  const [formAge, setFormAge] = useState('')
+  const [clientInterestsList, setClientInterestsList] = useState<string[]>([])
+  const [clientInterestInput, setClientInterestInput] = useState('')
+  const [editingInterestIndex, setEditingInterestIndex] = useState<number | null>(null)
+  const [editingInterestDraft, setEditingInterestDraft] = useState('')
+  const [formDirty, setFormDirty] = useState(false)
+  const formRef = useRef<HTMLFormElement>(null)
+  const [convertedCustomerId, setConvertedCustomerId] = useState<string | null>(null)
+  const router = useRouter()
 
-  const STAGES = ['Primer contacto', 'Cita agendada', 'Propuesta enviada', 'En negociación', 'Otro']
-  const SOURCES = ['Referido', 'Redes Sociales', 'Llamada en Frío', 'Campaña Web', 'Cartera Antigua', 'Otro']
-  const STATUSES = ['Nuevo', 'En seguimiento', 'Descartado', 'Ganado', 'Otro']
-  const PIPELINE_OPTIONS = ['Primer contacto', 'Cita agendada', 'Propuesta enviada', 'En negociación', 'Ganado', 'Descartado']
+  const LEAD_FORM_STAGES = Object.values(LeadFormStage)
+  const STATUSES = Object.values(LeadStatus)
+  const PIPELINE_OPTIONS = Object.values(PipelineStage)
   const PIPELINE_COLOR_MAP: Record<string, { border: string; bg: string; text: string; badge: string }> = {
     'Nuevo': { border: '#cbd5e1', bg: '#f8fafc', text: '#334155', badge: '#e2e8f0' },
-    'Primer contacto': { border: '#86efac', bg: '#f0fdf4', text: '#166534', badge: '#dcfce7' },
-    'Cita agendada': { border: '#60a5fa', bg: '#eff6ff', text: '#1d4ed8', badge: '#dbeafe' },
-    'Propuesta enviada': { border: '#a78bfa', bg: '#f5f3ff', text: '#5b21b6', badge: '#ede9fe' },
-    'En negociación': { border: '#f59e0b', bg: '#fffbeb', text: '#92400e', badge: '#fef3c7' },
-    'Ganado': { border: '#14b8a6', bg: '#f0fdfa', text: '#0f766e', badge: '#ccfbf1' },
-    'Descartado': { border: '#ef4444', bg: '#fef2f2', text: '#991b1b', badge: '#fee2e2' },
+    [PipelineStage.PrimerContacto]: { border: '#86efac', bg: '#f0fdf4', text: '#166534', badge: '#dcfce7' },
+    [PipelineStage.CitaAgendada]: { border: '#60a5fa', bg: '#eff6ff', text: '#1d4ed8', badge: '#dbeafe' },
+    [PipelineStage.PropuestaEnviada]: { border: '#a78bfa', bg: '#f5f3ff', text: '#5b21b6', badge: '#ede9fe' },
+    [PipelineStage.EnNegociacion]: { border: '#f59e0b', bg: '#fffbeb', text: '#92400e', badge: '#fef3c7' },
+    [PipelineStage.Ganado]: { border: '#14b8a6', bg: '#f0fdfa', text: '#0f766e', badge: '#ccfbf1' },
+    [PipelineStage.Descartado]: { border: '#ef4444', bg: '#fef2f2', text: '#991b1b', badge: '#fee2e2' },
   }
   const MARITAL_STATUSES = Object.values(MaritalStatus)
   const GENDERS = Object.values(Gender)
   const INSURANCE_TYPES = Object.values(InsuranceType)
-  const EDUCATION_LEVELS = ['Primaria', 'Secundaria', 'Preparatoria', 'Licenciatura', 'Posgrado', 'Otro']
-  const CURRENCIES = ['MXN', 'USD', 'EUR']
+  const ORIGIN_SOURCES = Object.values(OriginSource)
+  const EDUCATION_LEVELS = Object.values(EducationLevel)
+  const CURRENCIES = Object.values(Currency)
   // Los campos adicionales se guardan en `WS_LEADS.additional_fields` (JSONB)
 
   const leadDisplayName = useCallback((lead: any) => {
@@ -73,18 +102,6 @@ export default function ProspectosFinalUltraPage() {
     const last = String(lead?.last_name || '').trim()
     const merged = `${name} ${last}`.trim()
     return merged || 'Sin nombre'
-  }, [])
-
-  const computeAgeFromBirthday = useCallback((birthdayISO: string) => {
-    // birthdayISO: YYYY-MM-DD
-    const b = new Date(`${birthdayISO}T00:00:00`)
-    if (Number.isNaN(b.getTime())) return null
-    const now = new Date()
-    let age = now.getFullYear() - b.getFullYear()
-    const m = now.getMonth() - b.getMonth()
-    if (m < 0 || (m === 0 && now.getDate() < b.getDate())) age -= 1
-    if (age < 0 || age > 120) return null
-    return age
   }, [])
 
   const parseTriBool = useCallback((v: FormDataEntryValue | null): boolean | null => {
@@ -103,12 +120,12 @@ export default function ProspectosFinalUltraPage() {
     if (isDiscardedLead(lead)) return 'Descartado'
 
     const stage = String(lead?.stage || '').trim()
-    if (PIPELINE_OPTIONS.includes(stage)) return stage
+    if ((PIPELINE_OPTIONS as readonly string[]).includes(stage)) return stage
 
     const normalizedStatus = normalizeText(lead?.status)
     if (normalizedStatus === 'ganado') return 'Ganado'
     if (normalizedStatus === 'nuevo') return 'Nuevo'
-    return 'Primer contacto'
+    return PipelineStage.PrimerContacto
   }, [isDiscardedLead, normalizeText, PIPELINE_OPTIONS])
 
   const getDiscardReason = useCallback((lead: any) => {
@@ -124,6 +141,38 @@ export default function ProspectosFinalUltraPage() {
       : {}
     return String(extra?.discard_stage || lead?.stage || '').trim()
   }, [])
+
+  // Sincronizar fecha de nacimiento y edad al abrir el modal (edad editable solo si no hay birthday)
+  useEffect(() => {
+    if (isModalOpen) {
+      const b = selectedLead?.birthday ?? ''
+      setFormBirthday(b)
+      const age =
+        selectedLead?.age != null
+          ? String(selectedLead.age)
+          : b
+            ? String(calculateAge(b) ?? '')
+            : ''
+      setFormAge(age)
+    }
+  }, [isModalOpen, selectedLead?.id, selectedLead?.birthday, selectedLead?.age])
+
+  useEffect(() => {
+    if (isModalOpen) {
+      const raw = String(selectedLead?.client_interests ?? '').trim()
+      setClientInterestsList(raw ? raw.split(/\n/).map((s) => s.trim()).filter(Boolean) : [])
+      setClientInterestInput('')
+    } else {
+      setClientInterestsList([])
+      setClientInterestInput('')
+      setEditingInterestIndex(null)
+      setEditingInterestDraft('')
+    }
+  }, [isModalOpen, selectedLead?.id, selectedLead?.client_interests])
+
+  useEffect(() => {
+    if (isModalOpen) setFormDirty(false)
+  }, [isModalOpen])
 
   useEffect(() => {
     if (!isModalOpen) return
@@ -191,7 +240,7 @@ export default function ProspectosFinalUltraPage() {
     if (newStatus === 'Descartado') {
       setDiscardModalLead(lead)
       setDiscardReason('')
-      setDiscardStage(STAGES.includes(lead?.stage) ? lead.stage : 'Primer contacto')
+      setDiscardStage(LEAD_FORM_STAGES.includes(lead?.stage) ? lead.stage : LeadFormStage.PrimerContacto)
       return
     }
 
@@ -260,11 +309,11 @@ export default function ProspectosFinalUltraPage() {
     )
     setDiscardModalLead(null)
     setDiscardReason('')
-    setDiscardStage('Primer contacto')
+    setDiscardStage(LeadFormStage.PrimerContacto)
     toast.success('Prospecto movido a descartados.')
   }
 
-  const reactivateLead = async (lead: any) => {
+  const reactivateLead = async (lead: any, stage: string) => {
     const prevExtra =
       lead?.additional_fields && typeof lead.additional_fields === 'object'
         ? lead.additional_fields
@@ -274,12 +323,12 @@ export default function ProspectosFinalUltraPage() {
       reactivated_at: new Date().toISOString(),
     }
 
-    const fallbackStage = STAGES.includes(lead?.stage) ? lead.stage : 'Primer contacto'
+    const targetStage = stage && (LEAD_FORM_STAGES as readonly string[]).includes(stage) ? stage : LeadFormStage.PrimerContacto
     const { error } = await supabaseClient
       .from(DATABASE.TABLES.WS_LEADS)
       .update({
         status: 'En seguimiento',
-        stage: fallbackStage,
+        stage: targetStage,
         additional_fields: nextExtra,
         updated_at: new Date().toISOString(),
       })
@@ -293,10 +342,12 @@ export default function ProspectosFinalUltraPage() {
     setLeads((prev) =>
       prev.map((l) =>
         l.id === lead.id
-          ? { ...l, status: 'En seguimiento', stage: fallbackStage, additional_fields: nextExtra }
+          ? { ...l, status: 'En seguimiento', stage: targetStage, additional_fields: nextExtra }
           : l
       )
     )
+    setReactivateModalLead(null)
+    setReactivateStage(LeadFormStage.PrimerContacto)
     toast.success('Prospecto reactivado y movido a activos.')
   }
 
@@ -332,12 +383,14 @@ export default function ProspectosFinalUltraPage() {
         : {}
 
     // 1. Insertar en clientes (WS_CUSTOMERS_2, schema alineado con Prospectos)
-    const { error: insertError } = await supabaseClient.from(DATABASE.TABLES.WS_CUSTOMERS_2).insert({
-      user_id: user.id,
-      name,
-      last_name: lead?.last_name || null,
-      status: lead?.status || 'nuevo',
-      source: lead?.source || null,
+    const { data: newCustomer, error: insertError } = await supabaseClient
+      .from(DATABASE.TABLES.WS_CUSTOMERS_2)
+      .insert({
+        user_id: user.id,
+        name,
+        last_name: lead?.last_name || null,
+        status: CustomerStatus.Activo,
+        source: lead?.source || null,
       insurance_type: lead?.insurance_type || null,
       estimated_value: lead?.estimated_value ?? null,
       email: lead?.email || null,
@@ -351,9 +404,16 @@ export default function ProspectosFinalUltraPage() {
       gender: lead?.gender || null,
       client_interests: lead?.client_interests || null,
       notes: lead?.notes || null,
+      country: lead?.country || null,
+      state: lead?.state || null,
+      city: lead?.city || null,
+      postal_code: lead?.postal_code || null,
+      address: lead?.address || null,
       // Marker so Metas/Analytics can measure conversions lead -> customer
-      additional_fields: { ...baseExtra, converted_from_lead_id: String(lead?.id || ''), converted_at: nowIso },
-    })
+        additional_fields: { ...baseExtra, converted_from_lead_id: String(lead?.id || ''), converted_at: nowIso },
+      })
+      .select('id')
+      .single()
 
     if (insertError) {
       toast.error("Error al convertir: " + insertError.message)
@@ -363,6 +423,7 @@ export default function ProspectosFinalUltraPage() {
       toast.success("¡FELICIDADES! Venta cerrada y movida a Clientes.")
       setIsModalOpen(false)
       fetchData()
+      if (newCustomer?.id) setConvertedCustomerId(newCustomer.id)
     }
     setLoading(false)
   }
@@ -379,7 +440,10 @@ export default function ProspectosFinalUltraPage() {
     const stage = String(formData.get('stage') || '').trim() || 'Primer contacto'
     const source = String(formData.get('source') || '').trim() || null
     const insuranceType = String(formData.get('insurance_type') || '').trim() || null
-    const clientInterests = String(formData.get('client_interests') || '').trim() || null
+    const clientInterests =
+      clientInterestsList.length > 0
+        ? clientInterestsList.map((s) => s.trim()).filter(Boolean).join('\n').trim() || null
+        : null
     const email = String(formData.get('email') || '').trim() || null
     const phone = String(formData.get('phone') || '').trim() || null
     const ocupation = String(formData.get('ocupation') || '').trim() || null
@@ -397,7 +461,7 @@ export default function ProspectosFinalUltraPage() {
     const ageRaw = String(formData.get('age') || '').trim()
     const age = ageRaw
       ? (Number.isFinite(parseInt(ageRaw, 10)) ? parseInt(ageRaw, 10) : null)
-      : (birthday ? computeAgeFromBirthday(birthday) : null)
+      : (birthday ? calculateAge(birthday) ?? null : null)
 
     const valueStr = String(formData.get('estimated_value') || '').trim()
     const estimatedValue = valueStr ? (Number.isFinite(parseFloat(valueStr)) ? parseFloat(valueStr) : null) : null
@@ -506,6 +570,7 @@ export default function ProspectosFinalUltraPage() {
       return
     } else {
       toast.success(selectedLead ? "Expediente actualizado" : "Prospecto registrado")
+      setFormDirty(false)
       setIsModalOpen(false)
       fetchData()
     }
@@ -533,7 +598,18 @@ export default function ProspectosFinalUltraPage() {
     if (discardReasonFilter === '__none__') return discardedLeads.filter((l) => !getDiscardReason(l))
     return discardedLeads.filter((l) => getDiscardReason(l) === discardReasonFilter)
   }, [discardedLeads, discardReasonFilter, getDiscardReason])
-  const visibleLeads = activeTab === 'activos' ? activeLeads : discardedLeadsFilteredByReason
+  const baseListForStage = useMemo(() => {
+    if (activeTab === 'descartados') return discardedLeadsFilteredByReason
+    if (includeDiscarded) return [...activeLeads, ...discardedLeadsFilteredByReason]
+    return activeLeads
+  }, [activeTab, includeDiscarded, activeLeads, discardedLeadsFilteredByReason])
+  const visibleLeads = useMemo(() => {
+    if (stageFilter === '__all__') return baseListForStage
+    return baseListForStage.filter((lead) => {
+      const stage = activeTab === 'activos' ? resolveVisualStatus(lead) : (lead?.stage ?? getDiscardStage(lead))
+      return stage === stageFilter
+    })
+  }, [activeTab, baseListForStage, stageFilter, resolveVisualStatus, getDiscardStage])
 
   return (
     <div className="space-y-10 pb-20 p-6 max-w-[1400px] mx-auto bg- min-h-screen">
@@ -563,7 +639,7 @@ export default function ProspectosFinalUltraPage() {
       <div className="bg-white/70 backdrop-blur-sm p-6 rounded-[2rem] flex flex-wrap gap-8 items-center border border-black/5">
         <div className="flex items-center gap-2 border-r border-black/10 pr-6">
             <Info size={18} className="text-black" />
-            <span className="text-[12px] font-black text-black uppercase italic">Estatus del pipeline:</span>
+            <span className="text-base font-black text-black uppercase italic">Estatus del pipeline:</span>
         </div>
         {PIPELINE_OPTIONS.map((s) => (
             <div key={s} className="flex items-center gap-2">
@@ -571,7 +647,7 @@ export default function ProspectosFinalUltraPage() {
                   className="w-5 h-5 rounded-full border-2"
                   style={{ backgroundColor: PIPELINE_COLOR_MAP[s]?.badge, borderColor: PIPELINE_COLOR_MAP[s]?.border }}
                 />
-                <span className="text-[11px] font-black text-black uppercase tracking-tighter">{s}</span>
+                <span className="text-sm font-black text-black uppercase tracking-tighter">{s}</span>
             </div>
         ))}
       </div>
@@ -591,30 +667,69 @@ export default function ProspectosFinalUltraPage() {
         </button>
       </div>
 
-      <div className="bg-white p-2 rounded-[1.5rem] inline-flex items-center gap-2 border border-black/5 shadow-sm">
-        <button
-          type="button"
-          onClick={() => setActiveTab('activos')}
-          className={`px-6 py-3 rounded-[1rem] text-[11px] font-black uppercase tracking-widest transition-all ${
-            activeTab === 'activos' ? 'bg-black text-white' : 'text-black/60 hover:bg-black/5'
-          }`}
-        >
-          Prospectos activos ({activeLeads.length})
-        </button>
-        <button
-          type="button"
-          onClick={() => setActiveTab('descartados')}
-          className={`px-6 py-3 rounded-[1rem] text-[11px] font-black uppercase tracking-widest transition-all ${
-            activeTab === 'descartados' ? 'bg-red-600 text-white' : 'text-black/60 hover:bg-black/5'
-          }`}
-        >
-          Prospectos descartados ({discardedLeads.length})
-        </button>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div className="bg-white p-2 rounded-[1.5rem] inline-flex items-center gap-2 border border-black/5 shadow-sm">
+          <button
+            type="button"
+            onClick={() => setActiveTab('activos')}
+            className={`px-6 py-3 rounded-[1rem] text-sm font-black uppercase tracking-widest transition-all ${
+              activeTab === 'activos' ? 'bg-black text-white' : 'text-black/60 hover:bg-black/5'
+            }`}
+          >
+            Prospectos activos ({activeLeads.length})
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('descartados')}
+            className={`px-6 py-3 rounded-[1rem] text-sm font-black uppercase tracking-widest transition-all ${
+              activeTab === 'descartados' ? 'bg-red-600 text-white' : 'text-black/60 hover:bg-black/5'
+            }`}
+          >
+            Prospectos descartados ({discardedLeads.length})
+          </button>
+        </div>
+        <div className="flex flex-wrap items-center gap-4">
+          <RefreshButton onRefresh={fetchData} refreshing={fetching} />
+          {activeTab === 'activos' && (
+            <div className="flex items-center gap-2 mr-5">
+              <span className="text-sm font-black uppercase tracking-widest text-black/70 whitespace-nowrap">Incluir descartados</span>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={includeDiscarded}
+                onClick={() => setIncludeDiscarded((v) => !v)}
+                className={`relative inline-flex h-7 w-12 shrink-0 rounded-full border-2 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-(--accents) focus-visible:ring-offset-2 ${
+                  includeDiscarded ? 'bg-(--accents) border-(--accents)' : 'bg-black/10 border-black/20'
+                }`}
+              >
+                <span
+                  className={`pointer-events-none inline-block h-6 w-6 rounded-full bg-white shadow-sm ring-0 transition-transform ${
+                    includeDiscarded ? 'translate-x-6' : 'translate-x-0.5'
+                  }`}
+                  style={{ marginTop: 2 }}
+                />
+              </button>
+            </div>
+          )}
+          <div className="flex items-center gap-2">
+            <label className="text-sm font-black uppercase tracking-widest text-black/70 whitespace-nowrap">Etapa</label>
+            <select
+              value={stageFilter}
+              onChange={(e) => setStageFilter(e.target.value)}
+              className="bg-white border-2 border-black/10 rounded-xl px-4 py-3 text-sm font-black uppercase tracking-wide text-black outline-none focus:border-(--accents) min-w-[200px] cursor-pointer"
+            >
+              <option value="__all__">Todas las etapas</option>
+              {PIPELINE_OPTIONS.map((stage) => (
+                <option key={stage} value={stage}>{stage}</option>
+              ))}
+            </select>
+          </div>
+        </div>
       </div>
 
       {activeTab === 'descartados' && (
         <div className="bg-white p-4 rounded-[1.5rem] border border-red-100 shadow-sm flex flex-col md:flex-row md:items-center gap-3">
-          <label className="text-[11px] font-black uppercase tracking-widest text-red-700">Filtrar por motivo</label>
+          <label className="text-sm font-black uppercase tracking-widest text-red-700">Filtrar por motivo</label>
           <select
             value={discardReasonFilter}
             onChange={(e) => setDiscardReasonFilter(e.target.value)}
@@ -636,14 +751,14 @@ export default function ProspectosFinalUltraPage() {
           const visualStatus = resolveVisualStatus(lead)
           const tone = PIPELINE_COLOR_MAP[visualStatus] || PIPELINE_COLOR_MAP['Nuevo']
           return (
-          <div key={lead.id} className="bg-white p-8 rounded-[3rem] border-2 flex flex-wrap items-center gap-8 group transition-all shadow-md" style={{ borderColor: tone.border, backgroundColor: tone.bg }}>
+          <div key={lead.id} className="p-8 rounded-[3rem] border-2 flex flex-wrap items-center gap-8 group transition-all shadow-md" style={{ borderColor: tone.border, backgroundColor: activeTab === 'descartados' ? '#ffffff' : tone.bg }}>
             <div className="flex-1 min-w-[300px] cursor-pointer" onClick={() => {setSelectedLead(lead); setIsModalOpen(true)}}>
               <h4 className="font-black text-black text-2xl uppercase italic transition-colors tracking-tighter" style={{ color: tone.text }}>{leadDisplayName(lead)}</h4>
               <div className="flex flex-wrap gap-4 mt-2">
-                <span className="flex items-center gap-1 text-[11px] font-black text-black/40 uppercase italic tracking-wider"><Share2 size={12}/> {lead.source || 'Sin Fuente'}</span>
-                <span className="flex items-center gap-1 text-[11px] font-black text-black/40 uppercase italic tracking-wider"><Mail size={12}/> {lead.email || 'Sin Email'}</span>
-                <span className="flex items-center gap-1 text-[11px] font-black text-(--accents) uppercase italic tracking-wider"><Phone size={12}/> {lead.phone || 'Sin Tel.'}</span>
-                <span className="px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest" style={{ backgroundColor: tone.badge, color: tone.text }}>
+                <span className="flex items-center gap-1 text-sm font-black text-black/40 uppercase italic tracking-wider"><Share2 size={12}/> {lead.source || 'Sin Fuente'}</span>
+                <span className="flex items-center gap-1 text-sm font-black text-black/40 uppercase italic tracking-wider"><Mail size={12}/> {lead.email || 'Sin Email'}</span>
+                <span className="flex items-center gap-1 text-sm font-black text-(--accents) uppercase italic tracking-wider"><Phone size={12}/> {lead.phone || 'Sin Tel.'}</span>
+                <span className="px-3 py-1 rounded-full text-sm font-black uppercase tracking-widest" style={{ backgroundColor: tone.badge, color: tone.text }}>
                   {visualStatus}
                 </span>
               </div>
@@ -660,7 +775,7 @@ export default function ProspectosFinalUltraPage() {
             </div>
 
             <div className="bg-white p-5 rounded-[2rem] border border-black/10 min-w-[280px]">
-              <p className="text-[10px] font-black text-black/50 uppercase tracking-widest mb-2">Estatus</p>
+              <p className="text-[10px] font-black text-black/50 uppercase tracking-widest mb-2">Etapa</p>
               <div>
                 <select
                   value={visualStatus}
@@ -682,8 +797,15 @@ export default function ProspectosFinalUltraPage() {
               {activeTab === 'descartados' && (
                 <button
                   type="button"
-                  onClick={() => reactivateLead(lead)}
-                  className="px-5 py-3 rounded-2xl bg-emerald-600 text-white font-black text-[10px] uppercase tracking-widest hover:bg-emerald-700 transition-all"
+                  onClick={() => {
+                    const currentStage = lead?.stage
+                    const validStage = currentStage && LEAD_FORM_STAGES.filter((s) => s !== LeadFormStage.Otro).includes(currentStage)
+                      ? currentStage
+                      : LeadFormStage.PrimerContacto
+                    setReactivateStage(validStage)
+                    setReactivateModalLead(lead)
+                  }}
+                  className="px-5 py-3 rounded-2xl bg-emerald-600 text-white font-black text-sm uppercase tracking-widest hover:bg-emerald-700 transition-all"
                 >
                   Reactivar
                 </button>
@@ -714,17 +836,29 @@ export default function ProspectosFinalUltraPage() {
                 transition={{ type: 'spring', damping: 25 }}
                 className="w-full max-w-7xl bg-[#ece7e2] shadow-2xl rounded-[2.5rem] overflow-hidden border border-white/20"
               >
-                <div className="p-8 md:p-10 bg-white flex justify-between items-center border-b-2 border-black/5 shadow-sm">
+                <div className="p-8 md:p-10 bg-white flex flex-wrap justify-between items-center gap-4 border-b-2 border-black/5 shadow-sm">
                   <div>
                     <h3 className="text-3xl font-black italic text-black uppercase tracking-tighter">{selectedLead ? 'Expediente' : 'Nuevo prospecto'}</h3>
-                    <p className="text-[11px] font-bold text-black/50 uppercase tracking-widest mt-1">
+                    <p className="text-xs font-bold text-black/50 uppercase tracking-widest mt-1">
                       Captura rápida, clara y completa.
                     </p>
                   </div>
-                  <button onClick={() => setIsModalOpen(false)} className="p-3 hover:bg-gray-100 rounded-full text-black transition-all"><X size={32}/></button>
+                  <div className="flex items-center gap-2">
+                    {selectedLead && (
+                      <button
+                        type="button"
+                        disabled={!formDirty || loading}
+                        onClick={() => formRef.current?.requestSubmit()}
+                        className="px-5 py-3 rounded-2xl bg-(--accents) text-white font-black text-sm uppercase tracking-wide shadow-md hover:opacity-95 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
+                      >
+                        {loading ? <Loader2 className="animate-spin" size={20} /> : 'Guardar cambios'}
+                      </button>
+                    )}
+                    <button onClick={() => setIsModalOpen(false)} className="p-3 hover:bg-gray-100 rounded-full text-black transition-all" aria-label="Cerrar"><X size={32}/></button>
+                  </div>
                 </div>
 
-                <form onSubmit={handleSaveLead} className="max-h-[80vh] overflow-y-auto p-8 md:p-10 space-y-8 custom-scrollbar">
+                <form ref={formRef} onSubmit={handleSaveLead} onChange={() => setFormDirty(true)} className="max-h-[80vh] overflow-y-auto p-8 md:p-10 space-y-8 custom-scrollbar">
                 
                 {/* BOTÓN CONVERTIR - RESTABLECIDO */}
                 {selectedLead && (
@@ -778,11 +912,15 @@ export default function ProspectosFinalUltraPage() {
                     </div>
 
                     <div className="space-y-2">
-                      <label className="text-[12px] font-black uppercase text-black italic">WhatsApp / Tel (opcional)</label>
+                      <label className="text-[12px] font-black uppercase text-black italic">WhatsApp / Tel</label>
                       <input
                         name="phone"
                         defaultValue={selectedLead?.phone || ''}
                         placeholder="+52..."
+                        maxLength={12}
+                        inputMode="numeric"
+                        autoComplete="tel"
+                        onInput={(e) => { const v = e.currentTarget.value.replace(/\D/g, '').slice(0, 12); e.currentTarget.value = v; }}
                         className="w-full bg-[#ece7e2] p-5 rounded-2xl font-black text-black text-lg outline-none"
                       />
                     </div>
@@ -851,9 +989,10 @@ export default function ProspectosFinalUltraPage() {
                         <label className="text-[12px] font-black uppercase text-black italic">Origen</label>
                         <SelectWithOther
                           name="source"
-                          options={SOURCES}
+                          options={ORIGIN_SOURCES}
                           defaultValue={selectedLead?.source || ''}
                           emptyOption="Selecciona una opción..."
+                          otherOptionValue="Personalizado"
                           className="w-full bg-[#ece7e2] p-5 rounded-2xl font-black text-black text-lg outline-none appearance-none cursor-pointer"
                         />
                       </div>
@@ -897,8 +1036,8 @@ export default function ProspectosFinalUltraPage() {
                         <label className="text-[12px] font-black uppercase text-(--accents) italic">Etapa</label>
                         <SelectWithOther
                           name="stage"
-                          options={STAGES}
-                          defaultValue={selectedLead?.stage || 'Primer contacto'}
+                          options={LEAD_FORM_STAGES}
+                          defaultValue={selectedLead?.stage || LeadFormStage.PrimerContacto}
                           className="w-full bg-white p-5 rounded-2xl font-black text-black text-lg outline-none appearance-none cursor-pointer"
                         />
                       </div>
@@ -907,24 +1046,31 @@ export default function ProspectosFinalUltraPage() {
                     <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-black/5 space-y-6">
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="space-y-2">
-                          <label className="text-[12px] font-black uppercase text-black italic">Cumpleaños (opcional)</label>
+                          <label className="text-[12px] font-black uppercase text-black italic">Cumpleaños</label>
                           <input
                             name="birthday"
                             type="date"
-                            defaultValue={selectedLead?.birthday || ''}
+                            value={formBirthday}
+                            onChange={(e) => {
+                              const v = e.target.value
+                              setFormBirthday(v)
+                              setFormAge(v ? String(calculateAge(v) ?? '') : '')
+                            }}
                             className="w-full bg-[#ece7e2] p-5 rounded-2xl font-black text-black text-lg outline-none"
                           />
                         </div>
                         <div className="space-y-2">
-                          <label className="text-[12px] font-black uppercase text-black italic">Edad (opcional)</label>
+                          <label className="text-[12px] font-black uppercase text-black italic">Edad</label>
                           <input
                             name="age"
                             type="number"
-                            defaultValue={selectedLead?.age ?? ''}
-                            placeholder="Ej. 32"
+                            value={formAge}
+                            onChange={(e) => { const v = e.target.value; const n = v === '' ? '' : Math.min(99, Math.max(0, parseInt(v, 10) || 0)).toString(); setFormAge(n); }}
+                            readOnly={!!formBirthday}
+                            placeholder={formBirthday ? '' : 'Ej. 32 (editable si no hay fecha)'}
                             min={0}
-                            max={120}
-                            className="w-full bg-[#ece7e2] p-5 rounded-2xl font-black text-black text-lg outline-none"
+                            max={99}
+                            className={`w-full p-5 rounded-2xl font-black text-black text-lg outline-none ${formBirthday ? 'bg-gray-100 cursor-not-allowed' : 'bg-[#ece7e2]'}`}
                           />
                         </div>
                       </div>
@@ -953,28 +1099,134 @@ export default function ProspectosFinalUltraPage() {
                       </div>
 
                       <div className="space-y-2">
-                        <label className="text-[12px] font-black uppercase text-black italic">Intereses del cliente</label>
+                        <label className="text-[12px] font-black uppercase text-black italic">Notas / Bitácora</label>
                         <textarea
-                          name="client_interests"
-                          defaultValue={selectedLead?.client_interests || ''}
-                          rows={3}
+                          name="notes"
+                          defaultValue={selectedLead?.notes || ''}
+                          rows={4}
                           className="w-full bg-[#ece7e2] p-6 rounded-2xl font-black text-black text-base outline-none resize-none placeholder:text-black/20"
-                          placeholder="Ej. Hobbies, deportes, preferencias..."
+                          placeholder="Escribe aquí acuerdos, próximos pasos y contexto..."
                         />
                       </div>
                     </div>
                   </div>
                 </div>
 
-                <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-black/5 space-y-4">
-                  <label className="text-[12px] font-black uppercase text-black italic">Notas / Bitácora</label>
-                  <textarea
-                    name="notes"
-                    defaultValue={selectedLead?.notes || ''}
-                    rows={5}
-                    className="w-full bg-[#ece7e2] p-6 rounded-2xl font-black text-black text-base outline-none resize-none placeholder:text-black/20"
-                    placeholder="Escribe aquí acuerdos, próximos pasos y contexto..."
-                  />
+                <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border-2 border-(--accents)/20 space-y-4">
+                  <div>
+                    <label className="text-base font-black uppercase text-(--accents) italic">Intereses del cliente</label>
+                    <p className="text-sm text-black/60 mt-1.5 max-w-xl">
+                      Estos datos ayudan a nuestro asistente de IA a personalizar la conversación y ofrecer mejores recomendaciones. Escribe palabras, enunciados o párrafos (por ejemplo: &quot;Quiere asegurar a su familia&quot;, &quot;Le gusta el teatro&quot;) y agrégalos con Enter o el botón.
+                    </p>
+                  </div>
+                  <div className="space-y-3">
+                    <div className="flex flex-col sm:flex-row gap-2">
+                      <input
+                        type="text"
+                        value={clientInterestInput}
+                        onChange={(e) => setClientInterestInput(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault()
+                            const v = clientInterestInput.trim()
+                            if (v) {
+                              setClientInterestsList((prev) => [...prev, v])
+                              setClientInterestInput('')
+                            }
+                          }
+                        }}
+                        placeholder="Escribe hobbies, preferencias, etc... Presiona Enter para agregar."
+                        className="flex-1 bg-[#ece7e2] p-5 rounded-2xl font-black text-black text-base outline-none placeholder:text-black/30 border-2 border-transparent focus:border-(--accents)"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const v = clientInterestInput.trim()
+                          if (v) {
+                            setClientInterestsList((prev) => [...prev, v])
+                            setClientInterestInput('')
+                          }
+                        }}
+                        className="px-6 py-5 rounded-2xl bg-(--accents) text-white font-black text-sm uppercase tracking-wide hover:opacity-95 transition-opacity shrink-0"
+                      >
+                        Agregar
+                      </button>
+                    </div>
+                    {clientInterestsList.length > 0 && (
+                      <ul className="list-disc list-outside space-y-3 mt-4 pl-6 text-black font-bold text-sm [list-style-type:disc]">
+                        {clientInterestsList.map((item, i) => (
+                          <li key={`${i}-${item.slice(0, 30)}`} className="pl-1">
+                            {editingInterestIndex === i ? (
+                              <div className="flex flex-col gap-2">
+                                <textarea
+                                  value={editingInterestDraft}
+                                  onChange={(e) => setEditingInterestDraft(e.target.value)}
+                                  rows={4}
+                                  className="w-full bg-[#ece7e2] p-4 rounded-xl font-black text-black text-sm outline-none resize-y border-2 border-(--accents)"
+                                  placeholder="Edita el enunciado o párrafo..."
+                                />
+                                <div className="flex gap-2">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const v = editingInterestDraft.trim()
+                                      if (v) {
+                                        setClientInterestsList((prev) => prev.map((s, j) => (j === i ? v : s)))
+                                      } else {
+                                        setClientInterestsList((prev) => prev.filter((_, j) => j !== i))
+                                      }
+                                      setEditingInterestIndex(null)
+                                      setEditingInterestDraft('')
+                                    }}
+                                    className="px-4 py-2 rounded-xl bg-(--accents) text-white font-black text-xs uppercase"
+                                  >
+                                    Guardar
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setEditingInterestIndex(null)
+                                      setEditingInterestDraft('')
+                                    }}
+                                    className="px-4 py-2 rounded-xl border border-black/20 text-black font-black text-xs uppercase hover:bg-black/5"
+                                  >
+                                    Cancelar
+                                  </button>
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="flex items-start gap-2">
+                                <span className="flex-1 min-w-0">{item}</span>
+                                <div className="flex items-center gap-1 shrink-0">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setEditingInterestIndex(i)
+                                      setEditingInterestDraft(item)
+                                    }}
+                                    className="p-2 rounded-lg text-black/50 hover:text-(--accents) hover:bg-(--accents)/10 transition-colors"
+                                    aria-label="Editar"
+                                    title="Editar"
+                                  >
+                                    <Edit3 size={18} />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => setClientInterestsList((prev) => prev.filter((_, j) => j !== i))}
+                                    className="p-2 rounded-lg text-black/50 hover:text-red-600 hover:bg-red-50 transition-colors"
+                                    aria-label="Quitar"
+                                    title="Quitar"
+                                  >
+                                    <X size={18} />
+                                  </button>
+                                </div>
+                              </div>
+                            )}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
                 </div>
 
                 <details className="group bg-white p-8 rounded-[2.5rem] shadow-sm border border-black/5">
@@ -1041,6 +1293,7 @@ export default function ProspectosFinalUltraPage() {
                           name="economic_dependents"
                           type="number"
                           min={0}
+                          max={99}
                           value={additionalForm.economic_dependents}
                           onChange={(e) => setAdditionalForm((p) => ({ ...p, economic_dependents: e.target.value }))}
                           placeholder="Ej. 2"
@@ -1190,12 +1443,13 @@ export default function ProspectosFinalUltraPage() {
                                     <input
                                       value={child.age}
                                       onChange={(e) => {
-                                        const v = e.target.value
-                                        setChildren((prev) => prev.map((c, i) => (i === idx ? { ...c, age: v } : c)))
+                                        const v = e.target.value.replace(/\D/g, '').slice(0, 2)
+                                        const n = v === '' ? v : String(Math.min(99, parseInt(v, 10) || 0))
+                                        setChildren((prev) => prev.map((c, i) => (i === idx ? { ...c, age: n } : c)))
                                       }}
-                                      type="number"
-                                      min={0}
-                                      max={120}
+                                      type="text"
+                                      inputMode="numeric"
+                                      maxLength={2}
                                       placeholder="Ej. 8"
                                       className="w-full bg-[#ece7e2] p-4 rounded-2xl font-black text-black text-base outline-none"
                                     />
@@ -1263,7 +1517,7 @@ export default function ProspectosFinalUltraPage() {
                 <div className="p-6 bg-[#fef2f2] border-b border-red-100 flex items-center justify-between">
                   <div>
                     <h3 className="text-2xl font-black italic text-red-700 uppercase tracking-tighter">Descartar prospecto</h3>
-                    <p className="text-[11px] font-bold text-red-700/70 uppercase tracking-widest mt-1">
+                    <p className="text-sm font-bold text-red-700/70 uppercase tracking-widest mt-1">
                       {leadDisplayName(discardModalLead)}
                     </p>
                   </div>
@@ -1274,7 +1528,7 @@ export default function ProspectosFinalUltraPage() {
 
                 <div className="p-6 space-y-5">
                   <div className="space-y-2">
-                    <label className="text-[11px] font-black uppercase text-black italic">¿Cuál fue el motivo por el cual no continuó?</label>
+                    <label className="text-sm font-black uppercase text-black italic">¿Cuál fue el motivo por el cual no continuó?</label>
                     <textarea
                       value={discardReason}
                       onChange={(e) => setDiscardReason(e.target.value)}
@@ -1284,13 +1538,13 @@ export default function ProspectosFinalUltraPage() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <label className="text-[11px] font-black uppercase text-black italic">¿En qué etapa se quedó?</label>
+                    <label className="text-sm font-black uppercase text-black italic">¿En qué etapa se quedó?</label>
                     <select
                       value={discardStage}
-                      onChange={(e) => setDiscardStage(e.target.value)}
+                      onChange={(e) => setDiscardStage(e.target.value as LeadFormStage)}
                       className="w-full bg-[#fff7f7] p-4 rounded-2xl font-black text-black text-sm outline-none border border-red-100 appearance-none cursor-pointer"
                     >
-                      {STAGES.filter((stage) => stage !== 'Otro').map((stage) => (
+                      {LEAD_FORM_STAGES.filter((stage) => stage !== LeadFormStage.Otro).map((stage) => (
                         <option key={stage} value={stage}>{stage}</option>
                       ))}
                     </select>
@@ -1310,6 +1564,136 @@ export default function ProspectosFinalUltraPage() {
                       className="px-6 py-3 rounded-2xl bg-red-600 text-white font-black text-xs uppercase tracking-widest hover:bg-red-700 transition-all"
                     >
                       Confirmar descarte
+                    </button>
+                  </div>
+                </div>
+              </motion.div>
+            </div>
+          </>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {reactivateModalLead && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setReactivateModalLead(null)}
+              className="fixed inset-0 bg-black/60 backdrop-blur-md z-[80]"
+            />
+            <div className="fixed inset-0 z-[90] flex items-center justify-center p-4">
+              <motion.div
+                role="dialog"
+                aria-modal="true"
+                initial={{ opacity: 0, scale: 0.97 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.98 }}
+                transition={{ type: 'spring', damping: 25 }}
+                onClick={(e) => e.stopPropagation()}
+                className="w-full max-w-md bg-white shadow-2xl rounded-2xl overflow-hidden border border-black/10 p-6"
+              >
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-xl font-black italic text-black uppercase tracking-tighter">Reactivar prospecto</h3>
+                  <button onClick={() => setReactivateModalLead(null)} className="p-2 hover:bg-black/5 rounded-full text-black/60 transition-colors" aria-label="Cerrar">
+                    <X size={22} />
+                  </button>
+                </div>
+                <p className="text-sm text-black/60 mb-4">
+                  Elige en qué etapa del pipeline quieres que aparezca al reactivar.
+                </p>
+                <div className="space-y-2 mb-6">
+                  <label className="text-sm font-black uppercase text-black italic">Etapa</label>
+                  <select
+                    value={reactivateStage}
+                    onChange={(e) => setReactivateStage(e.target.value)}
+                    className="w-full bg-[#ece7e2] p-4 rounded-2xl font-black text-black text-sm outline-none border-2 border-transparent focus:border-(--accents) appearance-none cursor-pointer"
+                  >
+                    {LEAD_FORM_STAGES.filter((s) => s !== LeadFormStage.Otro).map((stage) => (
+                      <option key={stage} value={stage}>{stage}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="flex justify-end gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setReactivateModalLead(null)}
+                    className="px-5 py-3 rounded-2xl border border-black/10 text-black/70 font-black text-sm uppercase tracking-widest hover:bg-black/5 transition-all"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => reactivateLead(reactivateModalLead, reactivateStage)}
+                    className="px-6 py-3 rounded-2xl bg-emerald-600 text-white font-black text-sm uppercase tracking-widest hover:bg-emerald-700 transition-all"
+                  >
+                    Reactivar
+                  </button>
+                </div>
+              </motion.div>
+            </div>
+          </>
+        )}
+      </AnimatePresence>
+
+      {/* Modal: Prospecto convertido en cliente — Ir a cliente / Capturar póliza / Volver */}
+      <AnimatePresence>
+        {convertedCustomerId && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setConvertedCustomerId(null)}
+              className="fixed inset-0 bg-black/60 backdrop-blur-md z-[60]"
+            />
+            <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
+              <motion.div
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="convert-success-title"
+                initial={{ opacity: 0, scale: 0.97 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.98 }}
+                onClick={(e) => e.stopPropagation()}
+                className="w-full max-w-md bg-white rounded-[2rem] shadow-2xl border border-black/5 overflow-hidden"
+              >
+                <div className="p-8 text-center">
+                  <div className="mx-auto w-14 h-14 rounded-full bg-emerald-100 flex items-center justify-center mb-4">
+                    <CheckCircle2 className="text-emerald-600" size={28} />
+                  </div>
+                  <h3 id="convert-success-title" className="text-xl font-black text-black uppercase tracking-tighter mb-2">
+                    ¡Venta cerrada!
+                  </h3>
+                  <p className="text-sm text-black/60 mb-6">El prospecto ya es cliente. ¿Qué deseas hacer ahora?</p>
+                  <div className="flex flex-col gap-3">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        router.push(`/clientes?openId=${convertedCustomerId}`)
+                        setConvertedCustomerId(null)
+                      }}
+                      className="flex items-center justify-center gap-2 px-6 py-4 rounded-xl font-black text-sm uppercase bg-black text-white hover:bg-black/90 transition-all"
+                    >
+                      <User size={18} /> Ir a actualizar información del cliente
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        router.push(`/polizas?customerId=${convertedCustomerId}`)
+                        setConvertedCustomerId(null)
+                      }}
+                      className="flex items-center justify-center gap-2 px-6 py-4 rounded-xl font-black text-sm uppercase border-2 border-black/20 text-black hover:bg-black/5 transition-all"
+                    >
+                      <FileCheck size={18} /> Capturar póliza
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setConvertedCustomerId(null)}
+                      className="px-6 py-4 rounded-xl font-black text-sm uppercase text-black/60 hover:bg-black/5 transition-all"
+                    >
+                      Volver a prospectos
                     </button>
                   </div>
                 </div>
