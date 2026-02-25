@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
+import React, { Suspense, useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Currency, CustomerStatus, DATABASE, EducationLevel, Gender, InsuranceType, MaritalStatus, OriginSource } from '@/src/config'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -41,7 +41,7 @@ function formatDate(value: string | null | undefined): string {
   }
 }
 
-export default function ClientesPage() {
+function ClientesPageContent() {
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [selectedCustomer, setSelectedCustomer] = useState<any>(null)
   const [detailCustomer, setDetailCustomer] = useState<any>(null)
@@ -1240,6 +1240,20 @@ export default function ClientesPage() {
         )}
       </AnimatePresence>
     </div>
+  )
+}
+
+export default function ClientesPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex items-center justify-center min-h-[60vh]">
+          <Loader2 className="h-8 w-8 animate-spin text-black/40" />
+        </div>
+      }
+    >
+      <ClientesPageContent />
+    </Suspense>
   )
 }
 

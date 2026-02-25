@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react'
+import React, { Suspense, useState, useEffect, useCallback, useMemo } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { AnimatePresence } from 'framer-motion'
 import { Search, Plus, Loader2, Filter, X, Settings2, ChevronUp, ChevronDown, Settings } from 'lucide-react'
@@ -25,7 +25,7 @@ import { PolicyCaptureModal } from '@/src/components/workspace/polizas/PolicyCap
 import { RefreshButton } from '@/src/components/workspace/RefreshButton' 
 // Nota: Ya no importamos CustomerOption de aquí
 
-export default function PolizasPage() {
+function PolizasPageContent() {
   const searchParams = useSearchParams()
   const router = useRouter()
 
@@ -499,5 +499,19 @@ export default function PolizasPage() {
         onSuccess={handleModalSuccess}
       />
     </div>
+  )
+}
+
+export default function PolizasPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex items-center justify-center min-h-[60vh]">
+          <Loader2 className="h-8 w-8 animate-spin text-black/40" />
+        </div>
+      }
+    >
+      <PolizasPageContent />
+    </Suspense>
   )
 }
