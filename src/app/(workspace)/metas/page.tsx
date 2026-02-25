@@ -38,6 +38,8 @@ type GoalRow = {
   metric: GoalMetric
   format: GoalFormat
   target_value: number
+  /** Aporte manual que se suma al valor calculado (ej. +1 por "Actualizar manualmente"). */
+  manual_additions?: number | null
   period_type: GoalPeriod
   month_year: string | null
   start_at: string | null
@@ -213,6 +215,8 @@ export default function MetasPage() {
 
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editing, setEditing] = useState<GoalRow | null>(null)
+  const [savingManual, setSavingManual] = useState(false)
+  const [manualModalGoalId, setManualModalGoalId] = useState<string | null>(null)
 
   const nowMonth = useMemo(() => new Date().toISOString().slice(0, 7), [])
 
@@ -395,6 +399,25 @@ export default function MetasPage() {
     }
   }, [fetchGoals])
 
+  /** +1 al aporte manual de la meta (ej. "Actualizar manualmente" en llamadas). */
+  const addManualOne = useCallback(async (g: GoalRow) => {
+    setSavingManual(true)
+    try {
+      const current = safeNumber(g.manual_additions)
+      const { error } = await supabaseClient
+        .from(DATABASE.TABLES.WS_GOALS)
+        .update({ manual_additions: current + 1 })
+        .eq("id", g.id)
+      if (error) throw error
+      await fetchGoals({ silent: true })
+      toast.success("+1 registrado")
+    } catch (e: any) {
+      toast.error("No se pudo actualizar", { description: String(e?.message || e || "Error desconocido") })
+    } finally {
+      setSavingManual(false)
+    }
+  }, [fetchGoals])
+
   const templates = useMemo(
     () => [
       {
@@ -495,9 +518,11 @@ export default function MetasPage() {
             {goals.map((g) => {
               const meta = metricMeta(g.metric)
               const pr = progress[g.id]
-              const current = pr?.current ?? 0
-              const pct = pr?.pct ?? 0
+              const computedCurrent = pr?.current ?? 0
+              const manualAdditions = safeNumber(g.manual_additions)
+              const effectiveCurrent = computedCurrent + manualAdditions
               const target = safeNumber(g.target_value)
+              const effectivePct = target > 0 ? clampPct((effectiveCurrent / target) * 100) : 0
 
               const periodLabel = (() => {
                 if (g.period_type === "month") return g.month_year ? `Mes: ${g.month_year}` : "Mensual"
@@ -506,8 +531,9 @@ export default function MetasPage() {
               })()
 
               const Icon = meta.icon
-              const barWidth = `${Math.min(100, pct)}%`
-              const done = target > 0 && current >= target
+              const barWidth = `${Math.min(100, effectivePct)}%`
+              const done = target > 0 && effectiveCurrent >= target
+              const showBreakdown = manualAdditions > 0
 
               return (
                 <div
@@ -567,26 +593,56 @@ export default function MetasPage() {
                     </div>
                   </div>
 
-                  <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-6 items-center">
-                    <div className="md:col-span-2">
-                      <div className="h-4 rounded-full bg-gray-100 overflow-hidden">
-                        <div className="h-full bg-(--accents) rounded-full transition-all" style={{ width: barWidth }} />
+                  <div className="mt-8 grid grid-cols-1 md:grid-cols-12 gap-6 items-center">
+                    {/* Porcentaje muy visible */}
+                    <div className="md:col-span-4 flex flex-col items-center justify-center">
+                      <div
+                        className={`relative w-28 h-28 rounded-full flex items-center justify-center border-4 transition-all ${
+                          done
+                            ? "border-green-500 bg-green-50 text-green-700"
+                            : effectivePct >= 75
+                              ? "border-(--accents) bg-(--accents)/10 text-(--accents)"
+                              : "border-black/10 bg-gray-50 text-black"
+                        }`}
+                      >
+                        <span className="text-3xl font-black tabular-nums">
+                          {effectivePct.toFixed(0)}
+                          <span className="text-lg font-black opacity-80">%</span>
+                        </span>
                       </div>
-                      <div className="flex items-center justify-between mt-3">
-                        <p className="text-[10px] font-black uppercase tracking-widest text-black/40">Avance</p>
-                        <p className="text-[10px] font-black uppercase tracking-widest text-black">
-                          {clampPct(pct).toFixed(0)}%
+                      <p className="text-[10px] font-black uppercase tracking-widest text-black/50 mt-2">Avance</p>
+                    </div>
+
+                    {/* Botón Actualizar manualmente + Barra + Actual/Objetivo */}
+                    <div className="md:col-span-8 space-y-4">
+                      <div className="flex items-center gap-3 flex-wrap">
+                        <button
+                          type="button"
+                          onClick={() => setManualModalGoalId(g.id)}
+                          className="inline-flex items-center gap-2 px-4 py-3 rounded-2xl bg-(--accents)/10 border border-(--accents)/30 text-(--accents) font-black text-[10px] uppercase tracking-widest hover:bg-(--accents)/20 transition-all cursor-pointer"
+                          title="Abrir desglose y agregar llamadas manualmente"
+                        >
+                          <Plus size={16} />
+                          Actualizar manualmente
+                        </button>
+                      </div>
+                      <div className="h-4 rounded-full bg-gray-100 overflow-hidden">
+                        <div
+                          className={`h-full rounded-full transition-all duration-500 ${
+                            done ? "bg-green-500" : "bg-(--accents)"
+                          }`}
+                          style={{ width: barWidth }}
+                        />
+                      </div>
+                      <div className="bg-black rounded-[2rem] p-5 text-white">
+                        <p className="text-[10px] font-black text-(--accents) uppercase tracking-widest">Actual / Objetivo</p>
+                        <p className="text-2xl font-black tracking-tighter mt-2">
+                          {fmtValue(meta.format, effectiveCurrent)}{" "}
+                          <span className="text-white/40 text-sm font-black">
+                            / {fmtValue(meta.format, target)}
+                          </span>
                         </p>
                       </div>
-                    </div>
-                    <div className="bg-black rounded-[2rem] p-6 text-white">
-                      <p className="text-[10px] font-black text-(--accents) uppercase tracking-widest">Actual / Objetivo</p>
-                      <p className="text-2xl font-black tracking-tighter mt-2">
-                        {fmtValue(meta.format, current)}{" "}
-                        <span className="text-white/40 text-sm font-black">
-                          / {fmtValue(meta.format, target)}
-                        </span>
-                      </p>
                     </div>
                   </div>
                 </div>
@@ -595,6 +651,103 @@ export default function MetasPage() {
           </div>
         )}
       </section>
+
+      {/* Modal: Actualizar manualmente (círculo + desglose + botón +1) */}
+      <AnimatePresence>
+        {manualModalGoalId != null && (() => {
+          const goal = goals.find((gg) => gg.id === manualModalGoalId)
+          if (!goal) return null
+          const meta = metricMeta(goal.metric)
+          const computed = progress[goal.id]?.current ?? 0
+          const manual = safeNumber(goal.manual_additions)
+          const total = computed + manual
+          const target = safeNumber(goal.target_value)
+          const pct = target > 0 ? clampPct((total / target) * 100) : 0
+          const done = target > 0 && total >= target
+          return (
+            <motion.div
+              key="manual-modal"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-[998] bg-black/50 backdrop-blur-sm flex items-center justify-center p-4"
+              onClick={() => setManualModalGoalId(null)}
+            >
+              <motion.div
+                initial={{ scale: 0.95, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.95, opacity: 0 }}
+                transition={{ type: "spring", stiffness: 300, damping: 28 }}
+                className="bg-white w-full max-w-sm rounded-[2.5rem] shadow-2xl border border-black/5 overflow-hidden"
+                onClick={(e) => e.stopPropagation()}
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="manual-modal-title"
+              >
+                <div className="p-6 border-b border-black/5 flex items-center justify-between">
+                  <h3 id="manual-modal-title" className="text-lg font-black text-black uppercase tracking-tight">
+                    Actualizar manualmente
+                  </h3>
+                  <button
+                    type="button"
+                    onClick={() => setManualModalGoalId(null)}
+                    className="p-2 rounded-xl hover:bg-gray-100 text-black/60 hover:text-black transition-colors"
+                    aria-label="Cerrar"
+                  >
+                    <X size={20} />
+                  </button>
+                </div>
+                <div className="p-8 space-y-6">
+                  <p className="text-sm font-bold text-black/60 truncate">{goal.title}</p>
+                  <div className="flex flex-col items-center">
+                    <div
+                      className={`w-28 h-28 rounded-full flex items-center justify-center border-4 transition-all ${
+                        done
+                          ? "border-green-500 bg-green-50 text-green-700"
+                          : pct >= 75
+                            ? "border-(--accents) bg-(--accents)/10 text-(--accents)"
+                            : "border-black/10 bg-gray-50 text-black"
+                      }`}
+                    >
+                      <span className="text-3xl font-black tabular-nums">
+                        {pct.toFixed(0)}
+                        <span className="text-lg font-black opacity-80">%</span>
+                      </span>
+                    </div>
+                    <p className="text-[10px] font-black uppercase tracking-widest text-black/50 mt-2">Avance</p>
+                  </div>
+                  <div className="space-y-2 rounded-2xl bg-gray-50 border border-black/5 p-4">
+                    <p className="text-sm font-black text-black">
+                      <span className="text-black/50 font-bold text-xs uppercase tracking-widest">Eventos en calendario</span>
+                      <span className="block text-xl">{fmtValue(meta.format, computed)}</span>
+                    </p>
+                    <p className="text-sm font-black text-black">
+                      <span className="text-black/50 font-bold text-xs uppercase tracking-widest">Agregados manualmente</span>
+                      <span className="block text-xl">{fmtValue(meta.format, manual)}</span>
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => addManualOne(goal)}
+                    disabled={savingManual}
+                    className="w-full py-4 rounded-2xl bg-(--accents) text-white font-black text-sm uppercase tracking-widest flex items-center justify-center gap-2 hover:opacity-90 transition-opacity disabled:opacity-60 cursor-pointer"
+                  >
+                    <Plus size={18} />
+                    Agregar 1 llamada manualmente
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setManualModalGoalId(null)}
+                    className="w-full py-3 rounded-xl border-2 border-black/10 text-black/70 font-black text-xs uppercase tracking-widest hover:bg-black/5 transition-colors cursor-pointer"
+                  >
+                    Cerrar
+                  </button>
+                </div>
+              </motion.div>
+            </motion.div>
+          )
+        })()}
+      </AnimatePresence>
 
       {/* MODAL */}
       <AnimatePresence>
