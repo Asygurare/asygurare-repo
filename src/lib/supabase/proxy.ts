@@ -38,7 +38,7 @@ export async function updateSession(request: NextRequest) {
     const isAuthRoute = authRoutes.some(route => request.nextUrl.pathname === route || request.nextUrl.pathname.startsWith(route + '/'));
 
     // Lista de rutas públicas que no requieren autenticación
-    const publicRoutes = ['/', '/login', '/signup', '/forget-password', '/update-password', '/home', '/legal', '/error', '/sections', '/about', '/pricing', '/contact', '/privacy', '/terms'];
+    const publicRoutes = ['/', '/login', '/signup', '/forget-password', '/update-password', '/auth', '/api/auth', '/home', '/legal', '/error', '/sections', '/about', '/pricing', '/contact', '/privacy', '/terms'];
     const isPublicRoute = publicRoutes.some(route => request.nextUrl.pathname === route || request.nextUrl.pathname.startsWith(route + '/'));
     const schedulerRoutes = ['/api/gmail/scheduled/run', '/api/automations/run']
     const isSchedulerRoute = schedulerRoutes.some(
