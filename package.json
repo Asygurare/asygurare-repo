@@ -12,6 +12,9 @@
   "dependencies": {
     "@ai-sdk/google": "^3.0.21",
     "@ai-sdk/openai": "^3.0.25",
+    "@capacitor/android": "^8.1.0",
+    "@capacitor/core": "^8.1.0",
+    "@capacitor/ios": "^8.1.0",
     "@google/generative-ai": "^0.24.1",
     "@microsoft/clarity": "^1.0.2",
     "@supabase/ssr": "^0.8.0",
@@ -29,6 +32,7 @@
     "zod": "^4.3.6"
   },
   "devDependencies": {
+    "@capacitor/cli": "^8.1.0",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",
