@@ -118,6 +118,21 @@ type CalComEvent = {
   location?: string | null
 }
 
+type ZoomStatus = {
+  connected: boolean
+  email?: string | null
+  zoom_user_id?: string | null
+}
+
+type ZoomMeeting = {
+  id: string
+  status: string
+  summary: string
+  start?: string | null
+  end?: string | null
+  join_url?: string | null
+}
+
 const LS_KEY_PREFIX = "tg_calendar_tasks_v1"
 
 function pad2(n: number) {
@@ -226,6 +241,11 @@ export default function CalendarioPage() {
   const [calComEvents, setCalComEvents] = useState<CalComEvent[]>([])
   const [syncingCalCom, setSyncingCalCom] = useState(false)
   const [syncingCalComTasks, setSyncingCalComTasks] = useState(false)
+  const [zoomLoading, setZoomLoading] = useState(true)
+  const [zoomStatus, setZoomStatus] = useState<ZoomStatus | null>(null)
+  const [zoomMeetings, setZoomMeetings] = useState<ZoomMeeting[]>([])
+  const [syncingZoom, setSyncingZoom] = useState(false)
+  const [syncingZoomTasks, setSyncingZoomTasks] = useState(false)
 
   const [searchTerm, setSearchTerm] = useState("")
   const [priorityTab, setPriorityTab] = useState<Priority>("Todas")
@@ -545,6 +565,53 @@ export default function CalendarioPage() {
     }
   }, [fetchCalComEvents])
 
+  const fetchZoomMeetings = useCallback(async (opts?: { quiet?: boolean }) => {
+    if (!opts?.quiet) setSyncingZoom(true)
+    try {
+      const res = await fetch("/api/zoom/meetings?max=8", {
+        method: "GET",
+        cache: "no-store",
+      })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        if (!opts?.quiet) {
+          toast.error(json?.detail || json?.error || "No se pudieron cargar reuniones de Zoom")
+        }
+        setZoomMeetings([])
+        return
+      }
+      setZoomMeetings(Array.isArray(json?.items) ? json.items : [])
+    } catch (e: any) {
+      if (!opts?.quiet) toast.error("Error cargando Zoom: " + (e?.message || "Error desconocido"))
+      setZoomMeetings([])
+    } finally {
+      if (!opts?.quiet) setSyncingZoom(false)
+    }
+  }, [])
+
+  const fetchZoomStatus = useCallback(async () => {
+    setZoomLoading(true)
+    try {
+      const res = await fetch("/api/zoom/status", {
+        method: "GET",
+        cache: "no-store",
+      })
+      const json = (await res.json().catch(() => ({}))) as ZoomStatus
+      if (!res.ok) throw new Error((json as any)?.error || "No se pudo consultar Zoom")
+      setZoomStatus(json)
+      if (json.connected) {
+        await fetchZoomMeetings({ quiet: true })
+      } else {
+        setZoomMeetings([])
+      }
+    } catch {
+      setZoomStatus({ connected: false })
+      setZoomMeetings([])
+    } finally {
+      setZoomLoading(false)
+    }
+  }, [fetchZoomMeetings])
+
   const bootstrap = useCallback(async () => {
     setLoading(true)
     try {
@@ -559,13 +626,14 @@ export default function CalendarioPage() {
         fetchGoogleCalendarStatus(),
         fetchCalendlyStatus(),
         fetchCalComStatus(),
+        fetchZoomStatus(),
       ])
     } catch (e: any) {
       toast.error("No se pudo inicializar Calendario: " + (e?.message || "Error desconocido"))
     } finally {
       setLoading(false)
     }
-  }, [fetchCalComStatus, fetchCalendlyStatus, fetchGoogleCalendarStatus, fetchPeople, fetchTasks])
+  }, [fetchCalComStatus, fetchCalendlyStatus, fetchGoogleCalendarStatus, fetchPeople, fetchTasks, fetchZoomStatus])
 
   useEffect(() => {
     bootstrap()
@@ -627,6 +695,25 @@ export default function CalendarioPage() {
     window.history.replaceState({}, "", `${current.pathname}${current.search}${current.hash}`)
     void fetchCalComStatus()
   }, [fetchCalComStatus])
+
+  useEffect(() => {
+    const current = new URL(window.location.href)
+    const zoom = current.searchParams.get("zoom")
+    if (!zoom) return
+
+    if (zoom === "connected") {
+      toast.success("Zoom conectado")
+    } else if (zoom === "error") {
+      const reason = current.searchParams.get("reason") || "No se pudo conectar"
+      toast.error("Error de conexión con Zoom: " + reason)
+    }
+
+    current.searchParams.delete("zoom")
+    current.searchParams.delete("reason")
+    current.searchParams.delete("detail")
+    window.history.replaceState({}, "", `${current.pathname}${current.search}${current.hash}`)
+    void fetchZoomStatus()
+  }, [fetchZoomStatus])
 
   const monthLabel = useMemo(() => {
     const fmt = new Intl.DateTimeFormat("es-MX", { month: "long", year: "numeric" })
@@ -700,8 +787,20 @@ export default function CalendarioPage() {
     return map
   }, [calComEvents])
 
+  const zoomMeetingsByDayCounts = useMemo(() => {
+    const map = new Map<string, number>()
+    for (const meeting of zoomMeetings) {
+      if (!meeting.start) continue
+      const d = new Date(meeting.start)
+      if (Number.isNaN(d.getTime())) continue
+      const key = dayKey(d)
+      map.set(key, (map.get(key) || 0) + 1)
+    }
+    return map
+  }, [zoomMeetings])
+
   const externalEventsByMonth = useMemo(() => {
-    const map = new Map<string, { google: number; calendly: number; calcom: number; total: number }>()
+    const map = new Map<string, { google: number; calendly: number; calcom: number; zoom: number; total: number }>()
 
     for (const event of googleCalendarEvents) {
       const start = event.start?.dateTime || event.start?.date
@@ -709,7 +808,7 @@ export default function CalendarioPage() {
       const d = new Date(start)
       if (Number.isNaN(d.getTime())) continue
       const key = `${d.getFullYear()}-${pad2(d.getMonth() + 1)}`
-      const prev = map.get(key) || { google: 0, calendly: 0, calcom: 0, total: 0 }
+      const prev = map.get(key) || { google: 0, calendly: 0, calcom: 0, zoom: 0, total: 0 }
       const next = { ...prev, google: prev.google + 1, total: prev.total + 1 }
       map.set(key, next)
     }
@@ -719,7 +818,7 @@ export default function CalendarioPage() {
       const d = new Date(event.start)
       if (Number.isNaN(d.getTime())) continue
       const key = `${d.getFullYear()}-${pad2(d.getMonth() + 1)}`
-      const prev = map.get(key) || { google: 0, calendly: 0, calcom: 0, total: 0 }
+      const prev = map.get(key) || { google: 0, calendly: 0, calcom: 0, zoom: 0, total: 0 }
       const next = { ...prev, calendly: prev.calendly + 1, total: prev.total + 1 }
       map.set(key, next)
     }
@@ -729,13 +828,23 @@ export default function CalendarioPage() {
       const d = new Date(event.start)
       if (Number.isNaN(d.getTime())) continue
       const key = `${d.getFullYear()}-${pad2(d.getMonth() + 1)}`
-      const prev = map.get(key) || { google: 0, calendly: 0, calcom: 0, total: 0 }
+      const prev = map.get(key) || { google: 0, calendly: 0, calcom: 0, zoom: 0, total: 0 }
       const next = { ...prev, calcom: prev.calcom + 1, total: prev.total + 1 }
       map.set(key, next)
     }
 
+    for (const meeting of zoomMeetings) {
+      if (!meeting.start) continue
+      const d = new Date(meeting.start)
+      if (Number.isNaN(d.getTime())) continue
+      const key = `${d.getFullYear()}-${pad2(d.getMonth() + 1)}`
+      const prev = map.get(key) || { google: 0, calendly: 0, calcom: 0, zoom: 0, total: 0 }
+      const next = { ...prev, zoom: prev.zoom + 1, total: prev.total + 1 }
+      map.set(key, next)
+    }
+
     return map
-  }, [calComEvents, calendlyEvents, googleCalendarEvents])
+  }, [calComEvents, calendlyEvents, googleCalendarEvents, zoomMeetings])
 
   const upcomingTasks = useMemo(() => {
     const now = new Date()
@@ -1181,6 +1290,52 @@ export default function CalendarioPage() {
     }
   }
 
+  const connectZoom = () => {
+    window.location.href = "/api/zoom/oauth/start"
+  }
+
+  const disconnectZoom = async () => {
+    if (!confirm("¿Desconectar Zoom?")) return
+    try {
+      const res = await fetch("/api/zoom/disconnect", {
+        method: "POST",
+        cache: "no-store",
+      })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(json?.error || "No se pudo desconectar Zoom")
+      setZoomStatus({ connected: false })
+      setZoomMeetings([])
+      toast.success("Zoom desconectado")
+    } catch (e: any) {
+      toast.error("Error al desconectar Zoom: " + (e?.message || "Error desconocido"))
+    }
+  }
+
+  const syncZoomIntoTasks = async () => {
+    if (!zoomConnected) {
+      toast.error("Conecta Zoom primero")
+      return
+    }
+    setSyncingZoomTasks(true)
+    try {
+      const res = await fetch("/api/zoom/sync/tasks?max=50", {
+        method: "POST",
+        cache: "no-store",
+      })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(json?.detail || json?.error || "No se pudo sincronizar a tareas")
+
+      await Promise.all([fetchTasks(), fetchZoomMeetings({ quiet: true })])
+      toast.success(
+        `Zoom → Tareas listo: ${json?.created || 0} nuevas, ${json?.updated || 0} actualizadas, ${json?.canceled || 0} canceladas`
+      )
+    } catch (e: any) {
+      toast.error("Error sincronizando Zoom a tareas: " + (e?.message || "Error desconocido"))
+    } finally {
+      setSyncingZoomTasks(false)
+    }
+  }
+
   const googleCalendarConnected = !!googleCalendarStatus?.connected
   const googleConnectionNeedsReconnect = !!googleCalendarStatus?.needs_reconnect
   const nextGoogleEvent = googleCalendarEvents[0] || null
@@ -1188,6 +1343,8 @@ export default function CalendarioPage() {
   const nextCalendlyEvent = calendlyEvents[0] || null
   const calComConnected = !!calComStatus?.connected
   const nextCalComEvent = calComEvents[0] || null
+  const zoomConnected = !!zoomStatus?.connected
+  const nextZoomMeeting = zoomMeetings[0] || null
 
   const formatGoogleEventWhen = (event: GoogleCalendarEvent) => {
     const start = event.start?.dateTime || event.start?.date
@@ -1241,6 +1398,21 @@ export default function CalendarioPage() {
     return status === "canceled" || status === "cancelled"
   }
 
+  const formatZoomMeetingWhen = (meeting: ZoomMeeting) => {
+    const start = meeting.start
+    if (!start) return "Sin fecha"
+    const dt = new Date(start)
+    if (Number.isNaN(dt.getTime())) return "Sin fecha"
+    return new Intl.DateTimeFormat("es-MX", {
+      day: "2-digit",
+      month: "short",
+      hour: "2-digit",
+      minute: "2-digit",
+    })
+      .format(dt)
+      .toUpperCase()
+  }
+
   const selectedDayGoogleEvents = useMemo(() => {
     return googleCalendarEvents
       .filter((event) => {
@@ -1286,6 +1458,21 @@ export default function CalendarioPage() {
         return aStart - bStart
       })
   }, [calComEvents, selectedDate])
+
+  const selectedDayZoomMeetings = useMemo(() => {
+    return zoomMeetings
+      .filter((meeting) => {
+        if (!meeting.start) return false
+        const dt = new Date(meeting.start)
+        if (Number.isNaN(dt.getTime())) return false
+        return sameDay(dt, selectedDate)
+      })
+      .sort((a, b) => {
+        const aStart = new Date(a.start || "").getTime()
+        const bStart = new Date(b.start || "").getTime()
+        return aStart - bStart
+      })
+  }, [zoomMeetings, selectedDate])
 
   const renderTaskCard = (t: Task) => {
     const Icon = kindIcon(t.kind)
@@ -1432,7 +1619,7 @@ export default function CalendarioPage() {
       {/* INTEGRACIONES */}
       <div className="space-y-3">
         <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">Integraciones de calendario</p>
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
           <div className="bg-white p-4 rounded-[1.5rem] border border-black/5 shadow-sm flex flex-col gap-4 min-h-[280px]">
             <div className="flex items-center gap-4 min-w-0">
               <div className="h-16 w-16 rounded-2xl bg-[#f6f8ff] border border-black/5 flex items-center justify-center shrink-0 shadow-sm">
@@ -1674,6 +1861,76 @@ export default function CalendarioPage() {
               </div>
             ) : null}
           </div>
+{/* 
+          <div className="bg-white p-4 rounded-[1.5rem] border border-black/5 shadow-sm flex flex-col gap-4 min-h-[280px]">
+            <div className="flex items-center gap-4 min-w-0">
+              <div className="h-16 w-16 rounded-2xl bg-white border border-black/5 flex items-center justify-center shrink-0 shadow-sm">
+                <Image
+                  src="/logo_integrations/zoom_logo.png"
+                  alt="Zoom"
+                  width={56}
+                  height={56}
+                  className="h-12 w-12 object-contain"
+                />
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs font-black text-black uppercase tracking-widest truncate">Zoom</p>
+                <p className="text-[10px] font-bold text-black/50 uppercase tracking-widest leading-relaxed">
+                  {zoomLoading
+                    ? "Cargando..."
+                    : zoomConnected
+                      ? `Conectado${zoomStatus?.email ? ` · ${zoomStatus.email}` : ""}`
+                      : "Sin conexión"}
+                </p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                onClick={connectZoom}
+                className="px-3 py-2.5 rounded-xl bg-black text-white font-black text-[10px] uppercase tracking-widest hover:bg-(--accents) transition-all"
+              >
+                {zoomConnected ? "Reautorizar" : "Conectar"}
+              </button>
+              {zoomConnected ? (
+                <button
+                  onClick={disconnectZoom}
+                  className="px-3 py-2.5 rounded-xl bg-red-50 text-red-600 border border-red-100 font-black text-[10px] uppercase tracking-widest hover:bg-red-600 hover:text-white transition-all"
+                >
+                  Desconectar
+                </button>
+              ) : null}
+              <button
+                onClick={() => fetchZoomMeetings()}
+                disabled={!zoomConnected || syncingZoom || zoomLoading}
+                className="px-3 py-2.5 rounded-xl bg-gray-50 text-black font-black text-[10px] uppercase tracking-widest hover:bg-black hover:text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              >
+                {syncingZoom ? <Loader2 className="animate-spin" size={13} /> : <RefreshCw size={13} />}
+                Sync
+              </button>
+              <button
+                onClick={syncZoomIntoTasks}
+                disabled={!zoomConnected || syncingZoomTasks || zoomLoading}
+                className="px-3 py-2.5 rounded-xl bg-blue-50 text-blue-700 border border-blue-100 font-black text-[10px] uppercase tracking-widest hover:bg-blue-600 hover:text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              >
+                {syncingZoomTasks ? <Loader2 className="animate-spin" size={13} /> : <CalendarDays size={13} />}
+                A tareas
+              </button>
+            </div>
+
+            {!zoomLoading && zoomConnected && nextZoomMeeting ? (
+              <div className="block rounded-xl px-3 py-2.5 border border-black/5">
+                <div className="flex items-center justify-between gap-3">
+                  <p className="font-black text-[11px] text-black uppercase tracking-tight truncate">
+                    Próximo: {nextZoomMeeting.summary || "Reunión sin título"}
+                  </p>
+                  <span className="text-[10px] font-black uppercase tracking-widest text-black/40 shrink-0">
+                    {formatZoomMeetingWhen(nextZoomMeeting)}
+                  </span>
+                </div>
+              </div>
+            ) : null}
+          </div> */}
         </div>
       </div>
 
@@ -1787,7 +2044,8 @@ export default function CalendarioPage() {
               const googleExternalCount = googleEventsByDayCounts.get(key) || 0
               const calendlyExternalCount = calendlyEventsByDayCounts.get(key) || 0
               const calComExternalCount = calComEventsByDayCounts.get(key) || 0
-              const externalCount = googleExternalCount + calendlyExternalCount + calComExternalCount
+              const zoomExternalCount = zoomMeetingsByDayCounts.get(key) || 0
+              const externalCount = googleExternalCount + calendlyExternalCount + calComExternalCount + zoomExternalCount
               const selected = sameDay(date, selectedDate)
               const totalCount = openCount + doneCount
               const pendingCount = openCount + externalCount
@@ -2011,10 +2269,52 @@ export default function CalendarioPage() {
               </div>
             ) : null}
 
+            {selectedDayZoomMeetings.length > 0 ? (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between px-1">
+                  <p className="text-[10px] font-black uppercase tracking-widest text-black/40">
+                    Zoom ({selectedDayZoomMeetings.length})
+                  </p>
+                  <span className="inline-flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-black/40">
+                    <span className="w-2 h-2 rounded-full bg-[#2D8CFF]" /> Externo
+                  </span>
+                </div>
+                {selectedDayZoomMeetings.map((meeting) => (
+                  <div
+                    key={`zoom-${meeting.id}`}
+                    className="rounded-[1.4rem] p-4 border border-blue-100 bg-blue-50/40"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="font-black text-black uppercase tracking-tight truncate">{meeting.summary || "Reunión de Zoom"}</p>
+                        <p className="text-[10px] font-black uppercase tracking-widest text-black/45 mt-1">
+                          {formatZoomMeetingWhen(meeting)} · {meeting.status}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        {meeting.join_url ? (
+                          <a
+                            href={meeting.join_url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest bg-white border border-blue-200 text-blue-700 hover:bg-blue-600 hover:text-white transition-all"
+                          >
+                            <Video size={12} />
+                            Join
+                          </a>
+                        ) : null}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : null}
+
             {selectedDayTasks.length === 0 &&
             selectedDayGoogleEvents.length === 0 &&
             selectedDayCalendlyEvents.length === 0 &&
-            selectedDayCalComEvents.length === 0 ? (
+            selectedDayCalComEvents.length === 0 &&
+            selectedDayZoomMeetings.length === 0 ? (
               <div className="flex-1 flex flex-col items-center justify-center text-center opacity-40 py-14">
                 <CalendarDays size={44} className="text-gray-100 mb-4" />
                 <p className="font-bold text-black">Sin eventos ni tareas para este día</p>
@@ -2290,10 +2590,52 @@ export default function CalendarioPage() {
                 </div>
               ) : null}
 
+              {selectedDayZoomMeetings.length > 0 ? (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between px-1">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-black/40">
+                      Zoom ({selectedDayZoomMeetings.length})
+                    </p>
+                    <span className="inline-flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-black/40">
+                      <span className="w-2 h-2 rounded-full bg-[#2D8CFF]" /> Externo
+                    </span>
+                  </div>
+                  {selectedDayZoomMeetings.map((meeting) => (
+                    <div
+                      key={`zoom-day-${meeting.id}`}
+                      className="rounded-[1.4rem] p-4 border border-blue-100 bg-blue-50/40"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="font-black text-black uppercase tracking-tight truncate">{meeting.summary || "Reunión de Zoom"}</p>
+                          <p className="text-[10px] font-black uppercase tracking-widest text-black/45 mt-1">
+                            {formatZoomMeetingWhen(meeting)} · {meeting.status}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          {meeting.join_url ? (
+                            <a
+                              href={meeting.join_url}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest bg-white border border-blue-200 text-blue-700 hover:bg-blue-600 hover:text-white transition-all"
+                            >
+                              <Video size={12} />
+                              Join
+                            </a>
+                          ) : null}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
+
               {selectedDayTasks.length === 0 &&
               selectedDayGoogleEvents.length === 0 &&
               selectedDayCalendlyEvents.length === 0 &&
-              selectedDayCalComEvents.length === 0 ? (
+              selectedDayCalComEvents.length === 0 &&
+              selectedDayZoomMeetings.length === 0 ? (
                 <div className="flex-1 flex flex-col items-center justify-center text-center opacity-40 py-14">
                   <CalendarDays size={44} className="text-gray-100 mb-4" />
                   <p className="font-bold text-black">Sin eventos ni tareas para este día</p>
@@ -2456,7 +2798,7 @@ export default function CalendarioPage() {
               const monthDate = new Date(yearCursor, idx, 1)
               const monthKey = `${yearCursor}-${String(idx + 1).padStart(2, "0")}`
               const stats = tasksByMonth.get(monthKey) || { total: 0, open: 0, high: 0 }
-              const external = externalEventsByMonth.get(monthKey) || { google: 0, calendly: 0, calcom: 0, total: 0 }
+              const external = externalEventsByMonth.get(monthKey) || { google: 0, calendly: 0, calcom: 0, zoom: 0, total: 0 }
               const label = new Intl.DateTimeFormat("es-MX", { month: "long" }).format(monthDate)
               const monthLabel = label.charAt(0).toUpperCase() + label.slice(1)
 
@@ -2492,7 +2834,7 @@ export default function CalendarioPage() {
 
                   {external.total > 0 ? (
                     <p className="mt-2 text-[10px] font-black uppercase tracking-widest text-black/40">
-                      G{external.google} · C{external.calendly} · Co{external.calcom}
+                      G{external.google} · C{external.calendly} · Co{external.calcom} · Z{external.zoom}
                     </p>
                   ) : null}
 
