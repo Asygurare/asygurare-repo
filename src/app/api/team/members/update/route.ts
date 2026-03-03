@@ -35,8 +35,7 @@ export async function POST(request: Request) {
   }
 
   const admin = getAdminClient()
-  const { error } = await admin
-    .from(DATABASE.TABLES.WS_TEAM_MEMBERS)
+  const { error } = await (admin.from(DATABASE.TABLES.WS_TEAM_MEMBERS) as any)
     .update({ permissions, updated_at: new Date().toISOString() })
     .eq("id", memberId)
     .eq("team_id", team.id)

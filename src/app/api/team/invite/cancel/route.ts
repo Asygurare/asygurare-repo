@@ -33,8 +33,7 @@ export async function POST(request: Request) {
   }
 
   const admin = getAdminClient()
-  const { error } = await admin
-    .from(DATABASE.TABLES.WS_TEAM_INVITATIONS)
+  const { error } = await (admin.from(DATABASE.TABLES.WS_TEAM_INVITATIONS) as any)
     .update({ status: "expired" })
     .eq("id", invitationId)
     .eq("team_id", team.id)

@@ -75,8 +75,7 @@ export async function POST(request: Request) {
 
   const token = randomBase64UrlString(32)
 
-  const { error: inviteErr } = await admin
-    .from(DATABASE.TABLES.WS_TEAM_INVITATIONS)
+  const { error: inviteErr } = await (admin.from(DATABASE.TABLES.WS_TEAM_INVITATIONS) as any)
     .insert({
       team_id: team.id,
       email,
@@ -105,8 +104,7 @@ export async function POST(request: Request) {
     if (authInviteErr.message?.includes("already been registered") || authInviteErr.message?.includes("already registered")) {
       return NextResponse.json({ ok: true, note: "El usuario ya tiene cuenta. La invitación queda pendiente y se vinculará al iniciar sesión." })
     }
-    await admin
-      .from(DATABASE.TABLES.WS_TEAM_INVITATIONS)
+    await (admin.from(DATABASE.TABLES.WS_TEAM_INVITATIONS) as any)
       .delete()
       .eq("token", token)
     return NextResponse.json({ ok: false, error: "No se pudo enviar la invitación: " + authInviteErr.message }, { status: 500 })
