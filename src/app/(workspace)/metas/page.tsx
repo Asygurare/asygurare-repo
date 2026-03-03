@@ -20,6 +20,7 @@ import {
 import { Toaster, toast } from "sonner"
 import { supabaseClient } from "@/src/lib/supabase/client"
 import { DATABASE } from "@/src/config"
+import { SectionTutorial, type SectionTutorialStep } from "@/src/components/workspace/tutorial/SectionTutorial"
 
 type GoalFormat = "count" | "currency" | "percent" | "number"
 type GoalPeriod = "month" | "week" | "custom" | "always"
@@ -49,6 +50,39 @@ type GoalRow = {
   created_at: string
   updated_at: string
 }
+
+const METAS_TUTORIAL_STEPS: SectionTutorialStep[] = [
+  {
+    id: "nueva-meta",
+    title: "Crear una meta",
+    description: "Empieza aqui para definir tu objetivo, periodo y metrica principal.",
+    selector: '[data-tutorial="metas-new-goal"]',
+  },
+  {
+    id: "recalcular",
+    title: "Recalcular avance",
+    description: "Actualiza los porcentajes cuando quieras traer datos recientes.",
+    selector: '[data-tutorial="metas-refresh"]',
+  },
+  {
+    id: "listado",
+    title: "Panel de metas",
+    description: "Aqui ves todas tus metas, su progreso y estado de cumplimiento.",
+    selector: '[data-tutorial="metas-list"]',
+  },
+  {
+    id: "manual",
+    title: "Actualizar manualmente",
+    description: "Suma avances manuales para metas que necesiten ajuste operativo.",
+    selector: '[data-tutorial="metas-manual-update"]',
+  },
+  {
+    id: "acciones",
+    title: "Editar o eliminar",
+    description: "Usa estos botones para ajustar la meta o retirarla del tablero.",
+    selector: '[data-tutorial="metas-actions"]',
+  },
+]
 
 function safeNumber(x: any) {
   const n = typeof x === "number" ? x : parseFloat(String(x ?? ""))
@@ -460,30 +494,26 @@ export default function MetasPage() {
         </div>
 
         <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-black/5 flex items-center justify-between gap-4">
-          <div>
-            <p className="text-[10px] font-black text-black/40 uppercase tracking-widest">Control</p>
-            <p className="text-sm font-black text-black uppercase tracking-tight italic">Tablero de ejecución</p>
-          </div>
+
           <div className="flex items-center gap-2">
+            <SectionTutorial
+              steps={METAS_TUTORIAL_STEPS}
+              ariaLabel="Tutorial de la seccion metas"
+              triggerClassName="bg-white border border-black/10 text-black px-5 py-4 rounded-[2rem] font-black text-[10px] uppercase tracking-widest flex items-center gap-2 hover:bg-gray-50 transition-all active:scale-95"
+            />
             <button
+              data-tutorial="metas-new-goal"
               onClick={() => openCreate()}
               className="bg-black text-white px-6 py-4 rounded-[2rem] font-black text-[10px] uppercase tracking-widest flex items-center gap-2 hover:bg-(--accents) transition-all shadow-xl active:scale-95"
             >
               <Plus size={16} /> Nueva meta
-            </button>
-            <button
-              onClick={() => computeAllProgress(goals)}
-              className="bg-white border border-black/10 text-black px-5 py-4 rounded-[2rem] font-black text-[10px] uppercase tracking-widest flex items-center gap-2 hover:bg-gray-50 transition-all active:scale-95"
-              title="Recalcular avance"
-            >
-              <RefreshCw size={14} className={refreshing ? "animate-spin" : ""} />
             </button>
           </div>
         </div>
       </section>
 
       {/* LIST */}
-      <section className="space-y-4">
+      <section data-tutorial="metas-list" className="space-y-4">
         <div className="flex items-center justify-between">
           <div>
             <p className="text-[10px] font-black text-black/30 uppercase tracking-[0.35em]">Workspace</p>
@@ -575,7 +605,7 @@ export default function MetasPage() {
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-2 shrink-0">
+                    <div data-tutorial="metas-actions" className="flex items-center gap-2 shrink-0">
                       <button
                         onClick={() => openEdit(g)}
                         className="p-4 rounded-2xl bg-gray-50 border border-black/5 text-black/50 hover:text-black hover:bg-white transition-all"
@@ -619,6 +649,7 @@ export default function MetasPage() {
                         <button
                           type="button"
                           onClick={() => setManualModalGoalId(g.id)}
+                          data-tutorial="metas-manual-update"
                           className="inline-flex items-center gap-2 px-4 py-3 rounded-2xl bg-(--accents)/10 border border-(--accents)/30 text-(--accents) font-black text-[10px] uppercase tracking-widest hover:bg-(--accents)/20 transition-all cursor-pointer"
                           title="Abrir desglose y agregar llamadas manualmente"
                         >

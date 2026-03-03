@@ -29,6 +29,7 @@ import {
 import { supabaseClient } from "@/src/lib/supabase/client"
 import { getFullName } from "@/src/lib/utils/utils"
 import { toast, Toaster } from "sonner"
+import { SectionTutorial, type SectionTutorialStep } from "@/src/components/workspace/tutorial/SectionTutorial"
 
 type Priority = "Todas" | "Alta" | "Media" | "Baja"
 type TaskPriority = Exclude<Priority, "Todas">
@@ -132,6 +133,39 @@ type ZoomMeeting = {
   end?: string | null
   join_url?: string | null
 }
+
+const CALENDARIO_TUTORIAL_STEPS: SectionTutorialStep[] = [
+  {
+    id: "view-modes",
+    title: "Modos de vista",
+    description: "Cambia entre Dia, Mes y Año para revisar tu agenda desde distintos niveles.",
+    selector: '[data-tutorial="calendario-view-modes"]',
+  },
+  {
+    id: "new-task",
+    title: "Nueva tarea",
+    description: "Crea tareas de llamada, cita o seguimiento y vinculalas a prospectos o clientes.",
+    selector: '[data-tutorial="calendario-new-task"]',
+  },
+  {
+    id: "integraciones",
+    title: "Integraciones",
+    description: "Conecta Google, Calendly o Cal.com para traer eventos externos a tu flujo.",
+    selector: '[data-tutorial="calendario-integrations"]',
+  },
+  {
+    id: "filters",
+    title: "Busqueda y filtros",
+    description: "Filtra por texto, prioridad y estado para enfocarte en lo importante.",
+    selector: '[data-tutorial="calendario-filters"]',
+  },
+  {
+    id: "agenda",
+    title: "Agenda del dia",
+    description: "Aqui ves pendientes, hechas y eventos externos del dia seleccionado.",
+    selector: '[data-tutorial="calendario-agenda"]',
+  },
+]
 
 const LS_KEY_PREFIX = "tg_calendar_tasks_v1"
 
@@ -1589,7 +1623,7 @@ export default function CalendarioPage() {
         </div>
 
         <div className="flex flex-col sm:flex-row sm:items-center gap-3 w-full md:w-auto">
-          <div className="bg-white border border-black/5 rounded-[2rem] p-2 flex items-center gap-2 shadow-sm w-full md:w-auto overflow-x-auto flex-nowrap">
+          <div data-tutorial="calendario-view-modes" className="bg-white border border-black/5 rounded-[2rem] p-2 flex items-center gap-2 shadow-sm w-full md:w-auto overflow-x-auto flex-nowrap">
             {viewModes.map((m) => (
               <button
                 key={m}
@@ -1605,7 +1639,15 @@ export default function CalendarioPage() {
             ))}
           </div>
 
+          <SectionTutorial
+            steps={CALENDARIO_TUTORIAL_STEPS}
+            ariaLabel="Tutorial de la seccion calendario"
+            onBeforeStart={() => setViewMode("Mes")}
+            triggerClassName="bg-white border border-black/10 text-black px-6 py-4 rounded-[2rem] font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-gray-50 transition-all shadow-sm active:scale-95 shrink-0 w-full sm:w-auto"
+          />
+
           <button
+            data-tutorial="calendario-new-task"
             onClick={openNewTask}
             className="bg-black text-white px-6 py-4 sm:px-10 sm:py-5 rounded-[2rem] font-black text-[11px] sm:text-sm flex items-center justify-center gap-3 hover:bg-(--accents) transition-all shadow-2xl active:scale-95 shrink-0 w-full sm:w-auto"
           >
@@ -1617,7 +1659,7 @@ export default function CalendarioPage() {
       </div>
 
       {/* INTEGRACIONES */}
-      <div className="space-y-3">
+      <div data-tutorial="calendario-integrations" className="space-y-3">
         <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">Integraciones de calendario</p>
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
           <div className="bg-white p-4 rounded-[1.5rem] border border-black/5 shadow-sm flex flex-col gap-4 min-h-[280px]">
@@ -1935,7 +1977,7 @@ export default function CalendarioPage() {
       </div>
 
       {/* CONTROLES */}
-      <div className="bg-white p-4 rounded-[2rem] border border-black/5 flex flex-col md:flex-row gap-4 items-center shadow-sm">
+      <div data-tutorial="calendario-filters" className="bg-white p-4 rounded-[2rem] border border-black/5 flex flex-col md:flex-row gap-4 items-center shadow-sm">
         <div className="flex-1 relative group w-full">
           <Search className="absolute left-5 top-1/2 -translate-y-1/2 text-black/40 group-focus-within:text-(--accents)" size={20} />
           <input
@@ -2122,7 +2164,7 @@ export default function CalendarioPage() {
         </div>
 
         {/* LISTA DEL DÍA */}
-        <div className="bg-white rounded-[2.5rem] border border-black/5 shadow-sm p-4 sm:p-6 lg:p-8 flex flex-col">
+        <div data-tutorial="calendario-agenda" className="bg-white rounded-[2.5rem] border border-black/5 shadow-sm p-4 sm:p-6 lg:p-8 flex flex-col">
           <div className="mb-6">
             <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Agenda</p>
             <h3 className="text-2xl font-black text-black italic">{selectedDateLabel}</h3>

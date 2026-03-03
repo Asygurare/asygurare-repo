@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react"
 import { Bell, CalendarClock, Cake, Loader2, Save, ShieldAlert } from "lucide-react"
 import { toast } from "sonner"
+import { SectionTutorial, type SectionTutorialStep } from "@/src/components/workspace/tutorial/SectionTutorial"
 
 type Automation = {
   key: string
@@ -34,6 +35,33 @@ const LABELS: Record<string, string> = {
   birthday_customers_notify: "Notificar cumpleaños de clientes",
   policy_renewal_notice_notify: "Notificar vencimientos de póliza",
 }
+
+const AUTOMATIZAR_TUTORIAL_STEPS: SectionTutorialStep[] = [
+  {
+    id: "automatizar-header",
+    title: "Centro de automatizacion",
+    description: "Desde aqui activas reglas automaticas para correos y notificaciones.",
+    selector: '[data-tutorial="automatizar-header"]',
+  },
+  {
+    id: "automatizar-tabs",
+    title: "Tipos de reglas",
+    description: "Alterna entre automatizaciones y el historial de notificaciones.",
+    selector: '[data-tutorial="automatizar-tabs"]',
+  },
+  {
+    id: "automatizar-rules",
+    title: "Configurar reglas",
+    description: "Activa o desactiva procesos y ajusta plantillas y anticipacion.",
+    selector: '[data-tutorial="automatizar-rules"]',
+  },
+  {
+    id: "automatizar-history",
+    title: "Historial",
+    description: "Consulta ejecuciones previas con estado y mensaje del sistema.",
+    selector: '[data-tutorial="automatizar-history"]',
+  },
+]
 
 export default function AutomatizarClient() {
   const [tab, setTab] = useState<"automations" | "notifications">("automations")
@@ -176,11 +204,18 @@ export default function AutomatizarClient() {
 
   return (
     <div className="space-y-8">
-      <div className="bg-white border border-black/5 rounded-[2rem] p-6 sm:p-8">
+      <div className="bg-white border border-black/5 rounded-[2rem] p-6 sm:p-8" data-tutorial="automatizar-header">
+        <div className="mb-4 flex justify-end">
+          <SectionTutorial
+            steps={AUTOMATIZAR_TUTORIAL_STEPS}
+            ariaLabel="Tutorial de la seccion automatizar"
+            triggerClassName="inline-flex items-center gap-2 rounded-2xl border border-black/10 bg-white px-4 py-2 text-[10px] font-black uppercase tracking-widest text-black transition-all hover:bg-black hover:text-white"
+          />
+        </div>
         <h1 className="text-3xl sm:text-4xl font-black italic uppercase tracking-tight text-black">Automatizar</h1>
       </div>
 
-      <div className="bg-white border border-black/5 rounded-[2rem] p-3 flex flex-col sm:flex-row gap-2">
+      <div className="bg-white border border-black/5 rounded-[2rem] p-3 flex flex-col sm:flex-row gap-2" data-tutorial="automatizar-tabs">
         <button
           type="button"
           onClick={() => setTab("automations")}
@@ -209,7 +244,7 @@ export default function AutomatizarClient() {
       ) : null}
 
       {!loading && tab === "automations" ? (
-        <div className="space-y-4">
+        <div className="space-y-4" data-tutorial="automatizar-rules">
           <div className="bg-white border border-black/5 rounded-[2rem] p-5 sm:p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div className="flex items-start gap-3 w-full">
               <Cake className="mt-1 text-(--accents)" size={18} />
@@ -342,7 +377,7 @@ export default function AutomatizarClient() {
       ) : null}
 
       {!loading && tab === "notifications" ? (
-        <div className="space-y-4">
+        <div className="space-y-4" data-tutorial="automatizar-history">
           <div className="bg-white border border-black/5 rounded-[2rem] p-5 sm:p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div className="flex items-start gap-3 w-full">
               <Bell className="mt-1 text-(--accents)" size={18} />

@@ -7,6 +7,34 @@ import type { AnalyticsEntity, AnalyticsKpi } from "@/src/services/analytics/typ
 import { useRealtimeAnalytics } from "@/src/lib/hooks/useRealtimeAnalytics"
 import { Kpi, type KpiItem } from "@/src/components/analytics/Kpi"
 import { Graficas } from "@/src/components/analytics/Graficas"
+import { SectionTutorial, type SectionTutorialStep } from "@/src/components/workspace/tutorial/SectionTutorial"
+
+const ANALYTICS_TUTORIAL_STEPS: SectionTutorialStep[] = [
+  {
+    id: "analytics-header",
+    title: "Panel de analisis",
+    description: "Aqui visualizas el resumen general del rendimiento de tu workspace.",
+    selector: '[data-tutorial="analytics-header"]',
+  },
+  {
+    id: "analytics-tabs",
+    title: "Cambiar entidad",
+    description: "Alterna entre prospectos, clientes y polizas para revisar cada area.",
+    selector: '[data-tutorial="analytics-tabs"]',
+  },
+  {
+    id: "analytics-kpis",
+    title: "KPIs principales",
+    description: "Estos indicadores muestran los numeros clave de la entidad seleccionada.",
+    selector: '[data-tutorial="analytics-kpis"]',
+  },
+  {
+    id: "analytics-charts",
+    title: "Graficas",
+    description: "Aqui encuentras tendencias y comparativos para tomar decisiones.",
+    selector: '[data-tutorial="analytics-charts"]',
+  },
+]
 
 function formatKpiValue(k: AnalyticsKpi) {
   if (k.format === "currency") {
@@ -46,7 +74,7 @@ export default function AnalyticsPage() {
       >
         <div className="absolute -right-10 -bottom-10 w-40 h-40 bg-(--accents) blur-[90px] opacity-20" />
 
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6 mb-8">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6 mb-8" data-tutorial="analytics-header">
           <div className="flex items-center gap-3">
           <div className="p-4 bg-black rounded-2xl shadow-xl">
             <BarChart3 className="text-(--accents)" size={26} />
@@ -58,6 +86,11 @@ export default function AnalyticsPage() {
         </div>
 
           <div className="flex items-center gap-3">
+            <SectionTutorial
+              steps={ANALYTICS_TUTORIAL_STEPS}
+              ariaLabel="Tutorial de la seccion analisis"
+              triggerClassName="inline-flex items-center gap-2 px-5 py-3 rounded-full border border-black/10 bg-white text-black font-black text-[10px] uppercase tracking-widest hover:bg-black hover:text-white transition-all active:scale-95"
+            />
             <button
               onClick={() => refetch()}
               className="inline-flex items-center gap-2 px-5 py-3 rounded-full bg-black text-white font-black text-[10px] uppercase tracking-widest hover:bg-black/80 transition-all active:scale-95"
@@ -72,7 +105,7 @@ export default function AnalyticsPage() {
           </div>
         </div>
 
-        <div className="flex flex-wrap gap-2 mb-10">
+        <div className="flex flex-wrap gap-2 mb-10" data-tutorial="analytics-tabs">
           {([
             { id: "prospectos", label: "Prospectos" },
             { id: "clientes", label: "Clientes" },
@@ -93,7 +126,9 @@ export default function AnalyticsPage() {
         </div>
 
         <div className="space-y-6">
-          <Kpi items={kpiItems} />
+          <div data-tutorial="analytics-kpis">
+            <Kpi items={kpiItems} />
+          </div>
 
           {error ? (
             <div className="bg-red-50 border border-red-200 rounded-[2rem] p-6">
@@ -101,7 +136,9 @@ export default function AnalyticsPage() {
             </div>
           ) : null}
 
-          <Graficas charts={charts} loading={loading} />
+          <div data-tutorial="analytics-charts">
+            <Graficas charts={charts} loading={loading} />
+          </div>
         </div>
       </motion.div>
     </div>

@@ -2,12 +2,12 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   LayoutDashboard, Users, Target, Shield,
   CreditCard, Settings, BrainCircuit, CalendarDays, BarChart3,
   Cpu, Flag, X, ChevronDown,
-  User2Icon,
+  User2Icon, UserPlus,
   CpuIcon, FileText, Signature,
   Mail,
   Send,
@@ -16,6 +16,13 @@ import {
 import WorkspaceNavbar from '@/src/components/navbar/WorkspaceNavbar'
 import Image from 'next/image'
 import AgentOrb from '../../components/workspace/chat/AgentOrb'
+import {
+  type SectionPermissions,
+  type TeamRole,
+  FULL_PERMISSIONS,
+  HREF_TO_SECTION,
+  parsePermissions,
+} from '@/src/services/team/permissions'
 
 const Avatar = <Image src="/avatar/avatar.png" alt='' width={80} height={80}/>
 const menuItems = [
@@ -24,7 +31,7 @@ const menuItems = [
   { icon: Target, label: 'Prospectos', href: '/prospectos' },
   { icon: Users, label: 'Clientes', href: '/clientes' },
   { icon: Shield, label: 'Pólizas', href: '/polizas' },
-  { icon: CreditCard, label: 'Pagos', href: '/pagos', hidden: true }, // omitido por el momento
+  { icon: CreditCard, label: 'Pagos', href: '/pagos', hidden: true },
   { icon: CalendarDays, label: 'Calendario', href: '/calendario' },
   { icon: Cpu, label: 'Automatizar', href: '/automatizar' },
   {
@@ -41,10 +48,7 @@ const menuItems = [
   },
   { icon: BrainCircuit, label: 'Guros IA', href: '/ia' },
   { icon: BarChart3, label: 'Análisis', href: '/analytics', comingSoon: false },
-  { icon: User2Icon, label: 'Soporte', href: '/soporte', comingSoon: false},
- 
-
-
+  { icon: User2Icon, label: 'Soporte', href: '/soporte', comingSoon: false },
 ]
 
 export default function WorkspaceLayout({ children }: { children: React.ReactNode }) {
@@ -52,6 +56,30 @@ export default function WorkspaceLayout({ children }: { children: React.ReactNod
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false)
   const [isEmailMenuOpen, setIsEmailMenuOpen] = useState(pathname.startsWith('/email'))
   const previousPathnameRef = useRef(pathname)
+  const [teamRole, setTeamRole] = useState<TeamRole>("owner")
+  const [teamPermissions, setTeamPermissions] = useState<SectionPermissions>(FULL_PERMISSIONS)
+
+  const fetchTeamRole = useCallback(async () => {
+    try {
+      const res = await fetch("/api/team/status", { cache: "no-store" })
+      if (!res.ok) return
+      const json = await res.json()
+      setTeamRole(json.role || "owner")
+      setTeamPermissions(json.role === "member" ? parsePermissions(json.permissions) : FULL_PERMISSIONS)
+    } catch {}
+  }, [])
+
+  useEffect(() => {
+    fetchTeamRole()
+  }, [fetchTeamRole])
+
+  const filteredMenuItems = menuItems.filter((item) => {
+    if ((item as any).hidden) return false
+    if (teamRole === "owner") return true
+    const section = HREF_TO_SECTION[item.href]
+    if (!section) return true
+    return teamPermissions[section] !== "none"
+  })
 
   useEffect(() => {
     // Cierra el menú móvil solo cuando realmente cambia la ruta.
@@ -90,7 +118,7 @@ export default function WorkspaceLayout({ children }: { children: React.ReactNod
       </Link>
 
       <nav className="flex-1 space-y-2">
-        {menuItems.filter((item) => !(item as any).hidden).map((item) => {
+        {filteredMenuItems.map((item) => {
           // Verificamos si es activo.
           // Usamos startsWith para que si estás en un chat específico, el botón siga resaltado
           const isActive = pathname.startsWith(item.href)
@@ -188,12 +216,29 @@ export default function WorkspaceLayout({ children }: { children: React.ReactNod
         })}
       </nav>
 
-      {/* Botón de Ajustes al final */}
-      <div className="mt-auto pt-6 border-t border-black/5">
+      <div className="mt-auto pt-6 border-t border-black/5 space-y-1">
+        {teamRole === "owner" && (
+          <Link
+            href="/equipo"
+            onClick={onNavigate}
+            className={`flex items-center gap-3 px-4 py-3 rounded-2xl font-bold text-sm transition-all ${
+              pathname.startsWith('/equipo')
+                ? 'bg-(--accents) text-white shadow-lg shadow-(--accents)/20'
+                : 'text-gray-400 hover:text-black hover:bg-gray-50'
+            }`}
+          >
+            <UserPlus size={20} />
+            Mi equipo
+          </Link>
+        )}
         <Link
           href="/settings"
           onClick={onNavigate}
-          className="flex items-center gap-3 px-4 py-3 rounded-2xl font-bold text-sm text-gray-400 hover:text-black transition-all"
+          className={`flex items-center gap-3 px-4 py-3 rounded-2xl font-bold text-sm transition-all ${
+            pathname.startsWith('/settings')
+              ? 'bg-(--accents) text-white shadow-lg shadow-(--accents)/20'
+              : 'text-gray-400 hover:text-black hover:bg-gray-50'
+          }`}
         >
           <Settings size={20} />
           Configuración

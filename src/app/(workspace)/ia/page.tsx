@@ -4,14 +4,43 @@ import React, { useState, useEffect } from 'react'
 import SidebarConversaciones from '@/src/components/workspace/chat/SidebarConversaciones'
 import ChatDatamara from '@/src/components/workspace/chat/ChatGuros'
 import { supabaseClient } from '@/src/lib/supabase/client'
-import { BrainCircuit, PanelLeft, X } from 'lucide-react'
+import { BrainCircuit, CircleHelp, PanelLeft, Sparkles, X } from 'lucide-react'
 import Image from 'next/image'
+import { SectionTutorial, type SectionTutorialStep } from '@/src/components/workspace/tutorial/SectionTutorial'
+
+const IA_TUTORIAL_STEPS: SectionTutorialStep[] = [
+  {
+    id: 'titulo',
+    title: 'Guros IA',
+    description: 'Esta es tu zona de trabajo con el agente para ventas, operacion y seguimiento.',
+    selector: '[data-tutorial="ia-title"]',
+  },
+  {
+    id: 'acciones',
+    title: 'Acciones rapidas',
+    description: 'Desde aqui controlas historial, tutorial y guia de capacidades.',
+    selector: '[data-tutorial="ia-actions"]',
+  },
+  {
+    id: 'historial',
+    title: 'Historial de conversaciones',
+    description: 'Abre conversaciones pasadas para continuar contexto sin empezar de cero.',
+    selector: '[data-tutorial="ia-history-panel"]',
+  },
+  {
+    id: 'chat',
+    title: 'Panel de chat',
+    description: 'Aqui escribes tus solicitudes y ejecutas todo lo que necesites con el agente.',
+    selector: '[data-tutorial="ia-chat-panel"]',
+  },
+]
 
 export default function IASectorPage() {
   const [activeChatId, setActiveChatId] = useState<string | null>(null)
   const [user, setUser] = useState<any>(null)
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false)
   const [isDesktopSidebarHidden, setIsDesktopSidebarHidden] = useState(false)
+  const [isCapabilitiesOpen, setIsCapabilitiesOpen] = useState(false)
 
   useEffect(() => {
     const getUser = async () => {
@@ -27,7 +56,7 @@ export default function IASectorPage() {
     <div className="space-y-8 animate-in fade-in duration-700">
       {/* HEADER DE SECCIÓN */}
       <div className="flex flex-col gap-4 md:flex-row md:justify-between md:items-end">
-        <div>
+        <div data-tutorial="ia-title">
           <div className="flex items-center gap-3 mb-2">
             <div className="p-3 bg-transparent rounded-2xl shadow-xl">
               <BrainCircuit className="text-(--accents)" size={28} />
@@ -40,7 +69,27 @@ export default function IASectorPage() {
         </div>
 
         {/* METRICA RAPIDA DE IA */}
-        <div className="flex items-center gap-3 md:gap-4">
+        <div data-tutorial="ia-actions" className="flex items-center gap-3 md:gap-4">
+            <SectionTutorial
+              steps={IA_TUTORIAL_STEPS}
+              ariaLabel="Tutorial de la seccion Guros IA"
+              onBeforeStart={() => {
+                setIsDesktopSidebarHidden(false)
+                setIsMobileSidebarOpen(false)
+              }}
+              triggerLabel="Tutorial"
+              triggerClassName="bg-white px-4 py-3 rounded-2xl border border-black/5 flex items-center gap-2 shadow-sm text-[10px] font-black uppercase tracking-widest text-black/70 hover:text-black transition-colors"
+            />
+
+            <button
+              type="button"
+              onClick={() => setIsCapabilitiesOpen(true)}
+              className="bg-white px-4 py-3 rounded-2xl border border-black/5 flex items-center gap-2 shadow-sm text-[10px] font-black uppercase tracking-widest text-black/70 hover:text-black transition-colors"
+            >
+              <Sparkles size={16} className="text-(--accents)" />
+              Descubre lo que puede hacer por ti
+            </button>
+
             <button
               type="button"
               onClick={() => setIsMobileSidebarOpen(true)}
@@ -75,7 +124,7 @@ export default function IASectorPage() {
 
         {/* Sidebar (Desktop) */}
         {!isDesktopSidebarHidden && (
-          <div className="hidden lg:block w-full lg:w-80 flex-shrink-0">
+          <div data-tutorial="ia-history-panel" className="hidden lg:block w-full lg:w-80 flex-shrink-0">
             <SidebarConversaciones
               userId={user.id}
               activeChatId={activeChatId}
@@ -136,7 +185,7 @@ export default function IASectorPage() {
         </div>
 
         {/* Lado Derecho: Interfaz de Chat */}
-        <div className="flex-1 relative bg-white rounded-[2rem] sm:rounded-[3rem] border border-black/5 shadow-sm overflow-hidden flex flex-col min-h-[70dvh] lg:min-h-0">
+        <div data-tutorial="ia-chat-panel" className="flex-1 relative bg-white rounded-[2rem] sm:rounded-[3rem] border border-black/5 shadow-sm overflow-hidden flex flex-col min-h-[70dvh] lg:min-h-0">
           {activeChatId ? (
             <ChatDatamara conversationId={activeChatId} userId={user.id} />
           ) : (
@@ -157,6 +206,97 @@ export default function IASectorPage() {
           )}
         </div>
       </div>
+
+      {isCapabilitiesOpen ? (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center p-4">
+          <button
+            type="button"
+            className="absolute inset-0 bg-black/55 backdrop-blur-sm"
+            onClick={() => setIsCapabilitiesOpen(false)}
+            aria-label="Cerrar listado de capacidades"
+          />
+          <div className="relative w-full max-w-3xl max-h-[88vh] overflow-y-auto rounded-[2rem] border border-black/10 bg-white p-6 sm:p-8 shadow-2xl space-y-6">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-widest text-black/40">Guros IA</p>
+                <h3 className="text-2xl font-black text-black tracking-tight">Todo lo que puedes pedirle</h3>
+                <p className="text-sm font-bold text-black/60 mt-2">
+                  No solo te responde: trabaja en modo agentistico para quitarte carga administrativa y ejecutar acciones reales en tu workspace.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsCapabilitiesOpen(false)}
+                className="p-2 rounded-xl border border-black/10 text-black/60 hover:text-black hover:bg-gray-50 transition-colors"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div className="rounded-2xl border border-(--accents)/30 bg-(--accents)/10 p-4">
+                <p className="text-[11px] font-black uppercase tracking-widest text-black">Poder agentistico (tu mano derecha)</p>
+                <p className="text-[12px] font-bold text-black/70 mt-2">"Revisa pendientes de hoy y conviertelos en un plan operativo por prioridad."</p>
+                <p className="text-[12px] font-bold text-black/70">"Haz seguimiento de leads frios: dame lista priorizada + siguiente accion por cada uno."</p>
+                <p className="text-[12px] font-bold text-black/70">"Quiero delegarte la parte administrativa: detecta tareas repetitivas y propon automatizaciones."</p>
+              </div>
+
+              <div className="rounded-2xl border border-black/5 p-4">
+                <p className="text-[11px] font-black uppercase tracking-widest text-black">Ventas y seguimiento inteligente</p>
+                <p className="text-[12px] font-bold text-black/60 mt-2">"Prepara un plan de seguimiento para este prospecto en 7 dias."</p>
+                <p className="text-[12px] font-bold text-black/60">"Redacta 3 mensajes de seguimiento: WhatsApp, email y llamada."</p>
+                <p className="text-[12px] font-bold text-black/60">"Detecta clientes listos para renovacion y arma secuencia de contacto."</p>
+              </div>
+
+              <div className="rounded-2xl border border-black/5 p-4">
+                <p className="text-[11px] font-black uppercase tracking-widest text-black">Correos: redactar, enviar y programar</p>
+                <p className="text-[12px] font-bold text-black/60 mt-2">"Escribe un correo para reactivar clientes inactivos con tono cercano."</p>
+                <p className="text-[12px] font-bold text-black/60">"Crea una plantilla para bienvenida de nuevos prospectos."</p>
+                <p className="text-[12px] font-bold text-black/60">"Programa este correo para manana 8:30 AM y crea tarea de seguimiento 24h despues."</p>
+              </div>
+
+              <div className="rounded-2xl border border-black/5 p-4">
+                <p className="text-[11px] font-black uppercase tracking-widest text-black">Operacion diaria sin friccion</p>
+                <p className="text-[12px] font-bold text-black/60 mt-2">"Organiza mis prioridades de hoy con base en tareas y clientes."</p>
+                <p className="text-[12px] font-bold text-black/60">"Dame checklist para preparar una cita de cierre."</p>
+                <p className="text-[12px] font-bold text-black/60">"Crea tareas de seguimiento para todos los clientes contactados hoy."</p>
+              </div>
+
+              <div className="rounded-2xl border border-black/5 p-4">
+                <p className="text-[11px] font-black uppercase tracking-widest text-black">Analisis + decisiones accionables</p>
+                <p className="text-[12px] font-bold text-black/60 mt-2">"Analiza mis resultados y propon 5 acciones para subir conversion."</p>
+                <p className="text-[12px] font-bold text-black/60">"Que cuellos de botella ves en mi proceso comercial actual?"</p>
+                <p className="text-[12px] font-bold text-black/60">"Donde estoy perdiendo renovaciones y que hago esta semana para corregirlo?"</p>
+              </div>
+
+              <div className="rounded-2xl border border-black/5 p-4">
+                <p className="text-[11px] font-black uppercase tracking-widest text-black">Reuniones, llamadas y objeciones</p>
+                <p className="text-[12px] font-bold text-black/60 mt-2">"Genera un guion de llamada para cliente indeciso."</p>
+                <p className="text-[12px] font-bold text-black/60">"Dame respuestas para objeciones de precio y urgencia."</p>
+                <p className="text-[12px] font-bold text-black/60">"Prepara briefing para mi reunion de hoy con datos clave del cliente."</p>
+              </div>
+
+              <div className="rounded-2xl border border-black/5 p-4">
+                <p className="text-[11px] font-black uppercase tracking-widest text-black">Automatizaciones e integraciones</p>
+                <p className="text-[12px] font-bold text-black/60 mt-2">"Revisa mis automatizaciones activas y recomienda mejoras."</p>
+                <p className="text-[12px] font-bold text-black/60">"Sincroniza reuniones de calendario a tareas y marca prioridades."</p>
+                <p className="text-[12px] font-bold text-black/60">"Crea links de agenda y preparame mensaje para compartirlo con prospectos."</p>
+              </div>
+            </div>
+
+            <div className="flex justify-end">
+              <button
+                type="button"
+                onClick={() => setIsCapabilitiesOpen(false)}
+                className="inline-flex items-center gap-2 px-5 py-3 rounded-2xl bg-black text-white font-black text-[10px] uppercase tracking-widest hover:bg-black/85"
+              >
+                <CircleHelp size={14} />
+                Cerrar
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   )
 }

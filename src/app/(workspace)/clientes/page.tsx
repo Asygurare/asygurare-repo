@@ -14,6 +14,7 @@ import { toast, Toaster } from 'sonner'
 import { getFullName, calculateAge } from '@/src/lib/utils/utils'
 import { SelectWithOther } from '@/src/components/ui/SelectWithOther'
 import { RefreshButton } from '@/src/components/workspace/RefreshButton'
+import { SectionTutorial, type SectionTutorialStep } from '@/src/components/workspace/tutorial/SectionTutorial'
 
 const INSURANCE_TYPES = Object.values(InsuranceType)
 const ORIGIN_SOURCES = Object.values(OriginSource)
@@ -40,6 +41,39 @@ function formatDate(value: string | null | undefined): string {
     return '—'
   }
 }
+
+const CLIENTES_TUTORIAL_STEPS: SectionTutorialStep[] = [
+  {
+    id: 'nuevo-registro',
+    title: 'Nuevo registro',
+    description: 'Desde aqui creas un cliente nuevo y abres su expediente.',
+    selector: '[data-tutorial="clientes-new-record"]',
+  },
+  {
+    id: 'busqueda',
+    title: 'Busqueda rapida',
+    description: 'Filtra por nombre, email o telefono para encontrar clientes en segundos.',
+    selector: '[data-tutorial="clientes-search"]',
+  },
+  {
+    id: 'tabs',
+    title: 'Activos y descartados',
+    description: 'Cambia entre clientes activos y descartados para revisar tu cartera.',
+    selector: '[data-tutorial="clientes-tabs"]',
+  },
+  {
+    id: 'filtro-estatus',
+    title: 'Filtro por estatus',
+    description: 'Combina la busqueda con este filtro para segmentar mejor los resultados.',
+    selector: '[data-tutorial="clientes-status-filter"]',
+  },
+  {
+    id: 'listado',
+    title: 'Listado de clientes',
+    description: 'Haz clic en una fila o tarjeta para abrir y editar el expediente del cliente.',
+    selector: '[data-tutorial="clientes-list"]',
+  },
+]
 
 function ClientesPageContent() {
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -449,15 +483,24 @@ function ClientesPageContent() {
         <div>
           <h2 className="text-4xl font-black text-black tracking-tighter italic uppercase">Cartera.</h2>
         </div>
-        <button
-          onClick={() => {
-            setSelectedCustomer(null)
-            setIsModalOpen(true)
-          }}
-          className="bg-black text-white px-10 py-5 rounded-[2rem] font-black text-sm flex items-center gap-3 hover:bg-black/80 transition-all shadow-2xl active:scale-95"
-        >
-          <UserPlus size={20} /> NUEVO REGISTRO
-        </button>
+        <div className="flex flex-wrap items-center gap-3">
+          <SectionTutorial
+            steps={CLIENTES_TUTORIAL_STEPS}
+            ariaLabel="Tutorial de la seccion clientes"
+            triggerLabel="TUTORIAL"
+            triggerClassName="bg-white text-black px-6 py-4 rounded-[1.5rem] font-black text-xs sm:text-sm flex items-center gap-2 border border-black/10 hover:bg-black/5 transition-all shadow-sm active:scale-95"
+          />
+          <button
+            data-tutorial="clientes-new-record"
+            onClick={() => {
+              setSelectedCustomer(null)
+              setIsModalOpen(true)
+            }}
+            className="bg-black text-white px-10 py-5 rounded-[2rem] font-black text-sm flex items-center gap-3 hover:bg-black/80 transition-all shadow-2xl active:scale-95"
+          >
+            <UserPlus size={20} /> NUEVO REGISTRO
+          </button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -475,7 +518,7 @@ function ClientesPageContent() {
         </div> */}
       </div>
 
-      <div className="bg-white p-4 rounded-[2rem] border border-black/5 flex gap-4 items-center shadow-sm">
+      <div data-tutorial="clientes-search" className="bg-white p-4 rounded-[2rem] border border-black/5 flex gap-4 items-center shadow-sm">
         <div className="flex-1 relative group">
           <Search className="absolute left-5 top-1/2 -translate-y-1/2 text-black/40 group-focus-within:text-black" size={20} />
           <input
@@ -489,7 +532,7 @@ function ClientesPageContent() {
       </div>
 
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div className="bg-white p-2 rounded-[1.5rem] inline-flex items-center gap-2 border border-black/5 shadow-sm">
+        <div data-tutorial="clientes-tabs" className="bg-white p-2 rounded-[1.5rem] inline-flex items-center gap-2 border border-black/5 shadow-sm">
           <button
             type="button"
             onClick={() => setActiveTab('activos')}
@@ -532,7 +575,7 @@ function ClientesPageContent() {
               </button>
             </div>
           )}
-          <div className="flex items-center gap-2">
+          <div data-tutorial="clientes-status-filter" className="flex items-center gap-2">
             <label className="text-sm font-black uppercase tracking-widest text-black/70 whitespace-nowrap">Estatus</label>
             <select
               value={statusFilter}
@@ -548,7 +591,7 @@ function ClientesPageContent() {
         </div>
       </div>
 
-      <div className="bg-white rounded-[2rem] sm:rounded-[3rem] border border-black/5 shadow-sm overflow-hidden min-h-[400px] min-w-0">
+      <div data-tutorial="clientes-list" className="bg-white rounded-[2rem] sm:rounded-[3rem] border border-black/5 shadow-sm overflow-hidden min-h-[400px] min-w-0">
         {fetching ? (
           <div className="flex flex-col items-center justify-center h-[400px] gap-4">
             <Loader2 className="animate-spin text-black" size={40} />

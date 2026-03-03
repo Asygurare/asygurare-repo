@@ -11,6 +11,7 @@ import {
 } from 'lucide-react'
 import { supabaseClient } from '@/src/lib/supabase/client'
 import { getFullName } from '@/src/lib/utils/utils'
+import { SectionTutorial, type SectionTutorialStep } from '@/src/components/workspace/tutorial/SectionTutorial'
 
 type TaskKind = 'Llamada' | 'Cita' | 'Mensaje' | 'Seguimiento' | 'Otro'
 type TaskPriority = 'Alta' | 'Media' | 'Baja'
@@ -28,6 +29,27 @@ type MonthTask = {
   entity_id: string | null
   related_name?: string | null
 }
+
+const DASHBOARD_TUTORIAL_STEPS: SectionTutorialStep[] = [
+  {
+    id: "dashboard-overview",
+    title: "Vista general",
+    description: "Aqui tienes el resumen operativo y las alertas rapidas del mes.",
+    selector: '[data-tutorial="dashboard-overview"]',
+  },
+  {
+    id: "dashboard-kpis",
+    title: "Indicadores clave",
+    description: "Estos bloques resumen cartera, clientes, renovaciones y leads.",
+    selector: '[data-tutorial="dashboard-kpis"]',
+  },
+  {
+    id: "dashboard-activity",
+    title: "Actividad del mes",
+    description: "Revisa tareas recientes y su relacion con clientes o prospectos.",
+    selector: '[data-tutorial="dashboard-activity"]',
+  },
+]
 
 function kindIcon(kind: TaskKind) {
   if (kind === 'Llamada') return PhoneCall
@@ -170,8 +192,15 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-8">
+      <div className="flex justify-end">
+        <SectionTutorial
+          steps={DASHBOARD_TUTORIAL_STEPS}
+          ariaLabel="Tutorial de la seccion dashboard"
+          triggerClassName="inline-flex items-center gap-2 rounded-2xl border border-black/10 bg-white px-4 py-2 text-[10px] font-black uppercase tracking-widest text-black transition-all hover:bg-black hover:text-white"
+        />
+      </div>
       {/* --- SALUDO E IA --- */}
-      <section className="flex flex-col md:flex-row gap-6 items-stretch">
+      <section className="flex flex-col md:flex-row gap-6 items-stretch" data-tutorial="dashboard-overview">
         <motion.div
           initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
           className="flex-1 bg-white p-8 rounded-[2rem] border border-black/5 shadow-sm"
@@ -208,7 +237,7 @@ export default function DashboardPage() {
       </section>
 
       {/* --- ESTADÍSTICAS REALES --- */}
-      <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6" data-tutorial="dashboard-kpis">
         {cards.map((stat, i) => (
           
             <motion.div
@@ -239,7 +268,7 @@ export default function DashboardPage() {
       </section>
 
       {/* --- ACTIVIDAD Y TAREAS --- */}
-      <section className="grid lg:grid-cols-3 gap-6 sm:gap-8">
+      <section className="grid lg:grid-cols-3 gap-6 sm:gap-8" data-tutorial="dashboard-activity">
 
         <div className="lg:col-span-2 bg-white rounded-[2rem] sm:rounded-[2.5rem] border border-black/5 p-4 sm:p-10 flex flex-col min-w-0">
           <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-6 sm:mb-10">

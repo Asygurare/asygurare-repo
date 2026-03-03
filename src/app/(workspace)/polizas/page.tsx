@@ -23,7 +23,35 @@ import { PolicyCard } from '@/src/components/workspace/polizas/PolicyCard'
 import { PolicyStats } from '@/src/components/workspace/polizas/PolicyStats'
 import { PolicyCaptureModal } from '@/src/components/workspace/polizas/PolicyCaptureModal'
 import { RefreshButton } from '@/src/components/workspace/RefreshButton' 
+import { SectionTutorial, type SectionTutorialStep } from '@/src/components/workspace/tutorial/SectionTutorial'
 // Nota: Ya no importamos CustomerOption de aquí
+
+const POLIZAS_TUTORIAL_STEPS: SectionTutorialStep[] = [
+  {
+    id: "polizas-header",
+    title: "Gestion de cartera",
+    description: "Este panel concentra altas, edicion y seguimiento de polizas.",
+    selector: '[data-tutorial="polizas-header"]',
+  },
+  {
+    id: "polizas-kpis",
+    title: "KPIs de cartera",
+    description: "Aqui ves vencimientos, volumen y estado general de tus contratos.",
+    selector: '[data-tutorial="polizas-kpis"]',
+  },
+  {
+    id: "polizas-filters",
+    title: "Busqueda y filtros",
+    description: "Usa filtros y orden para priorizar oportunidades o riesgos.",
+    selector: '[data-tutorial="polizas-filters"]',
+  },
+  {
+    id: "polizas-results",
+    title: "Resultados",
+    description: "Estas tarjetas muestran cada poliza para abrir y editar su detalle.",
+    selector: '[data-tutorial="polizas-results"]',
+  },
+]
 
 function PolizasPageContent() {
   const searchParams = useSearchParams()
@@ -279,7 +307,7 @@ function PolizasPageContent() {
       <Toaster richColors position="top-right" />
 
       {/* HEADER */}
-      <div className="flex flex-col md:flex-row justify-between items-end gap-6 pb-4 border-b border-gray-200/50">
+      <div className="flex flex-col md:flex-row justify-between items-end gap-6 pb-4 border-b border-gray-200/50" data-tutorial="polizas-header">
         <div>
            <div className="flex items-center gap-3">
              <h2 className="text-4xl font-black text-black tracking-tighter italic uppercase">Gestión de Cartera.</h2>
@@ -289,6 +317,11 @@ function PolizasPageContent() {
            </p>
         </div>
         <div className="flex items-center gap-4">
+          <SectionTutorial
+            steps={POLIZAS_TUTORIAL_STEPS}
+            ariaLabel="Tutorial de la seccion polizas"
+            triggerClassName="inline-flex items-center gap-2 rounded-full border border-black/10 bg-white px-4 py-3 text-[10px] font-black uppercase tracking-widest text-black transition-all hover:bg-black hover:text-white"
+          />
           <RefreshButton onRefresh={() => fetchData(true)} refreshing={refreshing} />
           <button 
             onClick={handleCreate}
@@ -303,7 +336,9 @@ function PolizasPageContent() {
       </div>
 
       {/* KPIs */}
-      <PolicyStats policies={policies} />
+      <div data-tutorial="polizas-kpis">
+        <PolicyStats policies={policies} />
+      </div>
 
       {/* Búsqueda (entre KPIs y filtros, estilo Clientes) */}
       <div className="bg-white p-4 rounded-[2rem] border border-black/5 flex gap-4 items-center shadow-sm">
@@ -325,7 +360,7 @@ function PolizasPageContent() {
       </div>
 
       {/* Filtros + Ordenar por */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4" data-tutorial="polizas-filters">
         <div className="flex flex-wrap items-center gap-2">
           {[
             { id: 'all' as const, label: 'Toda la Cartera' },
@@ -463,7 +498,7 @@ function PolizasPageContent() {
             <p className="text-xs font-bold uppercase tracking-widest">Sincronizando Pólizas...</p>
         </div>
       ) : visiblePolicies.length > 0 ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-6 pb-20">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-6 pb-20" data-tutorial="polizas-results">
           <AnimatePresence mode="popLayout">
             {visiblePolicies.map((policy) => (
               <PolicyCard 

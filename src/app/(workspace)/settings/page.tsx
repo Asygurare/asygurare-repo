@@ -19,6 +19,7 @@ import { supabaseClient } from "@/src/lib/supabase/client"
 import { useRouter } from "next/navigation"
 import { changeUserPassword, deleteUserAccount, validatePassword } from "@/src/lib/utils/auth/auth-service"
 import { SITE_CONFIG } from "@/src/config/site"
+import { SectionTutorial, type SectionTutorialStep } from "@/src/components/workspace/tutorial/SectionTutorial"
 
 type Preferences = {
   language: "es-MX" | "en-US"
@@ -44,6 +45,33 @@ type SettingsState = {
 }
 
 const LS_KEY = "tg_settings_v1"
+
+const SETTINGS_TUTORIAL_STEPS: SectionTutorialStep[] = [
+  {
+    id: "settings-header",
+    title: "Configuracion general",
+    description: "Aqui gestionas tu perfil y los ajustes de tu cuenta.",
+    selector: '[data-tutorial="settings-header"]',
+  },
+  {
+    id: "settings-profile",
+    title: "Perfil del agente",
+    description: "Actualiza nombre, agencia y datos de ubicacion.",
+    selector: '[data-tutorial="settings-profile"]',
+  },
+  {
+    id: "settings-preferences",
+    title: "Preferencias",
+    description: "Consulta la configuracion de experiencia y notificaciones.",
+    selector: '[data-tutorial="settings-preferences"]',
+  },
+  {
+    id: "settings-security",
+    title: "Seguridad",
+    description: "Cambia tu contrasena y gestiona acciones sensibles de la cuenta.",
+    selector: '[data-tutorial="settings-security"]',
+  },
+]
 
 function isPlainObject(value: unknown): value is Record<string, any> {
   return !!value && typeof value === "object" && !Array.isArray(value)
@@ -334,7 +362,7 @@ export default function SettingsPage() {
       <Toaster richColors position="top-center" />
 
       {/* HEADER */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4" data-tutorial="settings-header">
         <div>
           <div className="flex items-center gap-3 mb-2">
             <div className="p-3 bg-black rounded-2xl shadow-xl">
@@ -347,14 +375,21 @@ export default function SettingsPage() {
           </p>
         </div>
 
-        <button
-          onClick={handleSaveAll}
-          disabled={saving}
-          className="bg-black text-white px-10 py-5 rounded-[2rem] font-black text-sm flex items-center gap-3 hover:bg-(--accents) transition-all shadow-2xl active:scale-95 disabled:opacity-60 cursor-pointer"
-        >
-          {saving ? <Loader2 className="animate-spin" size={18} /> : <Save size={18} />}
-          {saving ? "GUARDANDO" : "GUARDAR CAMBIOS"}
-        </button>
+        <div className="flex items-center gap-3">
+          <SectionTutorial
+            steps={SETTINGS_TUTORIAL_STEPS}
+            ariaLabel="Tutorial de la seccion configuracion"
+            triggerClassName="inline-flex items-center gap-2 rounded-[2rem] border border-black/10 bg-white px-5 py-3 text-[10px] font-black uppercase tracking-widest text-black transition-all hover:bg-black hover:text-white"
+          />
+          <button
+            onClick={handleSaveAll}
+            disabled={saving}
+            className="bg-black text-white px-10 py-5 rounded-[2rem] font-black text-sm flex items-center gap-3 hover:bg-(--accents) transition-all shadow-2xl active:scale-95 disabled:opacity-60 cursor-pointer"
+          >
+            {saving ? <Loader2 className="animate-spin" size={18} /> : <Save size={18} />}
+            {saving ? "GUARDANDO" : "GUARDAR CAMBIOS"}
+          </button>
+        </div>
       </div>
 
       {/* IDENTIDAD / QUICK CARD */}
@@ -382,7 +417,7 @@ export default function SettingsPage() {
       {/* GRID */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         {/* PERFIL */}
-        <div className="bg-white rounded-[2.5rem] border border-black/5 shadow-sm p-10 space-y-8">
+        <div className="bg-white rounded-[2.5rem] border border-black/5 shadow-sm p-10 space-y-8" data-tutorial="settings-profile">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="p-4 bg-gray-50 rounded-2xl text-black">
@@ -454,7 +489,7 @@ export default function SettingsPage() {
         </div>
 
         {/* PREFERENCIAS */}
-        <div className="bg-white rounded-[2.5rem] border border-black/5 shadow-sm p-10 space-y-8">
+        <div className="bg-white rounded-[2.5rem] border border-black/5 shadow-sm p-10 space-y-8" data-tutorial="settings-preferences">
           <div className="flex items-center gap-3">
             <div className="p-4 bg-gray-50 rounded-2xl text-black">
               <Settings2 size={20} />
@@ -567,7 +602,7 @@ export default function SettingsPage() {
         </div>
 
         {/* SEGURIDAD */}
-        <div className="bg-white rounded-[2.5rem] border-2 border-red-200 shadow-sm p-10 space-y-8">
+        <div className="bg-white rounded-[2.5rem] border-2 border-red-200 shadow-sm p-10 space-y-8" data-tutorial="settings-security">
           <div className="flex items-center gap-3">
             <div className="p-4 bg-red-50 rounded-2xl text-red-600">
               <ShieldCheck size={20} />
