@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react"
 import { Bell, CalendarClock, Cake, Loader2, Save, ShieldAlert } from "lucide-react"
 import { toast } from "sonner"
 import { SectionTutorial, type SectionTutorialStep } from "@/src/components/workspace/tutorial/SectionTutorial"
+import Link from "next/link"
 
 type Automation = {
   key: string
@@ -64,6 +65,8 @@ const AUTOMATIZAR_TUTORIAL_STEPS: SectionTutorialStep[] = [
 ]
 
 export default function AutomatizarClient() {
+  const [billingLoading, setBillingLoading] = useState(true)
+  const [hasProAccess, setHasProAccess] = useState(false)
   const [tab, setTab] = useState<"automations" | "notifications">("automations")
   const [loading, setLoading] = useState(false)
   const [savingKey, setSavingKey] = useState<string | null>(null)
@@ -137,6 +140,58 @@ export default function AutomatizarClient() {
   useEffect(() => {
     refreshAll()
   }, [])
+
+  useEffect(() => {
+    const loadBilling = async () => {
+      setBillingLoading(true)
+      try {
+        const response = await fetch("/api/billing/status", { cache: "no-store" })
+        const json = await response.json().catch(() => ({}))
+        setHasProAccess(Boolean(json?.billing?.has_pro_access))
+      } catch {
+        setHasProAccess(false)
+      } finally {
+        setBillingLoading(false)
+      }
+    }
+
+    loadBilling()
+  }, [])
+
+  if (billingLoading) {
+    return (
+      <div className="bg-white border border-black/5 rounded-[2rem] p-10 flex items-center gap-3">
+        <Loader2 size={18} className="animate-spin" />
+        <p className="text-sm font-bold">Validando suscripción...</p>
+      </div>
+    )
+  }
+
+  if (!hasProAccess) {
+    return (
+      <div className="bg-white border border-black/5 rounded-[2rem] p-8 space-y-4">
+        <p className="text-[11px] font-black uppercase tracking-widest text-black/50">Plan Pro requerido</p>
+        <h2 className="text-2xl font-black text-black tracking-tight">Automatizaciones es una función Pro</h2>
+        <p className="text-sm font-bold text-black/60">
+          Activa la prueba gratis de 15 días para habilitar envíos y reglas automáticas.
+        </p>
+        <div className="flex flex-wrap gap-3">
+          <Link
+            href="/pricing"
+            className="px-4 py-3 rounded-2xl bg-black text-white text-[11px] font-black uppercase tracking-widest"
+          >
+            Ver plan Pro
+          </Link>
+          <Link
+            href="/settings"
+            className="px-4 py-3 rounded-2xl border border-black/20 bg-white text-[11px] font-black uppercase tracking-widest"
+          >
+            Administrar suscripción
+          </Link>
+        </div>
+      </div>
+    )
+  }
 
   const updateAutomation = async (
     key: string,

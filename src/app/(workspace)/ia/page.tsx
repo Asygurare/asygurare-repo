@@ -4,9 +4,10 @@ import React, { useState, useEffect } from 'react'
 import SidebarConversaciones from '@/src/components/workspace/chat/SidebarConversaciones'
 import ChatDatamara from '@/src/components/workspace/chat/ChatGuros'
 import { supabaseClient } from '@/src/lib/supabase/client'
-import { BrainCircuit, CircleHelp, PanelLeft, Sparkles, X } from 'lucide-react'
+import { BrainCircuit, CircleHelp, CreditCard, PanelLeft, Sparkles, X } from 'lucide-react'
 import Image from 'next/image'
 import { SectionTutorial, type SectionTutorialStep } from '@/src/components/workspace/tutorial/SectionTutorial'
+import Link from 'next/link'
 
 const IA_TUTORIAL_STEPS: SectionTutorialStep[] = [
   {
@@ -38,6 +39,8 @@ const IA_TUTORIAL_STEPS: SectionTutorialStep[] = [
 export default function IASectorPage() {
   const [activeChatId, setActiveChatId] = useState<string | null>(null)
   const [user, setUser] = useState<any>(null)
+  const [billingLoading, setBillingLoading] = useState(true)
+  const [hasProAccess, setHasProAccess] = useState(false)
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false)
   const [isDesktopSidebarHidden, setIsDesktopSidebarHidden] = useState(false)
   const [isCapabilitiesOpen, setIsCapabilitiesOpen] = useState(false)
@@ -46,11 +49,56 @@ export default function IASectorPage() {
     const getUser = async () => {
       const { data: { user } } = await supabaseClient.auth.getUser()
       setUser(user)
+
+      if (user) {
+        try {
+          const response = await fetch("/api/billing/status", { cache: "no-store" })
+          const json = await response.json().catch(() => ({}))
+          setHasProAccess(Boolean(json?.billing?.has_pro_access))
+        } catch {
+          setHasProAccess(false)
+        } finally {
+          setBillingLoading(false)
+        }
+      } else {
+        setBillingLoading(false)
+      }
     }
     getUser()
   }, [])
 
-  if (!user) return null
+  if (!user || billingLoading) return null
+
+  if (!hasProAccess) {
+    return (
+      <div className="space-y-8 animate-in fade-in duration-500">
+        <div className="bg-white rounded-[2.5rem] border border-black/5 shadow-sm p-10 max-w-3xl">
+          <div className="inline-flex items-center gap-2 rounded-full bg-black text-white px-4 py-2 text-[11px] font-black uppercase tracking-widest">
+            <CreditCard size={14} />
+            Plan Pro requerido
+          </div>
+          <h2 className="mt-5 text-3xl font-black tracking-tight text-black">Guros IA es parte de Pro</h2>
+          <p className="mt-3 text-sm font-bold text-black/60 leading-relaxed">
+            Activa la prueba gratis de 15 días con tarjeta para usar Guros IA sin límites.
+          </p>
+          <div className="mt-6 flex flex-wrap gap-3">
+            <Link
+              href="/pricing"
+              className="px-5 py-3 rounded-2xl bg-black text-white text-[11px] font-black uppercase tracking-widest"
+            >
+              Ver plan Pro
+            </Link>
+            <Link
+              href="/settings"
+              className="px-5 py-3 rounded-2xl border border-black/20 bg-white text-[11px] font-black uppercase tracking-widest"
+            >
+              Administrar suscripción
+            </Link>
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-8 animate-in fade-in duration-700">

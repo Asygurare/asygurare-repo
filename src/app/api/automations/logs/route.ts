@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { createClient as createServerClient } from "@/src/lib/supabase/server"
 import { DATABASE } from "@/src/config"
+import { canAccessPro } from "@/src/services/billing/subscription"
 
 export const runtime = "edge"
 
@@ -10,6 +11,14 @@ export async function GET(request: Request) {
     data: { user },
   } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ ok: false, error: "No autorizado" }, { status: 401 })
+  const { data: billingSubscription } = await supabase
+    .from(DATABASE.TABLES.WS_BILLING_SUBSCRIPTIONS)
+    .select("status")
+    .eq("user_id", user.id)
+    .maybeSingle<{ status: string }>()
+  if (!canAccessPro(billingSubscription?.status)) {
+    return NextResponse.json({ ok: false, error: "Automatizaciones requiere plan Pro." }, { status: 402 })
+  }
 
   const url = new URL(request.url)
   const limit = Math.min(Math.max(Number(url.searchParams.get("limit") || 100), 1), 500)

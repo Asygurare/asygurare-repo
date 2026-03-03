@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { createClient as createServerClient } from "@/src/lib/supabase/server"
 import { DATABASE } from "@/src/config"
+import { canAccessPro } from "@/src/services/billing/subscription"
 import { DEFAULT_AUTOMATIONS, isAutomationKey, type AutomationKey } from "@/src/services/automations/config"
 
 export const runtime = "edge"
@@ -17,6 +18,15 @@ export async function GET() {
     data: { user },
   } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ ok: false, error: "No autorizado" }, { status: 401 })
+
+  const { data: billingSubscription } = await supabase
+    .from(DATABASE.TABLES.WS_BILLING_SUBSCRIPTIONS)
+    .select("status")
+    .eq("user_id", user.id)
+    .maybeSingle<{ status: string }>()
+  if (!canAccessPro(billingSubscription?.status)) {
+    return NextResponse.json({ ok: false, error: "Automatizaciones requiere plan Pro." }, { status: 402 })
+  }
 
   const { data, error } = await supabase
     .from(DATABASE.TABLES.WS_AUTOMATIONS)
@@ -46,6 +56,15 @@ export async function POST(request: Request) {
     data: { user },
   } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ ok: false, error: "No autorizado" }, { status: 401 })
+
+  const { data: billingSubscription } = await supabase
+    .from(DATABASE.TABLES.WS_BILLING_SUBSCRIPTIONS)
+    .select("status")
+    .eq("user_id", user.id)
+    .maybeSingle<{ status: string }>()
+  if (!canAccessPro(billingSubscription?.status)) {
+    return NextResponse.json({ ok: false, error: "Automatizaciones requiere plan Pro." }, { status: 402 })
+  }
 
   let body: UpsertBody
   try {

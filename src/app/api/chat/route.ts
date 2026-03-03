@@ -4,6 +4,7 @@ import { google } from '@ai-sdk/google'
 import { createClient } from '@/src/lib/supabase/server'
 import { DATABASE } from '@/src/config'
 import { buildChatTools } from '@/src/services/chat/tools'
+import { canAccessPro } from '@/src/services/billing/subscription'
 import * as fn from '@/src/lib/utils/functions'
 
 export const runtime = 'nodejs'
@@ -256,6 +257,22 @@ export async function POST(req: NextRequest) {
 
     if (authErr || !user || user.id !== user_id) {
       return NextResponse.json({ error: 'No autorizado.' }, { status: 401 })
+    }
+
+    const { data: billingSubscription } = await supabase
+      .from(DATABASE.TABLES.WS_BILLING_SUBSCRIPTIONS)
+      .select('status')
+      .eq('user_id', user.id)
+      .maybeSingle<{ status: string }>()
+
+    if (!canAccessPro(billingSubscription?.status)) {
+      return NextResponse.json(
+        {
+          error:
+            'Guros IA requiere una suscripción Pro activa o en trial. Activa tu plan desde Pricing o Configuración.',
+        },
+        { status: 402 },
+      )
     }
 
     const { data: history } = await supabase

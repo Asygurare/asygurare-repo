@@ -3,8 +3,10 @@
 import React, { useEffect, useMemo, useState } from "react"
 import { motion } from "framer-motion"
 import {
+  BadgeCheck,
   Bell,
   CheckCircle2,
+  CreditCard,
   Eye,
   EyeOff,
   KeyRound,
@@ -42,6 +44,14 @@ type SettingsState = {
   country: string
   preferences: Preferences
   notifications: Notifications
+}
+
+type BillingState = {
+  status: string
+  has_pro_access: boolean
+  trial_ends_at: string | null
+  current_period_ends_at: string | null
+  cancel_at_period_end: boolean
 }
 
 const LS_KEY = "tg_settings_v1"
@@ -147,6 +157,15 @@ export default function SettingsPage() {
   const [showCurrentPassword, setShowCurrentPassword] = useState(false)
   const [showNewPassword, setShowNewPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
+  const [billingLoading, setBillingLoading] = useState(true)
+  const [billingActionLoading, setBillingActionLoading] = useState(false)
+  const [billing, setBilling] = useState<BillingState>({
+    status: "free",
+    has_pro_access: false,
+    trial_ends_at: null,
+    current_period_ends_at: null,
+    cancel_at_period_end: false,
+  })
 
   useEffect(() => {
     const load = async () => {
@@ -226,6 +245,30 @@ export default function SettingsPage() {
     }
 
     load()
+  }, [])
+
+  useEffect(() => {
+    const loadBilling = async () => {
+      setBillingLoading(true)
+      try {
+        const response = await fetch("/api/billing/status", { cache: "no-store" })
+        const json = await response.json().catch(() => ({}))
+        if (!response.ok) throw new Error(json?.error || "No se pudo cargar billing")
+        if (json?.billing) setBilling(json.billing as BillingState)
+      } catch {
+        setBilling({
+          status: "free",
+          has_pro_access: false,
+          trial_ends_at: null,
+          current_period_ends_at: null,
+          cancel_at_period_end: false,
+        })
+      } finally {
+        setBillingLoading(false)
+      }
+    }
+
+    loadBilling()
   }, [])
 
   const agentLabel = useMemo(() => {
@@ -348,6 +391,38 @@ export default function SettingsPage() {
       console.error('Unexpected error during account deletion:', error);
     }
   };
+
+  const openCheckout = async () => {
+    setBillingActionLoading(true)
+    try {
+      const response = await fetch("/api/billing/checkout", { method: "POST" })
+      const json = await response.json().catch(() => ({}))
+      if (!response.ok || !json?.url) {
+        throw new Error(json?.error || "No se pudo abrir checkout")
+      }
+      window.location.href = String(json.url)
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : "No se pudo abrir checkout")
+    } finally {
+      setBillingActionLoading(false)
+    }
+  }
+
+  const openPortal = async () => {
+    setBillingActionLoading(true)
+    try {
+      const response = await fetch("/api/billing/portal", { method: "POST" })
+      const json = await response.json().catch(() => ({}))
+      if (!response.ok || !json?.url) {
+        throw new Error(json?.error || "No se pudo abrir el portal")
+      }
+      window.location.href = String(json.url)
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : "No se pudo abrir el portal")
+    } finally {
+      setBillingActionLoading(false)
+    }
+  }
 
   if (loading) {
     return (
@@ -598,6 +673,70 @@ export default function SettingsPage() {
               label="Actualizaciones del sistema"
               description="Mejoras y novedades de ASYGURARE."
             />
+          </div>
+        </div>
+
+        {/* BILLING */}
+        <div className="bg-white rounded-[2.5rem] border border-black/5 shadow-sm p-10 space-y-8">
+          <div className="flex items-center gap-3">
+            <div className="p-4 bg-gray-50 rounded-2xl text-black">
+              <CreditCard size={20} />
+            </div>
+            <div>
+              <p className="text-base font-black text-gray-400 uppercase tracking-widest">Suscripción</p>
+              <p className="text-xl font-black text-black italic">Plan Pro</p>
+            </div>
+          </div>
+
+          {billingLoading ? (
+            <div className="rounded-2xl border border-black/10 bg-black/[0.02] p-5 flex items-center gap-2">
+              <Loader2 size={16} className="animate-spin text-black/50" />
+              <p className="text-sm font-bold text-black/60">Cargando estado de suscripción...</p>
+            </div>
+          ) : (
+            <div className="rounded-2xl border border-black/10 bg-black/[0.02] p-5 space-y-3">
+              <div className="flex items-center justify-between gap-4">
+                <p className="text-sm font-black uppercase tracking-widest text-black/50">Estado actual</p>
+                <div className="inline-flex items-center gap-2 rounded-full px-3 py-1 text-[11px] font-black uppercase tracking-widest bg-black text-white">
+                  <BadgeCheck size={14} />
+                  {billing.status}
+                </div>
+              </div>
+              {billing.trial_ends_at ? (
+                <p className="text-sm font-bold text-black/70">
+                  Trial termina: {new Date(billing.trial_ends_at).toLocaleDateString("es-MX")}
+                </p>
+              ) : null}
+              {billing.current_period_ends_at ? (
+                <p className="text-sm font-bold text-black/70">
+                  Próximo corte: {new Date(billing.current_period_ends_at).toLocaleDateString("es-MX")}
+                </p>
+              ) : null}
+              {billing.cancel_at_period_end ? (
+                <p className="text-xs font-black uppercase tracking-widest text-amber-700">
+                  Tu plan está programado para cancelarse al final del periodo actual.
+                </p>
+              ) : null}
+            </div>
+          )}
+
+          <div className="flex flex-wrap gap-3">
+            <button
+              type="button"
+              onClick={openCheckout}
+              disabled={billingActionLoading || billing.has_pro_access}
+              className="px-5 py-3 rounded-2xl bg-black text-white text-[11px] font-black uppercase tracking-widest disabled:opacity-50"
+            >
+              {billing.has_pro_access ? "Plan activo" : "Iniciar Pro + trial 15 días"}
+            </button>
+            <button
+              type="button"
+              onClick={openPortal}
+              disabled={billingActionLoading || !billing.has_pro_access}
+              className="px-5 py-3 rounded-2xl border border-black/20 bg-white text-[11px] font-black uppercase tracking-widest disabled:opacity-50"
+            >
+              Administrar suscripción
+            </button>
           </div>
         </div>
 

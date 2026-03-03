@@ -3,6 +3,7 @@
 import React, { useState } from 'react'
 import { motion } from 'framer-motion'
 import { Check, Zap, Crown, Rocket, ArrowRight } from 'lucide-react'
+import { useRouter } from 'next/navigation'
 
 type BillingPeriod = "monthly" | "annual"
 
@@ -21,7 +22,9 @@ type PricingPlan = {
 
 
 export default function PricingPage() {
+  const router = useRouter()
   const [isAnnual, setIsAnnual] = useState(false)
+  const [loadingPlan, setLoadingPlan] = useState<null | "pro" | "ultimate">(null)
   const billing: BillingPeriod = isAnnual ? "annual" : "monthly"
 
   const plans: PricingPlan[] = [
@@ -62,6 +65,32 @@ export default function PricingPage() {
     },
   ]
 
+  const handlePlanCheckout = async (planKey: PricingPlan["key"]) => {
+    if (planKey !== "pro") return
+    setLoadingPlan(planKey)
+    try {
+      const response = await fetch("/api/billing/checkout", {
+        method: "POST",
+      })
+      const json = await response.json().catch(() => ({}))
+
+      if (response.status === 401) {
+        router.push("/login")
+        return
+      }
+      if (!response.ok || !json?.url) {
+        throw new Error(json?.error || "No se pudo iniciar el checkout")
+      }
+
+      window.location.href = String(json.url)
+    } catch (error) {
+      console.error(error)
+      alert("No se pudo abrir Stripe Checkout. Intenta nuevamente.")
+    } finally {
+      setLoadingPlan(null)
+    }
+  }
+
   return (
     <main className="bg-white min-h-screen pt-40 pb-24 px-7">
       <div className="max-w-7xl mx-auto">
@@ -86,7 +115,7 @@ export default function PricingPage() {
                 <p className="text-[11px] font-black uppercase tracking-widest text-black">Prueba gratis (15 días)</p>
               </div>
               <p className="text-sm font-bold text-black/50 leading-relaxed">
-                Acceso al workspace para conocer el flujo completo. Sin tarjeta. Cancela cuando quieras antes de que termine.
+                Acceso total al workspace por 15 dias. Tarjeta requerida al iniciar prueba. Cancela antes del dia 15 para no generar cobro.
               </p>
             </div>
           </div>
@@ -121,6 +150,8 @@ export default function PricingPage() {
               isPopular={!!p.highlight}
               tag={p.tag}
               billing={billing}
+              onSelect={() => handlePlanCheckout(p.key)}
+              loading={loadingPlan === p.key}
             />
           ))}
         </div>
@@ -153,6 +184,8 @@ function PricingCard({
   isPopular,
   tag,
   billing,
+  onSelect,
+  loading,
 }: {
   icon: React.ReactNode
   title: string
@@ -163,6 +196,8 @@ function PricingCard({
   isPopular: boolean
   tag?: string
   billing: BillingPeriod
+  onSelect: () => void
+  loading: boolean
 }) {
   return (
     <motion.div
@@ -204,11 +239,15 @@ function PricingCard({
         ))}
       </ul>
 
-      <button className={`w-full py-4 rounded-2xl font-bold transition-all flex items-center justify-center gap-2 ${isPopular
+      <button
+        onClick={onSelect}
+        disabled={loading}
+        className={`w-full py-4 rounded-2xl font-bold transition-all flex items-center justify-center gap-2 disabled:opacity-60 ${isPopular
           ? 'bg-(--accents) hover:bg-blue-500 text-white'
           : 'bg-[#1a1a1a] hover:bg-black text-white'
-        }`}>
-        {cta} <ArrowRight size={18} />
+        }`}
+      >
+        {loading ? "Conectando..." : cta} <ArrowRight size={18} />
       </button>
     </motion.div>
   )
