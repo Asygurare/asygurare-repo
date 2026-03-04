@@ -677,43 +677,50 @@ export default function SettingsPage() {
         </div>
 
         {/* BILLING */}
-        <div className="bg-white rounded-[2.5rem] border border-black/5 shadow-sm p-10 space-y-8">
+        <div className="bg-white rounded-[2.5rem] border border-[#D4AF37]/35 shadow-sm p-10 space-y-8 relative overflow-hidden">
+          <div className="pointer-events-none absolute -top-20 -right-16 h-44 w-44 rounded-full bg-(--accents)/15 blur-3xl" />
+          <div className="pointer-events-none absolute -bottom-24 -left-12 h-48 w-48 rounded-full bg-[#D4AF37]/20 blur-3xl" />
           <div className="flex items-center gap-3">
-            <div className="p-4 bg-gray-50 rounded-2xl text-black">
+            <div className="p-4 bg-gradient-to-br from-[#F8E7A4] to-[#D4AF37] rounded-2xl text-black shadow-sm">
               <CreditCard size={20} />
             </div>
             <div>
-              <p className="text-base font-black text-gray-400 uppercase tracking-widest">Suscripción</p>
-              <p className="text-xl font-black text-black italic">Plan Pro</p>
+              <p className="text-base font-black text-[#9A7A17] uppercase tracking-widest">Suscripción</p>
+              <div className="flex items-center gap-2">
+                <p className="text-xl font-black text-black italic">Plan Pro</p>
+                <span className="inline-flex items-center rounded-full bg-gradient-to-r from-[#D4AF37] to-(--accents) px-3 py-1 text-[10px] font-black uppercase tracking-widest text-white shadow-sm">
+                  Premium
+                </span>
+              </div>
             </div>
           </div>
 
           {billingLoading ? (
-            <div className="rounded-2xl border border-black/10 bg-black/[0.02] p-5 flex items-center gap-2">
-              <Loader2 size={16} className="animate-spin text-black/50" />
-              <p className="text-sm font-bold text-black/60">Cargando estado de suscripción...</p>
+            <div className="rounded-2xl border border-[#D4AF37]/35 bg-gradient-to-r from-[#FFF8DC] to-[#F8F6FF] p-5 flex items-center gap-2">
+              <Loader2 size={16} className="animate-spin text-[#9A7A17]" />
+              <p className="text-sm font-bold text-[#614D12]">Cargando estado de suscripción...</p>
             </div>
           ) : (
-            <div className="rounded-2xl border border-black/10 bg-black/[0.02] p-5 space-y-3">
+            <div className="rounded-2xl border border-[#D4AF37]/35 bg-gradient-to-r from-[#FFF8DC] to-[#F3EEFF] p-5 space-y-3">
               <div className="flex items-center justify-between gap-4">
-                <p className="text-sm font-black uppercase tracking-widest text-black/50">Estado actual</p>
-                <div className="inline-flex items-center gap-2 rounded-full px-3 py-1 text-[11px] font-black uppercase tracking-widest bg-black text-white">
+                <p className="text-sm font-black uppercase tracking-widest text-[#6D5714]">Estado actual</p>
+                <div className="inline-flex items-center gap-2 rounded-full px-3 py-1 text-[11px] font-black uppercase tracking-widest bg-gradient-to-r from-(--accents) to-[#D4AF37] text-white shadow-sm">
                   <BadgeCheck size={14} />
                   {billing.status}
                 </div>
               </div>
               {billing.trial_ends_at ? (
-                <p className="text-sm font-bold text-black/70">
+                <p className="text-sm font-bold text-[#5C4A14]">
                   Trial termina: {new Date(billing.trial_ends_at).toLocaleDateString("es-MX")}
                 </p>
               ) : null}
               {billing.current_period_ends_at ? (
-                <p className="text-sm font-bold text-black/70">
+                <p className="text-sm font-bold text-[#5C4A14]">
                   Próximo corte: {new Date(billing.current_period_ends_at).toLocaleDateString("es-MX")}
                 </p>
               ) : null}
               {billing.cancel_at_period_end ? (
-                <p className="text-xs font-black uppercase tracking-widest text-amber-700">
+                <p className="text-xs font-black uppercase tracking-widest text-[#8A5A00]">
                   Tu plan está programado para cancelarse al final del periodo actual.
                 </p>
               ) : null}
@@ -725,7 +732,7 @@ export default function SettingsPage() {
               type="button"
               onClick={openCheckout}
               disabled={billingActionLoading || billing.has_pro_access}
-              className="px-5 py-3 rounded-2xl bg-black text-white text-[11px] font-black uppercase tracking-widest disabled:opacity-50"
+              className="px-5 py-3 rounded-2xl bg-gradient-to-r from-(--accents) to-[#D4AF37] text-white text-[11px] font-black uppercase tracking-widest shadow-md hover:brightness-105 transition-all disabled:opacity-50"
             >
               {billing.has_pro_access ? "Plan activo" : "Iniciar Pro + trial 15 días"}
             </button>
@@ -733,7 +740,7 @@ export default function SettingsPage() {
               type="button"
               onClick={openPortal}
               disabled={billingActionLoading || !billing.has_pro_access}
-              className="px-5 py-3 rounded-2xl border border-black/20 bg-white text-[11px] font-black uppercase tracking-widest disabled:opacity-50"
+              className="px-5 py-3 rounded-2xl border border-[#D4AF37]/50 bg-white text-[11px] text-[#6A5416] font-black uppercase tracking-widest hover:bg-[#FFF8E8] transition-all disabled:opacity-50"
             >
               Administrar suscripción
             </button>

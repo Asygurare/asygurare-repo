@@ -30,6 +30,28 @@ type MonthTask = {
   related_name?: string | null
 }
 
+type TaskRow = {
+  id: string | number
+  title: string | null
+  kind: TaskKind | null
+  priority: TaskPriority | null
+  status: TaskStatus | null
+  due_at: string | null
+  entity_type: EntityType | null
+  entity_id: string | null
+}
+
+type NamedEntityRow = {
+  id: string | number
+  name?: string | null
+  last_name?: string | null
+}
+
+type PolicyRow = {
+  total_premium: number | null
+  expiry_date: string | null
+}
+
 const DASHBOARD_TUTORIAL_STEPS: SectionTutorialStep[] = [
   {
     id: "dashboard-overview",
@@ -67,6 +89,12 @@ function priorityDot(priority: TaskPriority) {
 
 export default function DashboardPage() {
   const [loading, setLoading] = useState(true)
+  const [showWelcomeModal, setShowWelcomeModal] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false
+    const shouldShow = window.sessionStorage.getItem('showAsygurareWelcomeModal') === '1'
+    if (shouldShow) window.sessionStorage.removeItem('showAsygurareWelcomeModal')
+    return shouldShow
+  })
   const [stats, setStats] = useState({
     primas: 0,
     clientes: 0,
@@ -103,7 +131,7 @@ export default function DashboardPage() {
           .limit(12),
       ])
 
-      const policies = policiesRes.data || []
+      const policies = (policiesRes.data || []) as PolicyRow[]
       const customerCount = customerCountRes.count || 0
       const leadsCount = leadsCountRes.count || 0
 
@@ -113,7 +141,7 @@ export default function DashboardPage() {
         setMonthTasks([])
       } else {
         setTasksAvailable(true)
-        const rawTasks: MonthTask[] = (tasksRes.data || []).map((t: any) => ({
+        const rawTasks: MonthTask[] = ((tasksRes.data || []) as TaskRow[]).map((t) => ({
           id: String(t.id),
           title: String(t.title || ''),
           kind: (t.kind as TaskKind) || 'Otro',
@@ -136,17 +164,17 @@ export default function DashboardPage() {
         const [custsRes, leadsRes] = await Promise.all([
           customerIds.length
             ? supabaseClient.from(DATABASE.TABLES.WS_CUSTOMERS_2).select('id, name, last_name').in('id', customerIds)
-            : Promise.resolve({ data: [] as any[], error: null }),
+            : Promise.resolve({ data: [] as NamedEntityRow[], error: null }),
           leadIds.length
             ? supabaseClient.from(DATABASE.TABLES.WS_LEADS).select('id, name, last_name').in('id', leadIds)
-            : Promise.resolve({ data: [] as any[], error: null }),
+            : Promise.resolve({ data: [] as NamedEntityRow[], error: null }),
         ])
 
         const custMap = new Map<string, string>()
         const leadMap = new Map<string, string>()
 
-        ;(custsRes.data || []).forEach((c: any) => custMap.set(String(c.id), getFullName(c)))
-        ;(leadsRes.data || []).forEach((l: any) => leadMap.set(String(l.id), getFullName(l)))
+        ;((custsRes.data || []) as NamedEntityRow[]).forEach((c) => custMap.set(String(c.id), getFullName(c)))
+        ;((leadsRes.data || []) as NamedEntityRow[]).forEach((l) => leadMap.set(String(l.id), getFullName(l)))
 
         const enriched = rawTasks.map(t => ({
           ...t,
@@ -160,13 +188,13 @@ export default function DashboardPage() {
       }
 
       // Lógica de cálculo
-      const totalPrimas = policies.reduce((acc, curr: any) => acc + (curr.total_premium || 0), 0) || 0
+      const totalPrimas = policies.reduce((acc, curr) => acc + (curr.total_premium || 0), 0) || 0
 
       // Lógica de renovaciones (próximos 30 días)
       const nextMonth = new Date()
       nextMonth.setDate(today.getDate() + 30)
 
-      const renovacionesCount = policies.filter((p: any) => {
+      const renovacionesCount = policies.filter((p) => {
         const expiry = new Date(p.expiry_date)
         return expiry >= today && expiry <= nextMonth
       }).length || 0
@@ -192,6 +220,28 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-8">
+      {showWelcomeModal ? (
+        <div className="fixed inset-0 z-[160] bg-black/55 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="w-full max-w-xl rounded-[2rem] bg-white border border-black/10 shadow-2xl p-8 text-center">
+            <div className="mx-auto w-14 h-14 rounded-2xl bg-(--accents) text-white flex items-center justify-center">
+              <Sparkles size={24} />
+            </div>
+            <p className="mt-4 text-[11px] font-black uppercase tracking-[0.25em] text-black/40">Activación completada</p>
+            <h2 className="mt-2 text-3xl font-black tracking-tight text-black">Bienvenido a Asygurare</h2>
+            <p className="mt-4 text-sm font-bold text-black/60 leading-relaxed">
+              Tu prueba gratis de 15 días ya está activa. No se realizará ningún cobro hoy.
+              Tu primer cargo será al finalizar el periodo de prueba, y puedes cancelar cuando quieras antes de esa fecha.
+            </p>
+            <button
+              type="button"
+              onClick={() => setShowWelcomeModal(false)}
+              className="mt-6 inline-flex items-center justify-center rounded-2xl bg-black text-white px-6 py-3 text-[11px] font-black uppercase tracking-widest hover:bg-(--accents) transition-all"
+            >
+              Empezar a usar Asygurare
+            </button>
+          </div>
+        </div>
+      ) : null}
       <div className="flex justify-end">
         <SectionTutorial
           steps={DASHBOARD_TUTORIAL_STEPS}

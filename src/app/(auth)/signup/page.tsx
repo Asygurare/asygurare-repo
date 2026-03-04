@@ -47,6 +47,8 @@ export default function SignUpPage() {
     }
 
     setLoading(true)
+    const origin = typeof window !== 'undefined' ? window.location.origin : (process.env.NEXT_PUBLIC_APP_URL || '')
+    const emailConfirmationNext = encodeURIComponent('/login?code=email_confirmed')
     const firstName = formData.get('firstName') as string
     const lastName = formData.get('lastName') as string
     const agencyName = formData.get('agencyName') as string
@@ -58,7 +60,7 @@ export default function SignUpPage() {
       password,
       options: {
         // A dónde vuelve el usuario después de confirmar el correo
-        emailRedirectTo: `${process.env.NEXT_PUBLIC_APP_URL}/login?code=email_confirmed`,
+        emailRedirectTo: `${origin}/api/auth/callback?next=${emailConfirmationNext}`,
         // Estos datos son los que el trigger de SQL leerá para la tabla profiles
         data: {
           first_name: firstName,
@@ -66,7 +68,8 @@ export default function SignUpPage() {
           agency_name: agencyName,
           city:city,
           country:country,
-          email: email,         
+          email: email,
+          trial_checkout_required: true,
         }
       }
     })
@@ -93,6 +96,12 @@ export default function SignUpPage() {
           </Link>
 
           <h1 className="text-4xl text-(--text) font-medium tracking-tight mb-8">Crea tu cuenta.</h1>
+          <div className="mb-6 rounded-2xl border border-(--accents)/20 bg-(--accents)/10 px-4 py-3">
+            <p className="text-xs font-black uppercase tracking-widest text-(--accents)">Prueba gratis incluida</p>
+            <p className="mt-1 text-sm font-bold text-black/70">
+              En cuanto crees tu cuenta, inicia tu prueba gratis de 15 días del plan Pro.
+            </p>
+          </div>
 
           {error && (
             <div className="mb-6 p-4 bg-red-50 border border-red-100 text-red-600 text-sm rounded-2xl">

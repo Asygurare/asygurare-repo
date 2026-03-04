@@ -72,6 +72,13 @@ export default function PricingPage() {
       const response = await fetch("/api/billing/checkout", {
         method: "POST",
       })
+
+      // In this app, unauthenticated API requests can be redirected by proxy to /login.
+      if (response.redirected || response.url.includes("/login")) {
+        router.push("/login")
+        return
+      }
+
       const json = await response.json().catch(() => ({}))
 
       if (response.status === 401) {
@@ -83,9 +90,10 @@ export default function PricingPage() {
       }
 
       window.location.href = String(json.url)
-    } catch (error) {
+    } catch (error: unknown) {
       console.error(error)
-      alert("No se pudo abrir Stripe Checkout. Intenta nuevamente.")
+      const message = error instanceof Error ? error.message : "No se pudo abrir Stripe Checkout. Intenta nuevamente."
+      alert(message)
     } finally {
       setLoadingPlan(null)
     }
