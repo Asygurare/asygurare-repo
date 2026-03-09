@@ -1,6 +1,53 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/src/lib/supabase/server'
+import { getAdminClient } from '@/src/lib/supabase/admin'
 import { DATABASE } from '@/src/config/database'
+
+type PendingInvite = {
+  id: string
+  team_id: string
+  permissions: Record<string, unknown> | null
+  token: string
+}
+
+async function linkPendingInvitations(userId: string, userEmail: string | undefined) {
+  if (!userEmail) return
+  const email = userEmail.toLowerCase()
+
+  const admin = getAdminClient()
+
+  const { data: pendingInvitesRaw } = await admin
+    .from(DATABASE.TABLES.WS_TEAM_INVITATIONS)
+    .select('id, team_id, permissions, token')
+    .eq('email', email)
+    .eq('status', 'pending')
+
+  const pendingInvites = (pendingInvitesRaw ?? []) as PendingInvite[]
+
+  if (!pendingInvites || pendingInvites.length === 0) return
+
+  for (const invite of pendingInvites) {
+    const { data: existingMember } = await admin
+      .from(DATABASE.TABLES.WS_TEAM_MEMBERS)
+      .select('id')
+      .eq('team_id', invite.team_id)
+      .eq('user_id', userId)
+      .maybeSingle()
+
+    if (existingMember) continue
+
+    await (admin.from(DATABASE.TABLES.WS_TEAM_MEMBERS) as any).insert({
+      team_id: invite.team_id,
+      user_id: userId,
+      role: 'member',
+      permissions: invite.permissions ?? {},
+    })
+
+    await (admin.from(DATABASE.TABLES.WS_TEAM_INVITATIONS) as any)
+      .update({ status: 'accepted', accepted_by: userId })
+      .eq('id', invite.id)
+  }
+}
 
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url)
@@ -16,6 +63,7 @@ export async function GET(request: Request) {
     if (!error) {
       const { data: userData } = await supabase.auth.getUser()
       const userId = userData.user?.id ?? null
+      const userEmail = userData.user?.email ?? undefined
 
       if (userId) {
         const { data: profile } = await supabase
@@ -33,6 +81,8 @@ export async function GET(request: Request) {
         if (needsCompletion) {
           next = '/complete-profile'
         }
+
+        await linkPendingInvitations(userId, userEmail)
       }
 
       const forwardedHost = request.headers.get('x-forwarded-host')

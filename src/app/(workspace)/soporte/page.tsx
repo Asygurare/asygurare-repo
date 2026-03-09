@@ -13,6 +13,7 @@ import {
 } from "lucide-react"
 import { supabaseClient } from "@/src/lib/supabase/client"
 import { toast, Toaster } from "sonner"
+import { SectionTutorial, type SectionTutorialStep } from "@/src/components/workspace/tutorial/SectionTutorial"
 
 const channels = [
   {
@@ -51,6 +52,33 @@ const faqs = [
   {
     q: "¿Puedo pedir un tutorial?",
     a: "Claro, agenda una reunión y nuestro equipo técnico te guiará para sacar el 100% de Asygurare.",
+  },
+]
+
+const SOPORTE_TUTORIAL_STEPS: SectionTutorialStep[] = [
+  {
+    id: "soporte-header",
+    title: "Centro de soporte",
+    description: "Desde aqui puedes elegir el canal de ayuda y consultar guias rapidas.",
+    selector: '[data-tutorial="soporte-header"]',
+  },
+  {
+    id: "soporte-channels",
+    title: "Canales directos",
+    description: "Contacta soporte por WhatsApp, correo o agenda una reunion.",
+    selector: '[data-tutorial="soporte-channels"]',
+  },
+  {
+    id: "soporte-faq",
+    title: "Preguntas frecuentes",
+    description: "Revisa respuestas comunes antes de abrir un ticket.",
+    selector: '[data-tutorial="soporte-faq"]',
+  },
+  {
+    id: "soporte-form",
+    title: "Formulario de ayuda",
+    description: "Envia tu caso con detalle para seguimiento tecnico.",
+    selector: '[data-tutorial="soporte-form"]',
   },
 ]
 
@@ -108,7 +136,14 @@ export default function SoportePage() {
   return (
     <section className="space-y-8 pb-8">
       <Toaster richColors position="top-center" />
-      <div className="rounded-[2.2rem] border border-black/5 bg-white p-6 shadow-sm sm:p-8">
+      <div className="rounded-[2.2rem] border border-black/5 bg-white p-6 shadow-sm sm:p-8" data-tutorial="soporte-header">
+        <div className="mb-4 flex justify-end">
+          <SectionTutorial
+            steps={SOPORTE_TUTORIAL_STEPS}
+            ariaLabel="Tutorial de la seccion soporte"
+            triggerClassName="inline-flex items-center gap-2 rounded-2xl border border-black/10 bg-white px-4 py-2 text-[10px] font-black uppercase tracking-widest text-black transition-all hover:bg-black hover:text-white"
+          />
+        </div>
         <div className="inline-flex items-center gap-2 rounded-full border border-(--accents)/20 bg-(--accents)/10 px-4 py-1">
           <Headset className="h-4 w-4 text-(--accents)" />
           <span className="text-[11px] font-black uppercase tracking-widest text-(--accents)">
@@ -125,7 +160,7 @@ export default function SoportePage() {
         </p>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-3" data-tutorial="soporte-channels">
         {channels.map((channel) => (
           <Link
             key={channel.title}
@@ -149,7 +184,7 @@ export default function SoportePage() {
       </div>
 
       <div className="grid gap-4 lg:grid-cols-[1.15fr_1fr]">
-        <div className="rounded-[2rem] border border-black/5 bg-white p-6 shadow-sm sm:p-8">
+        <div className="rounded-[2rem] border border-black/5 bg-white p-6 shadow-sm sm:p-8" data-tutorial="soporte-faq">
           <div className="mb-5 flex items-center gap-2">
             <CircleHelp className="h-5 w-5 text-(--accents)" />
             <p className="text-xs font-black uppercase tracking-widest text-black/40">
@@ -172,7 +207,7 @@ export default function SoportePage() {
           </div>
         </div>
 
-        <div className="rounded-[2rem] border border-black/5 bg-white p-6 shadow-sm sm:p-8">
+        <div className="rounded-[2rem] border border-black/5 bg-white p-6 shadow-sm sm:p-8" data-tutorial="soporte-form">
           <div className="mb-6 flex items-center gap-2">
             <Send className="h-5 w-5 text-(--accents)" />
             <p className="text-xs font-black uppercase tracking-widest text-black/40">

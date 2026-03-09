@@ -8,6 +8,7 @@ import { DATABASE } from "@/src/config"
 import TemplatesPanel from "./components/TemplatesPanel"
 import SignaturePanel from "./components/SignaturePanel"
 import AIAssistantPanel from "./components/AIAssistantPanel"
+import { SectionTutorial, type SectionTutorialStep } from "@/src/components/workspace/tutorial/SectionTutorial"
 import {
   Cpu,
   Pencil,
@@ -34,6 +35,48 @@ type SignatureLink = {
   url: string
 }
 
+type SignatureVisualStyle = {
+  backgroundColor: string
+  borderColor: string
+  borderRadius: number
+  logoBackgroundColor: string
+  logoBorderColor: string
+  logoBorderRadius: number
+}
+
+const SIGNATURE_STYLE_STORAGE_KEY = "asygurare_email_signature_visual_style_v1"
+
+const sanitizeHexColor = (value: unknown, fallback: string) => {
+  const raw = String(value ?? "").trim()
+  return /^#([0-9a-fA-F]{6})$/.test(raw) ? raw : fallback
+}
+
+const sanitizeRadius = (value: unknown, fallback: number) => {
+  const numeric = Number(value)
+  if (!Number.isFinite(numeric)) return fallback
+  return Math.max(0, Math.min(28, Math.round(numeric)))
+}
+
+const escapeHtml = (value: string) =>
+  value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;")
+
+const inferSocialBadge = (label: string, url: string) => {
+  const haystack = `${label} ${url}`.toLowerCase()
+  if (haystack.includes("instagram")) return { icon: "IG", bg: "#fdf2f8", text: "#be185d", border: "#fbcfe8" }
+  if (haystack.includes("facebook")) return { icon: "FB", bg: "#eff6ff", text: "#1d4ed8", border: "#bfdbfe" }
+  if (haystack.includes("linkedin")) return { icon: "IN", bg: "#eff6ff", text: "#0a66c2", border: "#bfdbfe" }
+  if (haystack.includes("youtube")) return { icon: "YT", bg: "#fef2f2", text: "#b91c1c", border: "#fecaca" }
+  if (haystack.includes("whatsapp") || haystack.includes("wa.me")) {
+    return { icon: "WA", bg: "#f0fdf4", text: "#15803d", border: "#bbf7d0" }
+  }
+  return { icon: "WEB", bg: "#f9fafb", text: "#111827", border: "#e5e7eb" }
+}
+
 type TemplateTag = "prospectos" | "clientes" | "polizas" | "cumpleanos" | "eventos" | "personalizar"
 
 type EmailTemplate = {
@@ -56,6 +99,75 @@ type TemplateAttachment = {
   path: string
   mime_type: string
 }
+
+const EMAIL_ENVIAR_TUTORIAL_STEPS: SectionTutorialStep[] = [
+  {
+    id: "refresh",
+    title: "Estado de Gmail",
+    description: "Refresca el estado de conexion y permisos antes de iniciar un envio.",
+    selector: '[data-tutorial="email-refresh"]',
+  },
+  {
+    id: "tabs",
+    title: "Tabs de correo",
+    description: "Alterna entre redactor, enviados y programados segun tu flujo.",
+    selector: '[data-tutorial="email-enviar-tabs"]',
+  },
+  {
+    id: "step1",
+    title: "Paso 1: destinatarios",
+    description: "Selecciona audiencia, busca contactos y marca a quienes enviaras.",
+    selector: '[data-tutorial="email-enviar-step1"]',
+  },
+  {
+    id: "contacts",
+    title: "Lista de contactos",
+    description: "Desde aqui eliges uno por uno o en bloque a tus destinatarios.",
+    selector: '[data-tutorial="email-enviar-contacts-list"]',
+  },
+]
+
+const EMAIL_TEMPLATES_TUTORIAL_STEPS: SectionTutorialStep[] = [
+  {
+    id: "refresh",
+    title: "Estado de Gmail",
+    description: "Valida que la conexion de Gmail este lista antes de usar plantillas.",
+    selector: '[data-tutorial="email-refresh"]',
+  },
+  {
+    id: "templates-section",
+    title: "Seccion de plantillas",
+    description: "Aqui gestionas tus templates para reutilizar mensajes en segundos.",
+    selector: '[data-tutorial="email-templates-section"]',
+  },
+  {
+    id: "templates-panel",
+    title: "Editor y biblioteca",
+    description: "Crea, edita y mejora plantillas con acciones manuales o IA.",
+    selector: '[data-tutorial="email-templates-panel"]',
+  },
+]
+
+const EMAIL_SIGNATURE_TUTORIAL_STEPS: SectionTutorialStep[] = [
+  {
+    id: "refresh",
+    title: "Estado de Gmail",
+    description: "Confirma que tu cuenta este conectada para aplicar firma al enviar.",
+    selector: '[data-tutorial="email-refresh"]',
+  },
+  {
+    id: "signature-section",
+    title: "Seccion de firma",
+    description: "Define una firma unica para usarla de forma consistente en tus correos.",
+    selector: '[data-tutorial="email-signature-section"]',
+  },
+  {
+    id: "signature-panel",
+    title: "Configuracion de firma",
+    description: "Personaliza nombre, telefono, enlaces, logo y pie de firma.",
+    selector: '[data-tutorial="email-signature-panel"]',
+  },
+]
 
 export default function AutomatizacionesClient({
   banner,
@@ -152,6 +264,12 @@ export default function AutomatizacionesClient({
   const [signatureLinksText, setSignatureLinksText] = useState(
     "Sitio web|https://\nInstagram|https://instagram.com/\nFacebook|https://facebook.com/"
   )
+  const [signatureBackgroundColor, setSignatureBackgroundColor] = useState("#ffffff")
+  const [signatureBorderColor, setSignatureBorderColor] = useState("#e5e7eb")
+  const [signatureBorderRadius, setSignatureBorderRadius] = useState(16)
+  const [logoBackgroundColor, setLogoBackgroundColor] = useState("#f8fafc")
+  const [logoBorderColor, setLogoBorderColor] = useState("#e5e7eb")
+  const [logoBorderRadius, setLogoBorderRadius] = useState(14)
   const [templatesLoading, setTemplatesLoading] = useState(false)
   const [templatesSaving, setTemplatesSaving] = useState(false)
   const [templatesAIWorking, setTemplatesAIWorking] = useState(false)
@@ -247,24 +365,44 @@ export default function AutomatizacionesClient({
       .filter((x) => !!x.label && !!x.url)
   }
 
+  const addSocialLink = (label: string, url: string) => {
+    const nextLine = `${label}|${url}`
+    const lines = signatureLinksText
+      .split("\n")
+      .map((line) => line.trim())
+      .filter(Boolean)
+    const alreadyExists = lines.some((line) => line.toLowerCase().startsWith(`${label.toLowerCase()}|`))
+    if (alreadyExists) return
+    const nextValue = lines.length > 0 ? `${lines.join("\n")}\n${nextLine}` : nextLine
+    setSignatureLinksText(nextValue)
+  }
+
   const buildSignatureHtml = () => {
     if (!includeSignature) return ""
     const links = parseSignatureLinks(signatureLinksText)
     const linksHtml = links
-      .map((link) => `<a href="${link.url}" target="_blank" style="color:#111111;text-decoration:underline;">${link.label}</a>`)
-      .join(" · ")
+      .map((link) => {
+        const safeLabel = escapeHtml(link.label)
+        const safeUrl = escapeHtml(link.url)
+        const badge = inferSocialBadge(link.label, link.url)
+        return `<a href="${safeUrl}" target="_blank" style="display:inline-flex;align-items:center;gap:6px;padding:4px 8px;border-radius:999px;border:1px solid ${badge.border};background:${badge.bg};color:${badge.text};text-decoration:none;font-size:12px;font-weight:700;margin:0 6px 6px 0;"><span style="display:inline-flex;align-items:center;justify-content:center;min-width:24px;height:24px;border-radius:999px;background:#ffffff;border:1px solid ${badge.border};font-size:10px;letter-spacing:0.04em;">${badge.icon}</span>${safeLabel}</a>`
+      })
+      .join("")
+    const safePhone = escapeHtml(signaturePhone.trim())
+    const safeFooter = escapeHtml(signatureFooterText.trim())
+    const safeName = escapeHtml(signatureName.trim() || "Tu firma de correo")
     const phonePart = signaturePhone.trim()
-      ? `<div style="margin:4px 0 0 0;"><strong>Telefono:</strong> <a href="tel:${signaturePhone.trim()}" style="color:#111111;text-decoration:underline;">${signaturePhone.trim()}</a></div>`
+      ? `<div style="margin:6px 0 0 0;"><strong>Telefono:</strong> <a href="tel:${safePhone}" style="color:#111111;text-decoration:underline;">${safePhone}</a></div>`
       : ""
     const footerPart = signatureFooterText.trim()
-      ? `<div style="margin:4px 0 0 0;">${signatureFooterText.trim()}</div>`
+      ? `<div style="margin:8px 0 0 0;color:#374151;">${safeFooter}</div>`
       : ""
     const logoPart = signatureLogoUrl
-      ? `<div style="margin-top:10px;"><img src="${signatureLogoUrl}" alt="Logo" style="max-height:70px;max-width:220px;object-fit:contain;" /></div>`
+      ? `<div style="margin-top:12px;padding:10px;border:1px solid ${logoBorderColor};border-radius:${logoBorderRadius}px;background:${logoBackgroundColor};display:inline-flex;"><img src="${signatureLogoUrl}" alt="Logo" style="max-height:70px;max-width:220px;object-fit:contain;" /></div>`
       : ""
-    const linksPart = linksHtml ? `<div style="margin:4px 0 0 0;">${linksHtml}</div>` : ""
+    const linksPart = linksHtml ? `<div style="margin:8px 0 0 0;">${linksHtml}</div>` : ""
     if (!phonePart && !footerPart && !logoPart && !linksPart) return ""
-    return `<div style="margin-top:18px;padding-top:12px;border-top:1px solid #e5e7eb;font-family:Arial,sans-serif;font-size:13px;color:#111111;"><div style="font-weight:700;margin-bottom:4px;">${signatureName.trim() || "Tu firma de correo"}</div>${phonePart}${linksPart}${footerPart}${logoPart}</div>`
+    return `<div style="margin-top:18px;padding-top:12px;font-family:Arial,sans-serif;font-size:13px;color:#111111;"><div style="padding:14px;border:1px solid ${signatureBorderColor};border-radius:${signatureBorderRadius}px;background:${signatureBackgroundColor};"><div style="font-weight:700;margin-bottom:4px;font-size:14px;">${safeName}</div>${phonePart}${linksPart}${footerPart}${logoPart}</div></div>`
   }
 
   const buildSignatureText = () => {
@@ -290,6 +428,12 @@ export default function AutomatizacionesClient({
     sendBodyText,
     signatureFooterText,
     signatureLinksText,
+    signatureBackgroundColor,
+    signatureBorderColor,
+    signatureBorderRadius,
+    logoBackgroundColor,
+    logoBorderColor,
+    logoBorderRadius,
     signatureLogoUrl,
     signatureName,
     signaturePhone,
@@ -307,6 +451,16 @@ export default function AutomatizacionesClient({
   const isTemplatesSection = initialSection === "templates"
   const isSignatureSection = initialSection === "firma"
   const isStandalonePanel = composerToolPanel === "templates" || composerToolPanel === "firma"
+  const tutorialSteps = useMemo(() => {
+    if (isTemplatesSection) return EMAIL_TEMPLATES_TUTORIAL_STEPS
+    if (isSignatureSection) return EMAIL_SIGNATURE_TUTORIAL_STEPS
+    return EMAIL_ENVIAR_TUTORIAL_STEPS
+  }, [isTemplatesSection, isSignatureSection])
+  const tutorialAriaLabel = isTemplatesSection
+    ? "Tutorial de la seccion plantillas"
+    : isSignatureSection
+      ? "Tutorial de la seccion firma electronica"
+      : "Tutorial de la seccion enviar correos"
 
   const load = async () => {
     setLoading(true)
@@ -393,6 +547,43 @@ export default function AutomatizacionesClient({
     load()
     loadSenderDisplayName()
   }, [])
+
+  useEffect(() => {
+    if (typeof window === "undefined") return
+    try {
+      const raw = window.localStorage.getItem(SIGNATURE_STYLE_STORAGE_KEY)
+      if (!raw) return
+      const parsed = JSON.parse(raw) as Partial<SignatureVisualStyle>
+      setSignatureBackgroundColor(sanitizeHexColor(parsed.backgroundColor, "#ffffff"))
+      setSignatureBorderColor(sanitizeHexColor(parsed.borderColor, "#e5e7eb"))
+      setSignatureBorderRadius(sanitizeRadius(parsed.borderRadius, 16))
+      setLogoBackgroundColor(sanitizeHexColor(parsed.logoBackgroundColor, "#f8fafc"))
+      setLogoBorderColor(sanitizeHexColor(parsed.logoBorderColor, "#e5e7eb"))
+      setLogoBorderRadius(sanitizeRadius(parsed.logoBorderRadius, 14))
+    } catch {
+      // noop
+    }
+  }, [])
+
+  useEffect(() => {
+    if (typeof window === "undefined") return
+    const payload: SignatureVisualStyle = {
+      backgroundColor: signatureBackgroundColor,
+      borderColor: signatureBorderColor,
+      borderRadius: signatureBorderRadius,
+      logoBackgroundColor,
+      logoBorderColor,
+      logoBorderRadius,
+    }
+    window.localStorage.setItem(SIGNATURE_STYLE_STORAGE_KEY, JSON.stringify(payload))
+  }, [
+    logoBackgroundColor,
+    logoBorderColor,
+    logoBorderRadius,
+    signatureBackgroundColor,
+    signatureBorderColor,
+    signatureBorderRadius,
+  ])
 
   const loadContacts = async (type: "prospectos" | "clientes") => {
     setContactsLoading(true)
@@ -1181,15 +1372,29 @@ export default function AutomatizacionesClient({
             </div>
           </div>
 
-          <button
-            onClick={() => load()}
-            className="inline-flex items-center gap-2 px-5 py-3 rounded-full bg-black text-white font-black text-[10px] uppercase tracking-widest hover:bg-black/80 transition-all active:scale-95"
-            title="Refrescar estado"
-            disabled={loading}
-          >
-            <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
-            Refrescar
-          </button>
+          <div className="flex items-center gap-2">
+            <SectionTutorial
+              steps={tutorialSteps}
+              ariaLabel={tutorialAriaLabel}
+              onBeforeStart={() => {
+                if (isEnviarSection) {
+                  setTab("redactor")
+                  setComposerStep(1)
+                }
+              }}
+              triggerClassName="inline-flex items-center gap-2 px-5 py-3 rounded-full bg-white border border-black/10 text-black font-black text-[10px] uppercase tracking-widest hover:bg-gray-50 transition-all active:scale-95"
+            />
+            <button
+              data-tutorial="email-refresh"
+              onClick={() => load()}
+              className="inline-flex items-center gap-2 px-5 py-3 rounded-full bg-black text-white font-black text-[10px] uppercase tracking-widest hover:bg-black/80 transition-all active:scale-95"
+              title="Refrescar estado"
+              disabled={loading}
+            >
+              <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
+              Refrescar
+            </button>
+          </div>
         </div>
 
         {banner === "connected" ? (
@@ -1212,7 +1417,7 @@ export default function AutomatizacionesClient({
 
         {/* 4) Tabs (solo en flujo Enviar) */}
         {isEnviarSection ? (
-        <div className="flex items-center gap-2 mb-6">
+        <div data-tutorial="email-enviar-tabs" className="flex items-center gap-2 mb-6">
           <button
             type="button"
             onClick={() => setTab("redactor")}
@@ -1252,7 +1457,7 @@ export default function AutomatizacionesClient({
         {!isEnviarSection ? (
           isTemplatesSection ? (
             <div className="space-y-5">
-              <div className="rounded-[2rem] border border-black/5 bg-white p-8 space-y-4">
+              <div data-tutorial="email-templates-section" className="rounded-[2rem] border border-black/5 bg-white p-8 space-y-4">
                 <div>
                   <p className="text-[11px] font-black text-black uppercase tracking-widest">Plantillas de correo</p>
                   <p className="text-[11px] font-bold text-black/40 mt-1">
@@ -1260,38 +1465,40 @@ export default function AutomatizacionesClient({
                   </p>
                 </div>
 
-                <TemplatesPanel
-                  showPrimaryActions={true}
-                  showOnlyPrimaryActions={!templatesActionStarted}
-                  connected={status.connected}
-                  templatesLoading={templatesLoading}
-                  templatesSaving={templatesSaving}
-                  templatesAIWorking={templatesAIWorking}
-                  templatesResult={templatesResult}
-                  templates={templates}
-                  selectedTemplateId={selectedTemplateId}
-                  selectedTemplateIsSystem={!!selectedTemplate?.is_system}
-                  hasSelectedTemplate={!!selectedTemplate}
-                  templateName={templateName}
-                  templateCategory={templateCategory}
-                  templateTagLabel={templateTagLabel}
-                  templateTagColor={templateTagColor}
-                  templateTagCustomLabel={templateTagCustomLabel}
-                  templatePrompt={templatePrompt}
-                  onChangeSelectedTemplate={setSelectedTemplateId}
-                  onApplyTemplate={onPrimaryEditTemplate}
-                  onStartNewTemplate={onPrimaryNewTemplate}
-                  onDeleteTemplate={onPrimaryDeleteTemplate}
-                  onChangeTemplateName={setTemplateName}
-                  onChangeTemplateCategory={setTemplateCategory}
-                  onChangeTemplateTagLabel={setTemplateTagLabel}
-                  onChangeTemplateTagColor={setTemplateTagColor}
-                  onChangeTemplateTagCustomLabel={setTemplateTagCustomLabel}
-                  onSaveCurrentAsTemplate={onSaveCurrentAsTemplate}
-                  onChangeTemplatePrompt={setTemplatePrompt}
-                  onCreateTemplateWithAI={onCreateTemplateWithAI}
-                  onImproveTemplateWithAI={onImproveTemplateWithAI}
-                />
+                <div data-tutorial="email-templates-panel">
+                  <TemplatesPanel
+                    showPrimaryActions={true}
+                    showOnlyPrimaryActions={!templatesActionStarted}
+                    connected={status.connected}
+                    templatesLoading={templatesLoading}
+                    templatesSaving={templatesSaving}
+                    templatesAIWorking={templatesAIWorking}
+                    templatesResult={templatesResult}
+                    templates={templates}
+                    selectedTemplateId={selectedTemplateId}
+                    selectedTemplateIsSystem={!!selectedTemplate?.is_system}
+                    hasSelectedTemplate={!!selectedTemplate}
+                    templateName={templateName}
+                    templateCategory={templateCategory}
+                    templateTagLabel={templateTagLabel}
+                    templateTagColor={templateTagColor}
+                    templateTagCustomLabel={templateTagCustomLabel}
+                    templatePrompt={templatePrompt}
+                    onChangeSelectedTemplate={setSelectedTemplateId}
+                    onApplyTemplate={onPrimaryEditTemplate}
+                    onStartNewTemplate={onPrimaryNewTemplate}
+                    onDeleteTemplate={onPrimaryDeleteTemplate}
+                    onChangeTemplateName={setTemplateName}
+                    onChangeTemplateCategory={setTemplateCategory}
+                    onChangeTemplateTagLabel={setTemplateTagLabel}
+                    onChangeTemplateTagColor={setTemplateTagColor}
+                    onChangeTemplateTagCustomLabel={setTemplateTagCustomLabel}
+                    onSaveCurrentAsTemplate={onSaveCurrentAsTemplate}
+                    onChangeTemplatePrompt={setTemplatePrompt}
+                    onCreateTemplateWithAI={onCreateTemplateWithAI}
+                    onImproveTemplateWithAI={onImproveTemplateWithAI}
+                  />
+                </div>
 
                 {templateModalMode ? (
                   <div className="fixed inset-0 z-[80] flex items-center justify-center p-4">
@@ -1790,33 +1997,49 @@ export default function AutomatizacionesClient({
             </div>
           ) : (
             <div className="space-y-5">
-              <div className="rounded-[2rem] border border-black/5 bg-white p-8 space-y-4">
+              <div data-tutorial="email-signature-section" className="rounded-[2rem] border border-black/5 bg-white p-8 space-y-4">
                 <div>
                   <p className="text-[11px] font-black text-black uppercase tracking-widest">Firma electronica</p>
                   <p className="text-[11px] font-bold text-black/40 mt-1">
                     Configura tu firma una sola vez y reutilizala automaticamente al enviar correos.
                   </p>
                 </div>
-                <SignaturePanel
-                  connected={status.connected}
-                  includeSignature={includeSignature}
-                  signatureName={signatureName}
-                  signaturePhone={signaturePhone}
-                  signatureLinksText={signatureLinksText}
-                  signatureFooterText={signatureFooterText}
-                  logoUploading={logoUploading}
-                  signatureSaving={signatureSaving}
-                  signatureLoading={signatureLoading}
-                  signatureLogoUrl={signatureLogoUrl}
-                  signatureResult={signatureResult}
-                  onToggleIncludeSignature={setIncludeSignature}
-                  onChangeSignatureName={setSignatureName}
-                  onChangeSignaturePhone={setSignaturePhone}
-                  onChangeSignatureLinksText={setSignatureLinksText}
-                  onChangeSignatureFooterText={setSignatureFooterText}
-                  onUploadSignatureLogo={onUploadSignatureLogo}
-                  onSaveSignature={onSaveSignature}
-                />
+                <div data-tutorial="email-signature-panel">
+                  <SignaturePanel
+                    connected={status.connected}
+                    includeSignature={includeSignature}
+                    signatureName={signatureName}
+                    signaturePhone={signaturePhone}
+                    signatureLinksText={signatureLinksText}
+                    signatureFooterText={signatureFooterText}
+                    logoUploading={logoUploading}
+                    signatureSaving={signatureSaving}
+                    signatureLoading={signatureLoading}
+                    signatureLogoUrl={signatureLogoUrl}
+                    signatureResult={signatureResult}
+                    signatureBackgroundColor={signatureBackgroundColor}
+                    signatureBorderColor={signatureBorderColor}
+                    signatureBorderRadius={signatureBorderRadius}
+                    logoBackgroundColor={logoBackgroundColor}
+                    logoBorderColor={logoBorderColor}
+                    logoBorderRadius={logoBorderRadius}
+                    signaturePreviewHtml={buildSignatureHtml()}
+                    onToggleIncludeSignature={setIncludeSignature}
+                    onChangeSignatureName={setSignatureName}
+                    onChangeSignaturePhone={setSignaturePhone}
+                    onChangeSignatureLinksText={setSignatureLinksText}
+                    onChangeSignatureFooterText={setSignatureFooterText}
+                    onChangeSignatureBackgroundColor={setSignatureBackgroundColor}
+                    onChangeSignatureBorderColor={setSignatureBorderColor}
+                    onChangeSignatureBorderRadius={setSignatureBorderRadius}
+                    onChangeLogoBackgroundColor={setLogoBackgroundColor}
+                    onChangeLogoBorderColor={setLogoBorderColor}
+                    onChangeLogoBorderRadius={setLogoBorderRadius}
+                    onAddSocialLink={addSocialLink}
+                    onUploadSignatureLogo={onUploadSignatureLogo}
+                    onSaveSignature={onSaveSignature}
+                  />
+                </div>
               </div>
             </div>
           )
@@ -1972,7 +2195,7 @@ export default function AutomatizacionesClient({
             </div>
 
             {composerStep === 1 ? (
-              <div className="rounded-[2rem] border border-black/5 bg-gray-50/60 p-8">
+              <div data-tutorial="email-enviar-step1" className="rounded-[2rem] border border-black/5 bg-gray-50/60 p-8">
                 <div className="flex items-center justify-between gap-4 mb-4 flex-wrap">
                   <div>
                     <p className="text-[11px] font-black text-black uppercase tracking-widest">
@@ -2063,7 +2286,7 @@ export default function AutomatizacionesClient({
                 {contactsLoading ? (
                   <div className="text-[11px] font-black uppercase tracking-widest text-black/40">Cargando…</div>
                 ) : (
-                  <div className="max-h-[420px] overflow-auto rounded-2xl bg-white border border-black/5">
+                  <div data-tutorial="email-enviar-contacts-list" className="max-h-[420px] overflow-auto rounded-2xl bg-white border border-black/5">
                     {filteredContacts.length === 0 ? (
                       <div className="p-4 text-[11px] font-bold text-black/40">No hay contactos.</div>
                     ) : (
@@ -2366,11 +2589,25 @@ export default function AutomatizacionesClient({
                         signatureLoading={signatureLoading}
                         signatureLogoUrl={signatureLogoUrl}
                         signatureResult={signatureResult}
+                        signatureBackgroundColor={signatureBackgroundColor}
+                        signatureBorderColor={signatureBorderColor}
+                        signatureBorderRadius={signatureBorderRadius}
+                        logoBackgroundColor={logoBackgroundColor}
+                        logoBorderColor={logoBorderColor}
+                        logoBorderRadius={logoBorderRadius}
+                        signaturePreviewHtml={buildSignatureHtml()}
                         onToggleIncludeSignature={setIncludeSignature}
                         onChangeSignatureName={setSignatureName}
                         onChangeSignaturePhone={setSignaturePhone}
                         onChangeSignatureLinksText={setSignatureLinksText}
                         onChangeSignatureFooterText={setSignatureFooterText}
+                        onChangeSignatureBackgroundColor={setSignatureBackgroundColor}
+                        onChangeSignatureBorderColor={setSignatureBorderColor}
+                        onChangeSignatureBorderRadius={setSignatureBorderRadius}
+                        onChangeLogoBackgroundColor={setLogoBackgroundColor}
+                        onChangeLogoBorderColor={setLogoBorderColor}
+                        onChangeLogoBorderRadius={setLogoBorderRadius}
+                        onAddSocialLink={addSocialLink}
                         onUploadSignatureLogo={onUploadSignatureLogo}
                         onSaveSignature={onSaveSignature}
                       />

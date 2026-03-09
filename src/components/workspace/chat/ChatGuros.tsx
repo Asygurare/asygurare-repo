@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { DATABASE } from '@/src/config'
-import { Send, Loader2, Sparkles, ShieldCheck, TrendingUp, User, RotateCcw } from 'lucide-react'
+import { Send, Loader2, Sparkles, ShieldCheck, TrendingUp, User, RotateCcw, Mic, MicOff } from 'lucide-react'
 import { supabaseClient } from '@/src/lib/supabase/client'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
@@ -13,6 +13,35 @@ interface Message {
   role: 'user' | 'assistant'
   content: string
   status?: 'ok' | 'error' | 'streaming'
+}
+
+type DictationAlternative = { transcript: string }
+type DictationResult = {
+  isFinal: boolean
+  length: number
+  [index: number]: DictationAlternative
+}
+type DictationEvent = {
+  resultIndex: number
+  results: ArrayLike<DictationResult>
+}
+type SpeechRecognitionInstance = {
+  continuous: boolean
+  interimResults: boolean
+  lang: string
+  onresult: ((event: DictationEvent) => void) | null
+  onerror: ((event: { error?: string }) => void) | null
+  onend: (() => void) | null
+  start: () => void
+  stop: () => void
+}
+type SpeechRecognitionCtor = new () => SpeechRecognitionInstance
+
+declare global {
+  interface Window {
+    SpeechRecognition?: SpeechRecognitionCtor
+    webkitSpeechRecognition?: SpeechRecognitionCtor
+  }
 }
 
 function ChatMarkdown({
@@ -122,9 +151,19 @@ export default function ChatDatamara({ conversationId, userId }: { conversationI
   const [input, setInput] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [toolStatus, setToolStatus] = useState<string | null>(null)
+  const [isListening, setIsListening] = useState(false)
+  const [speechError, setSpeechError] = useState<string | null>(null)
+  const [isSpeechSupported, setIsSpeechSupported] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
   const queueRef = useRef<string[]>([])
   const processingRef = useRef(false)
+  const recognitionRef = useRef<SpeechRecognitionInstance | null>(null)
+  const autoSendTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const inputRef = useRef("")
+  const isListeningRef = useRef(false)
+  const lastVoiceSentRef = useRef("")
+  const dictationBaseRef = useRef("")
+  const finalDictationRef = useRef("")
 
   useEffect(() => {
     const loadHistory = async () => {
@@ -137,6 +176,23 @@ export default function ChatDatamara({ conversationId, userId }: { conversationI
     }
     loadHistory()
   }, [conversationId])
+
+  useEffect(() => {
+    const ctor = window.SpeechRecognition || window.webkitSpeechRecognition
+    setIsSpeechSupported(Boolean(ctor))
+    return () => {
+      recognitionRef.current?.stop()
+      if (autoSendTimeoutRef.current) clearTimeout(autoSendTimeoutRef.current)
+    }
+  }, [])
+
+  useEffect(() => {
+    inputRef.current = input
+  }, [input])
+
+  useEffect(() => {
+    isListeningRef.current = isListening
+  }, [isListening])
 
   useEffect(() => {
     scrollRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -259,16 +315,32 @@ export default function ChatDatamara({ conversationId, userId }: { conversationI
     processingRef.current = false
   }, [processOneMessage])
 
+  const clearAutoSendTimer = useCallback(() => {
+    if (autoSendTimeoutRef.current) {
+      clearTimeout(autoSendTimeoutRef.current)
+      autoSendTimeoutRef.current = null
+    }
+  }, [])
+
+  const queueUserMessage = useCallback((rawText: string) => {
+    const userMsg = rawText.trim()
+    if (!userMsg) return false
+    setInput('')
+    setMessages(prev => [...prev, { role: 'user', content: userMsg }])
+    queueRef.current.push(userMsg)
+    processQueue()
+    return true
+  }, [processQueue])
+
   const sendMessage = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!input.trim()) return
-
-    const userMsg = input.trim()
-    setInput('')
-    setMessages(prev => [...prev, { role: 'user', content: userMsg }])
-
-    queueRef.current.push(userMsg)
-    processQueue()
+    clearAutoSendTimer()
+    if (isListening && recognitionRef.current) {
+      recognitionRef.current.stop()
+      setIsListening(false)
+    }
+    queueUserMessage(input)
   }
 
   const retryLastMessage = useCallback(() => {
@@ -287,6 +359,84 @@ export default function ChatDatamara({ conversationId, userId }: { conversationI
       return withoutLast
     })
   }, [processQueue])
+
+  const stopDictation = useCallback(() => {
+    clearAutoSendTimer()
+    recognitionRef.current?.stop()
+    setIsListening(false)
+  }, [clearAutoSendTimer])
+
+  const startDictation = useCallback(() => {
+    const ctor = window.SpeechRecognition || window.webkitSpeechRecognition
+    if (!ctor) {
+      setSpeechError("Tu navegador no soporta dictado por voz.")
+      return
+    }
+    setSpeechError(null)
+    finalDictationRef.current = ""
+    dictationBaseRef.current = input.trim()
+    lastVoiceSentRef.current = ""
+
+    const recognition = new ctor()
+    recognition.lang = "es-MX"
+    recognition.continuous = true
+    recognition.interimResults = true
+
+    recognition.onresult = (event) => {
+      let finalChunk = ""
+      let interimChunk = ""
+      for (let i = event.resultIndex; i < event.results.length; i += 1) {
+        const result = event.results[i]
+        const transcript = result?.[0]?.transcript || ""
+        if (!transcript) continue
+        if (result.isFinal) finalChunk += transcript
+        else interimChunk += transcript
+      }
+      if (finalChunk) {
+        finalDictationRef.current = `${finalDictationRef.current} ${finalChunk}`.trim()
+      }
+      const merged = `${dictationBaseRef.current} ${finalDictationRef.current} ${interimChunk}`.trim()
+      setInput(merged)
+      clearAutoSendTimer()
+      autoSendTimeoutRef.current = setTimeout(() => {
+        if (!isListeningRef.current) return
+        const pending = inputRef.current.trim()
+        if (!pending) return
+        if (pending === lastVoiceSentRef.current) return
+        const sent = queueUserMessage(pending)
+        if (sent) {
+          lastVoiceSentRef.current = pending
+          dictationBaseRef.current = ""
+          finalDictationRef.current = ""
+          setSpeechError(null)
+          recognitionRef.current?.stop()
+          setIsListening(false)
+        }
+      }, 1500)
+    }
+
+    recognition.onerror = (event) => {
+      if (event?.error && event.error !== "aborted") {
+        setSpeechError("No pudimos capturar tu voz. Revisa permisos del microfono.")
+      }
+      clearAutoSendTimer()
+      setIsListening(false)
+    }
+
+    recognition.onend = () => {
+      clearAutoSendTimer()
+      setIsListening(false)
+    }
+
+    recognitionRef.current = recognition
+    recognition.start()
+    setIsListening(true)
+  }, [clearAutoSendTimer, queueUserMessage])
+
+  const toggleDictation = useCallback(() => {
+    if (isListening) stopDictation()
+    else startDictation()
+  }, [isListening, startDictation, stopDictation])
 
   return (
     <div className="flex flex-col h-full w-full bg-[#f8f6f4] rounded-[2rem] sm:rounded-[3rem] border border-black/[0.08] shadow-2xl overflow-hidden relative">
@@ -403,8 +553,21 @@ export default function ChatDatamara({ conversationId, userId }: { conversationI
               value={input}
               onChange={(e) => setInput(e.target.value)}
               placeholder="Ordena una acción estratégica..."
-              className="w-full bg-[#f8f6f4] py-4 sm:py-6 pl-14 sm:pl-16 pr-16 sm:pr-20 rounded-[1.5rem] sm:rounded-[2rem] font-bold text-black outline-none focus:ring-4 focus:ring-(--accents)/10 transition-all text-xs border border-transparent focus:border-black/5"
+              className="w-full bg-[#f8f6f4] py-4 sm:py-6 pl-14 sm:pl-16 pr-24 sm:pr-28 rounded-[1.5rem] sm:rounded-[2rem] font-bold text-black outline-none focus:ring-4 focus:ring-(--accents)/10 transition-all text-xs border border-transparent focus:border-black/5"
             />
+            <button
+              type="button"
+              onClick={toggleDictation}
+              disabled={!isSpeechSupported}
+              aria-label={isListening ? "Detener dictado por voz" : "Iniciar dictado por voz"}
+              className={`absolute right-14 sm:right-16 p-2.5 rounded-xl transition-colors ${
+                isListening
+                  ? "bg-red-500 text-white"
+                  : "bg-black/10 text-black/60 hover:bg-black hover:text-white"
+              } disabled:opacity-30`}
+            >
+              {isListening ? <MicOff size={16} /> : <Mic size={16} />}
+            </button>
             <button
               type="submit"
               disabled={!input.trim()}
@@ -413,6 +576,12 @@ export default function ChatDatamara({ conversationId, userId }: { conversationI
               <Send size={18} />
             </button>
           </form>
+          {isListening ? (
+            <p className="px-2 sm:px-6 mt-2 text-[10px] font-bold text-blue-500 uppercase tracking-widest">Escuchando...</p>
+          ) : null}
+          {speechError ? (
+            <p className="px-2 sm:px-6 mt-1 text-[10px] font-bold text-red-500">{speechError}</p>
+          ) : null}
           
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between px-2 sm:px-6 mt-4 gap-3">
             <div className="flex gap-4 flex-wrap">

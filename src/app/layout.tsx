@@ -11,6 +11,7 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+
 // Nota: Si Cal_Sans no te carga desde google, asegúrate de tener el paquete instalado 
 // o usarlo como variable CSS correctamente.
 const calSans = { variable: "--font-cal-sans" }; 

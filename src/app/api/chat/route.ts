@@ -45,6 +45,7 @@ const TOOL_LABELS: Record<string, string> = {
   listarAutomatizaciones: 'Cargando automatizaciones',
   configurarAutomatizacion: 'Configurando automatización',
   listarNotificacionesAutomatizacion: 'Cargando notificaciones',
+  buscarWeb: 'Buscando en internet',
 }
 
 const SYSTEM = `Eres el copiloto estratégico de un agente de seguros mexicano dentro de la plataforma Asygurare.
@@ -134,6 +135,9 @@ REGLAS DE USO DE HERRAMIENTAS:
 - Para Cal.com: verificarConexionCalCom (ver si está conectado), obtenerLinkCalCom (obtener link de agenda para compartir), buscarReunionesCalCom (listar bookings) y sincronizarCalComATareas (sincronizar bookings como tareas).
 - Para automatizaciones: listarAutomatizaciones y configurarAutomatizacion.
 - Para notificaciones de automatizaciones: listarNotificacionesAutomatizacion.
+- Para información externa/actualizada (internet): buscarWeb.
+- Si el usuario pregunta por noticias recientes, regulación, cambios legales o actualidad del mercado, debes usar buscarWeb antes de responder.
+- Cuando uses buscarWeb, SIEMPRE incluye links de referencia en la respuesta final (2 a 5 fuentes) y, si viene disponible, agrega también el "link de búsqueda" usado.
 - Puedes encadenar herramientas: primero buscar un cliente, luego consultar sus pólizas con filtro customer_id.
 - Cuando el usuario pida estrategia, PRIMERO consulta datos con herramientas, LUEGO genera estrategia basada en datos reales.
 

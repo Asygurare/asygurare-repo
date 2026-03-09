@@ -12,6 +12,34 @@ import {
 } from 'lucide-react'
 import { supabaseClient } from '@/src/lib/supabase/client'
 import { toast, Toaster } from 'sonner'
+import { SectionTutorial, type SectionTutorialStep } from '@/src/components/workspace/tutorial/SectionTutorial'
+
+const PAGOS_TUTORIAL_STEPS: SectionTutorialStep[] = [
+  {
+    id: "pagos-header",
+    title: "Tesoreria",
+    description: "Desde aqui programas y controlas cobros de tus polizas.",
+    selector: '[data-tutorial="pagos-header"]',
+  },
+  {
+    id: "pagos-kpis",
+    title: "Indicadores financieros",
+    description: "Monitorea recaudado, pendiente y recibos en mora.",
+    selector: '[data-tutorial="pagos-kpis"]',
+  },
+  {
+    id: "pagos-filters",
+    title: "Busqueda y filtros",
+    description: "Filtra por estatus y busca por cliente o numero de poliza.",
+    selector: '[data-tutorial="pagos-filters"]',
+  },
+  {
+    id: "pagos-table",
+    title: "Tabla de cobros",
+    description: "Procesa pagos, revisa fechas y elimina registros si hace falta.",
+    selector: '[data-tutorial="pagos-table"]',
+  },
+]
 
 export default function PagosPage() {
   const [isPanelOpen, setIsPanelOpen] = useState(false)
@@ -138,23 +166,30 @@ export default function PagosPage() {
       <Toaster richColors position="top-right" />
 
       {/* HEADER */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6" data-tutorial="pagos-header">
         <div>
           <h2 className="text-5xl font-black text-black tracking-tighter italic uppercase flex items-center gap-4">
             Tesorería<span className="text-(--accents) not-italic">.</span>
           </h2>
           <p className="text-black/40 font-bold text-xs uppercase tracking-[0.4em] mt-2 italic">Administración de Flujo de Efectivo</p>
         </div>
-        <button 
-          onClick={() => setIsPanelOpen(true)}
-          className="bg-black text-white px-10 py-6 rounded-[2rem] font-black text-sm flex items-center gap-4 hover:bg-(--accents) transition-all shadow-2xl active:scale-95 group"
-        >
-          <Plus size={20} className="group-hover:rotate-90 transition-transform" /> AGENDAR COBRO
-        </button>
+        <div className="flex items-center gap-3">
+          <SectionTutorial
+            steps={PAGOS_TUTORIAL_STEPS}
+            ariaLabel="Tutorial de la seccion pagos"
+            triggerClassName="inline-flex items-center gap-2 rounded-[2rem] border border-black/10 bg-white px-4 py-2 text-[10px] font-black uppercase tracking-widest text-black transition-all hover:bg-black hover:text-white"
+          />
+          <button 
+            onClick={() => setIsPanelOpen(true)}
+            className="bg-black text-white px-10 py-6 rounded-[2rem] font-black text-sm flex items-center gap-4 hover:bg-(--accents) transition-all shadow-2xl active:scale-95 group"
+          >
+            <Plus size={20} className="group-hover:rotate-90 transition-transform" /> AGENDAR COBRO
+          </button>
+        </div>
       </div>
 
       {/* KPI CARDS */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-8" data-tutorial="pagos-kpis">
         <div className="bg-white p-10 rounded-[3rem] border border-black/5 shadow-sm relative overflow-hidden">
           <TrendingUp className="absolute -right-6 -bottom-6 text-green-600/5" size={140} />
           <p className="text-[10px] font-black text-green-600 uppercase tracking-widest mb-4 italic">Total Recaudado</p>
@@ -173,7 +208,7 @@ export default function PagosPage() {
       </div>
 
       {/* FILTROS */}
-      <div className="flex flex-col md:flex-row gap-4">
+      <div className="flex flex-col md:flex-row gap-4" data-tutorial="pagos-filters">
         <div className="flex-1 relative">
           <Search className="absolute left-6 top-1/2 -translate-y-1/2 text-black/20" size={24} />
           <input 
@@ -195,7 +230,7 @@ export default function PagosPage() {
       </div>
 
       {/* TABLA */}
-      <div className="bg-white rounded-[3.5rem] border border-black/5 shadow-sm overflow-hidden min-h-[500px]">
+      <div className="bg-white rounded-[3.5rem] border border-black/5 shadow-sm overflow-hidden min-h-[500px]" data-tutorial="pagos-table">
         <table className="w-full text-left">
           <thead>
             <tr className="bg-gray-50 border-b border-black/5">

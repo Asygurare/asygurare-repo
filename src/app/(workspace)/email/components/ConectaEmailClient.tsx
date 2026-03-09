@@ -4,6 +4,7 @@ import { useEffect, useState } from "react"
 import Image from "next/image"
 import Link from "next/link"
 import { Link2Off, RefreshCw } from "lucide-react"
+import { SectionTutorial, type SectionTutorialStep } from "@/src/components/workspace/tutorial/SectionTutorial"
 
 type GmailStatus =
   | { connected: false; error?: string }
@@ -14,6 +15,27 @@ type GmailStatus =
       updated_at: string | null
       created_at: string | null
     }
+
+const CONECTA_EMAIL_TUTORIAL_STEPS: SectionTutorialStep[] = [
+  {
+    id: "acciones",
+    title: "Conectar o refrescar",
+    description: "Desde aqui conectas Gmail, refrescas estado o desconectas tu cuenta.",
+    selector: '[data-tutorial="email-connect-actions"]',
+  },
+  {
+    id: "estado",
+    title: "Estado de la conexion",
+    description: "Revisa cuenta, permisos y estado actual para validar que puedes enviar.",
+    selector: '[data-tutorial="email-connect-status"]',
+  },
+  {
+    id: "continuar",
+    title: "Siguiente paso",
+    description: "Cuando Gmail este listo, continua a la seccion de enviar correos.",
+    selector: '[data-tutorial="email-connect-continue"]',
+  },
+]
 
 export default function ConectaEmailClient({
   banner,
@@ -70,7 +92,12 @@ export default function ConectaEmailClient({
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div data-tutorial="email-connect-actions" className="flex items-center gap-2">
+            <SectionTutorial
+              steps={CONECTA_EMAIL_TUTORIAL_STEPS}
+              ariaLabel="Tutorial de la seccion conecta tu email"
+              triggerClassName="inline-flex items-center gap-2 px-4 py-3 rounded-full bg-white border border-black/10 text-black font-black text-[10px] uppercase tracking-widest hover:bg-gray-50 disabled:opacity-60"
+            />
             <button
               type="button"
               onClick={load}
@@ -116,7 +143,7 @@ export default function ConectaEmailClient({
           </div>
         ) : null}
 
-        <div className="mt-5 grid grid-cols-1 md:grid-cols-3 gap-3">
+        <div data-tutorial="email-connect-status" className="mt-5 grid grid-cols-1 md:grid-cols-3 gap-3">
           <div className="rounded-2xl bg-gray-50/70 border border-black/5 p-3">
             <p className="text-[10px] font-black uppercase tracking-widest text-black/40">Cuenta</p>
             <p className="text-sm font-black text-black mt-1">{status.connected ? status.email ?? "—" : "—"}</p>
@@ -136,7 +163,7 @@ export default function ConectaEmailClient({
         </div>
       </div>
 
-      <div className="flex justify-end">
+      <div data-tutorial="email-connect-continue" className="flex justify-end">
         <Link
           href="/email/enviar"
           className="inline-flex items-center justify-center gap-2 px-6 py-4 rounded-[2rem] bg-black text-white font-black text-[10px] uppercase tracking-widest hover:bg-black/85"

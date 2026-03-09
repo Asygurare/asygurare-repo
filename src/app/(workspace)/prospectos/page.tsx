@@ -26,6 +26,34 @@ import { toast, Toaster } from 'sonner'
 import { calculateAge } from '@/src/lib/utils/utils'
 import { SelectWithOther } from '@/src/components/ui/SelectWithOther'
 import { RefreshButton } from '@/src/components/workspace/RefreshButton'
+import { SectionTutorial, type SectionTutorialStep } from '@/src/components/workspace/tutorial/SectionTutorial'
+
+const PROSPECTOS_TUTORIAL_STEPS: SectionTutorialStep[] = [
+  {
+    id: "prospectos-summary",
+    title: "Resumen comercial",
+    description: "Aqui visualizas el valor del pipeline y el total de prospectos.",
+    selector: '[data-tutorial="prospectos-summary"]',
+  },
+  {
+    id: "prospectos-search",
+    title: "Busqueda y alta",
+    description: "Busca prospectos existentes o crea una nueva oportunidad.",
+    selector: '[data-tutorial="prospectos-search"]',
+  },
+  {
+    id: "prospectos-filters",
+    title: "Filtros de pipeline",
+    description: "Cambia entre activos y descartados, y filtra por etapa.",
+    selector: '[data-tutorial="prospectos-filters"]',
+  },
+  {
+    id: "prospectos-list",
+    title: "Listado de prospectos",
+    description: "Gestiona etapa, monto, conversion y acciones por prospecto.",
+    selector: '[data-tutorial="prospectos-list"]',
+  },
+]
 
 export default function ProspectosFinalUltraPage() {
   const [leads, setLeads] = useState<any[]>([])
@@ -614,9 +642,16 @@ export default function ProspectosFinalUltraPage() {
   return (
     <div className="space-y-10 pb-20 p-6 max-w-[1400px] mx-auto bg- min-h-screen">
       <Toaster richColors position="bottom-right" />
+      <div className="flex justify-end">
+        <SectionTutorial
+          steps={PROSPECTOS_TUTORIAL_STEPS}
+          ariaLabel="Tutorial de la seccion prospectos"
+          triggerClassName="inline-flex items-center gap-2 rounded-2xl border border-black/10 bg-white px-4 py-2 text-[10px] font-black uppercase tracking-widest text-black transition-all hover:bg-black hover:text-white"
+        />
+      </div>
 
       {/* DASHBOARD */}
-      <section className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <section className="grid grid-cols-1 md:grid-cols-3 gap-6" data-tutorial="prospectos-summary">
         <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-black/5">
           <h2 className="text-4xl font-black italic text-black uppercase tracking-tighter">Mis prospectos.</h2>
           <p className="text-black font-bold text-[10px] uppercase tracking-widest mt-1">Asygurare Intelligence</p>
@@ -653,7 +688,7 @@ export default function ProspectosFinalUltraPage() {
       </div>
 
       {/* SEARCH Y NEW */}
-      <div className="flex flex-col md:flex-row gap-4 items-stretch">
+      <div className="flex flex-col md:flex-row gap-4 items-stretch" data-tutorial="prospectos-search">
         <div className="relative flex-1 group">
           <Search className="absolute left-6 top-1/2 -translate-y-1/2 text-black/40 group-focus-within:text-(--accents)" size={22}/>
           <input 
@@ -667,7 +702,7 @@ export default function ProspectosFinalUltraPage() {
         </button>
       </div>
 
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4" data-tutorial="prospectos-filters">
         <div className="bg-white p-2 rounded-[1.5rem] inline-flex items-center gap-2 border border-black/5 shadow-sm">
           <button
             type="button"
@@ -745,7 +780,7 @@ export default function ProspectosFinalUltraPage() {
       )}
 
       {/* LISTA */}
-      <div className="grid grid-cols-1 gap-5">
+      <div className="grid grid-cols-1 gap-5" data-tutorial="prospectos-list">
         {fetching ? <div className="py-20 flex justify-center"><Loader2 className="animate-spin text-(--accents)" size={40}/></div> : 
         visibleLeads.map((lead) => {
           const visualStatus = resolveVisualStatus(lead)

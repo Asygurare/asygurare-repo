@@ -16,6 +16,94 @@ type ToolCtx = {
   nowIso: string
 }
 
+function flattenDuckDuckGoTopics(topics: unknown[]): Array<{ title: string; url: string }> {
+  const out: Array<{ title: string; url: string }> = []
+  for (const item of topics) {
+    const node = item as { Text?: unknown; FirstURL?: unknown; Topics?: unknown[] }
+    const text = typeof node.Text === 'string' ? node.Text.trim() : ''
+    const url = typeof node.FirstURL === 'string' ? node.FirstURL.trim() : ''
+    if (text && url) out.push({ title: text, url })
+    if (Array.isArray(node.Topics)) out.push(...flattenDuckDuckGoTopics(node.Topics))
+  }
+  return out
+}
+
+function decodeXmlEntities(text: string) {
+  return text
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+}
+
+function decodeHtmlEntities(text: string) {
+  return text
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&#x2F;/g, '/')
+}
+
+function parseGoogleNewsRss(xml: string): Array<{ title: string; url: string; snippet: string; source: string }> {
+  const items = xml.match(/<item>[\s\S]*?<\/item>/g) || []
+  const out: Array<{ title: string; url: string; snippet: string; source: string }> = []
+
+  for (const item of items) {
+    const titleMatch = item.match(/<title><!\[CDATA\[([\s\S]*?)\]\]><\/title>|<title>([\s\S]*?)<\/title>/i)
+    const linkMatch = item.match(/<link>([\s\S]*?)<\/link>/i)
+    const sourceMatch = item.match(/<source[^>]*>([\s\S]*?)<\/source>/i)
+
+    const rawTitle = (titleMatch?.[1] || titleMatch?.[2] || '').trim()
+    const title = decodeXmlEntities(rawTitle.replace(/\s+-\s+[^-]+$/, '').trim())
+    const url = decodeXmlEntities((linkMatch?.[1] || '').trim())
+    const source = decodeXmlEntities((sourceMatch?.[1] || 'Google News').trim())
+    if (!title || !url) continue
+    out.push({
+      title,
+      url,
+      snippet: `${title} (${source})`,
+      source: 'google_news',
+    })
+  }
+
+  return out
+}
+
+function parseDuckDuckGoHtml(html: string): Array<{ title: string; url: string; snippet: string; source: string }> {
+  const out: Array<{ title: string; url: string; snippet: string; source: string }> = []
+  const blocks = html.match(/<a[^>]*class="[^"]*result__a[^"]*"[^>]*>[\s\S]*?<\/a>/g) || []
+  for (const block of blocks) {
+    const hrefMatch = block.match(/href="([^"]+)"/i)
+    const titleMatch = block.match(/>([\s\S]*?)<\/a>/i)
+    const rawUrl = decodeHtmlEntities((hrefMatch?.[1] || '').trim())
+    const title = decodeHtmlEntities((titleMatch?.[1] || '').replace(/<[^>]+>/g, '').trim())
+    if (!rawUrl || !title) continue
+    out.push({
+      title,
+      url: rawUrl,
+      snippet: title,
+      source: 'duckduckgo_html',
+    })
+  }
+  return out
+}
+
+function buildInsuranceExpandedQueries(query: string) {
+  const q = query.trim()
+  const queries = new Set<string>([q])
+  const isInsuranceLike = /(seguro|aseguradora|asegurador|promotoria|promotoría|poliza|póliza|cnsf|amis|reaseguro|sinistro|siniestro)/i.test(q)
+  if (isInsuranceLike) {
+    queries.add(`${q} México`)
+    queries.add(`${q} seguros México`)
+    queries.add(`${q} AMIS CNSF`)
+    queries.add(`${q} promotorías de seguros`)
+  }
+  return Array.from(queries).slice(0, 4)
+}
+
 // ─── Reusable filter schema (matches existing functions.ts) ───
 const FilterSchema = z.object({
   column: z.string(),
@@ -176,6 +264,133 @@ export function buildChatTools(ctx: ToolCtx) {
       execute: async () =>
         fn.obtenerContextoOperativoWorkspaceConCache(supabase, { tz, nowIso }),
     }),
+
+    // buscarWeb: tool({
+    //   description:
+    //     'Busca información en internet (noticias, regulación, aseguradoras, promotorías, eventos y contexto externo). Devuelve resultados y links.',
+    //   inputSchema: z.object({
+    //     query: z.string().min(2).max(300),
+    //     limit: z.number().optional().describe('Máximo de resultados (default 5, max 8)'),
+    //   }),
+    //   execute: async (args) => {
+    //     const q = String(args.query || '').trim()
+    //     const limit = Math.max(1, Math.min(8, Number(args.limit || 5)))
+    //     if (!q) return { ok: false, error: 'Consulta vacía.' }
+
+    //     const isNewsIntent = /(noticia|noticias|reciente|recientes|hoy|semana|actualidad|evento|eventos|regulaci[oó]n|ley|leyes)/i.test(q)
+    //     const expandedQueries = buildInsuranceExpandedQueries(q)
+    //     const combined = new Map<string, { title: string; snippet: string; url: string; source: string }>()
+    //     const searchLinks: string[] = []
+
+    //     // 1) Google News RSS (fuerte para noticias/eventos/regulación)
+    //     if (isNewsIntent || expandedQueries.length > 1) {
+    //       for (const queryItem of expandedQueries.slice(0, 2)) {
+    //         const newsUrl = new URL('https://news.google.com/rss/search')
+    //         newsUrl.searchParams.set('q', `${queryItem} when:30d`)
+    //         newsUrl.searchParams.set('hl', 'es-419')
+    //         newsUrl.searchParams.set('gl', 'MX')
+    //         newsUrl.searchParams.set('ceid', 'MX:es-419')
+    //         searchLinks.push(newsUrl.toString())
+
+    //         const newsRes = await fetch(newsUrl.toString(), {
+    //           method: 'GET',
+    //           headers: { Accept: 'application/rss+xml, application/xml, text/xml' },
+    //           cache: 'no-store',
+    //         })
+    //         if (newsRes.ok) {
+    //           const xml = await newsRes.text()
+    //           const parsed = parseGoogleNewsRss(xml)
+    //           for (const item of parsed) {
+    //             if (!combined.has(item.url)) {
+    //               combined.set(item.url, {
+    //                 title: item.title,
+    //                 snippet: item.snippet,
+    //                 url: item.url,
+    //                 source: item.source,
+    //               })
+    //             }
+    //           }
+    //         }
+    //       }
+    //     }
+
+    //     // 2) DuckDuckGo Instant Answer + DuckDuckGo HTML para mayor cobertura
+    //     for (const queryItem of expandedQueries) {
+    //       const instantUrl = new URL('https://api.duckduckgo.com/')
+    //       instantUrl.searchParams.set('q', queryItem)
+    //       instantUrl.searchParams.set('format', 'json')
+    //       instantUrl.searchParams.set('no_html', '1')
+    //       instantUrl.searchParams.set('no_redirect', '1')
+    //       instantUrl.searchParams.set('skip_disambig', '1')
+    //       searchLinks.push(instantUrl.toString())
+
+    //       const res = await fetch(instantUrl.toString(), {
+    //         method: 'GET',
+    //         headers: { Accept: 'application/json' },
+    //         cache: 'no-store',
+    //       })
+
+    //       if (res.ok) {
+    //         const data = (await res.json()) as {
+    //           Heading?: string
+    //           AbstractText?: string
+    //           AbstractURL?: string
+    //           RelatedTopics?: unknown[]
+    //           Results?: Array<{ Text?: string; FirstURL?: string }>
+    //         }
+
+    //         const primary = data.AbstractText && data.AbstractURL
+    //           ? [{ title: data.Heading || 'Resultado principal', snippet: data.AbstractText, url: data.AbstractURL }]
+    //           : []
+
+    //         const fromResults = (data.Results || [])
+    //           .map((r) => ({
+    //             title: String(r.Text || '').trim(),
+    //             snippet: String(r.Text || '').trim(),
+    //             url: String(r.FirstURL || '').trim(),
+    //           }))
+    //           .filter((r) => r.title && r.url)
+
+    //         const fromRelated = flattenDuckDuckGoTopics(Array.isArray(data.RelatedTopics) ? data.RelatedTopics : [])
+    //           .map((r) => ({ title: r.title, snippet: r.title, url: r.url }))
+
+    //         for (const item of [...primary, ...fromResults, ...fromRelated]) {
+    //           if (!item.url || combined.has(item.url)) continue
+    //           combined.set(item.url, { ...item, source: 'duckduckgo' })
+    //         }
+    //       }
+
+    //       const htmlUrl = new URL('https://html.duckduckgo.com/html/')
+    //       htmlUrl.searchParams.set('q', queryItem)
+    //       searchLinks.push(htmlUrl.toString())
+    //       const htmlRes = await fetch(htmlUrl.toString(), {
+    //         method: 'GET',
+    //         headers: { Accept: 'text/html' },
+    //         cache: 'no-store',
+    //       })
+    //       if (htmlRes.ok) {
+    //         const html = await htmlRes.text()
+    //         const parsedHtmlResults = parseDuckDuckGoHtml(html)
+    //         for (const item of parsedHtmlResults) {
+    //           if (!item.url || combined.has(item.url)) continue
+    //           combined.set(item.url, item)
+    //         }
+    //       }
+    //     }
+
+    //     const results = Array.from(combined.values()).slice(0, limit)
+    //     if (results.length === 0) {
+    //       return { ok: false, error: 'No se encontraron resultados web para esa consulta.' }
+    //     }
+    //     return {
+    //       ok: true,
+    //       query: q,
+    //       source: isNewsIntent ? 'google_news+duckduckgo' : 'duckduckgo_multi',
+    //       search_links: Array.from(new Set(searchLinks)).slice(0, 8),
+    //       results,
+    //     }
+    //   },
+    // }),
 
     crearTarea: tool({
       description:

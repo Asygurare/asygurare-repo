@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useRef, useState, useCallback } from "react"
-import { Loader2, Send, X, RotateCcw } from "lucide-react"
+import { Loader2, Send, X, RotateCcw, Mic, MicOff } from "lucide-react"
 import Image from "next/image"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
@@ -12,6 +12,35 @@ type ChatMessage = {
   role: "user" | "assistant"
   content: string
   status?: "ok" | "error" | "streaming"
+}
+
+type DictationAlternative = { transcript: string }
+type DictationResult = {
+  isFinal: boolean
+  length: number
+  [index: number]: DictationAlternative
+}
+type DictationEvent = {
+  resultIndex: number
+  results: ArrayLike<DictationResult>
+}
+type SpeechRecognitionInstance = {
+  continuous: boolean
+  interimResults: boolean
+  lang: string
+  onresult: ((event: DictationEvent) => void) | null
+  onerror: ((event: { error?: string }) => void) | null
+  onend: (() => void) | null
+  start: () => void
+  stop: () => void
+}
+type SpeechRecognitionCtor = new () => SpeechRecognitionInstance
+
+declare global {
+  interface Window {
+    SpeechRecognition?: SpeechRecognitionCtor
+    webkitSpeechRecognition?: SpeechRecognitionCtor
+  }
 }
 
 async function consumeStream(
@@ -61,7 +90,17 @@ export default function AgentOrb() {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [conversationId, setConversationId] = useState<string | null>(null)
   const [userId, setUserId] = useState<string | null>(null)
+  const [isListening, setIsListening] = useState(false)
+  const [speechError, setSpeechError] = useState<string | null>(null)
+  const [isSpeechSupported, setIsSpeechSupported] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
+  const recognitionRef = useRef<SpeechRecognitionInstance | null>(null)
+  const autoSendTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const inputRef = useRef("")
+  const isListeningRef = useRef(false)
+  const lastVoiceSentRef = useRef("")
+  const dictationBaseRef = useRef("")
+  const finalDictationRef = useRef("")
 
   useEffect(() => {
     const loadUser = async () => {
@@ -70,6 +109,23 @@ export default function AgentOrb() {
     }
     loadUser()
   }, [])
+
+  useEffect(() => {
+    const ctor = window.SpeechRecognition || window.webkitSpeechRecognition
+    setIsSpeechSupported(Boolean(ctor))
+    return () => {
+      recognitionRef.current?.stop()
+      if (autoSendTimeoutRef.current) clearTimeout(autoSendTimeoutRef.current)
+    }
+  }, [])
+
+  useEffect(() => {
+    inputRef.current = input
+  }, [input])
+
+  useEffect(() => {
+    isListeningRef.current = isListening
+  }, [isListening])
 
   useEffect(() => {
     if (!isOpen || !userId || conversationId) return
@@ -185,15 +241,32 @@ export default function AgentOrb() {
     processingRef.current = false
   }, [processOneMessage])
 
-  const sendMessage = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!input.trim() || !conversationId || !userId) return
+  const clearAutoSendTimer = useCallback(() => {
+    if (autoSendTimeoutRef.current) {
+      clearTimeout(autoSendTimeoutRef.current)
+      autoSendTimeoutRef.current = null
+    }
+  }, [])
 
-    const userMsg = input.trim()
+  const queueUserMessage = useCallback((rawText: string) => {
+    const userMsg = rawText.trim()
+    if (!userMsg || !conversationId || !userId) return false
     setInput("")
     setMessages((prev) => [...prev, { role: "user", content: userMsg }])
     queueRef.current.push(userMsg)
     processQueue()
+    return true
+  }, [conversationId, userId, processQueue])
+
+  const sendMessage = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!input.trim() || !conversationId || !userId) return
+    clearAutoSendTimer()
+    if (isListening && recognitionRef.current) {
+      recognitionRef.current.stop()
+      setIsListening(false)
+    }
+    queueUserMessage(input)
   }
 
   const retryLastMessage = useCallback(() => {
@@ -209,6 +282,84 @@ export default function AgentOrb() {
       return withoutLast
     })
   }, [processQueue])
+
+  const stopDictation = useCallback(() => {
+    clearAutoSendTimer()
+    recognitionRef.current?.stop()
+    setIsListening(false)
+  }, [clearAutoSendTimer])
+
+  const startDictation = useCallback(() => {
+    const ctor = window.SpeechRecognition || window.webkitSpeechRecognition
+    if (!ctor) {
+      setSpeechError("Tu navegador no soporta dictado por voz.")
+      return
+    }
+    setSpeechError(null)
+    finalDictationRef.current = ""
+    dictationBaseRef.current = input.trim()
+    lastVoiceSentRef.current = ""
+
+    const recognition = new ctor()
+    recognition.lang = "es-MX"
+    recognition.continuous = true
+    recognition.interimResults = true
+
+    recognition.onresult = (event) => {
+      let finalChunk = ""
+      let interimChunk = ""
+      for (let i = event.resultIndex; i < event.results.length; i += 1) {
+        const result = event.results[i]
+        const transcript = result?.[0]?.transcript || ""
+        if (!transcript) continue
+        if (result.isFinal) finalChunk += transcript
+        else interimChunk += transcript
+      }
+      if (finalChunk) {
+        finalDictationRef.current = `${finalDictationRef.current} ${finalChunk}`.trim()
+      }
+      const merged = `${dictationBaseRef.current} ${finalDictationRef.current} ${interimChunk}`.trim()
+      setInput(merged)
+      clearAutoSendTimer()
+      autoSendTimeoutRef.current = setTimeout(() => {
+        if (!isListeningRef.current) return
+        const pending = inputRef.current.trim()
+        if (!pending) return
+        if (pending === lastVoiceSentRef.current) return
+        const sent = queueUserMessage(pending)
+        if (sent) {
+          lastVoiceSentRef.current = pending
+          dictationBaseRef.current = ""
+          finalDictationRef.current = ""
+          setSpeechError(null)
+          recognitionRef.current?.stop()
+          setIsListening(false)
+        }
+      }, 1500)
+    }
+
+    recognition.onerror = (event) => {
+      if (event?.error && event.error !== "aborted") {
+        setSpeechError("No pudimos capturar tu voz. Revisa permisos del microfono.")
+      }
+      clearAutoSendTimer()
+      setIsListening(false)
+    }
+
+    recognition.onend = () => {
+      clearAutoSendTimer()
+      setIsListening(false)
+    }
+
+    recognitionRef.current = recognition
+    recognition.start()
+    setIsListening(true)
+  }, [clearAutoSendTimer, queueUserMessage])
+
+  const toggleDictation = useCallback(() => {
+    if (isListening) stopDictation()
+    else startDictation()
+  }, [isListening, startDictation, stopDictation])
 
   return (
     <div className="fixed bottom-5 right-5 z-[65]">
@@ -308,8 +459,21 @@ export default function AgentOrb() {
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 placeholder="Escribe tu instrucción..."
-                className="w-full bg-[#f8f6f4] rounded-2xl py-3 pl-4 pr-12 text-[12px] text-black font-medium outline-none border border-transparent focus:border-black/10"
+                className="w-full bg-[#f8f6f4] rounded-2xl py-3 pl-4 pr-20 text-[12px] text-black font-medium outline-none border border-transparent focus:border-black/10"
               />
+              <button
+                type="button"
+                onClick={toggleDictation}
+                disabled={!isSpeechSupported}
+                aria-label={isListening ? "Detener dictado por voz" : "Iniciar dictado por voz"}
+                className={`absolute right-10 top-1/2 -translate-y-1/2 w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${
+                  isListening
+                    ? "bg-red-500 text-white"
+                    : "bg-black/10 text-black/60 hover:bg-black hover:text-white"
+                } disabled:opacity-30`}
+              >
+                {isListening ? <MicOff size={13} /> : <Mic size={13} />}
+              </button>
               <button
                 type="submit"
                 disabled={!input.trim() || !conversationId || !userId}
@@ -318,6 +482,12 @@ export default function AgentOrb() {
                 <Send size={14} />
               </button>
             </div>
+            {isListening ? (
+              <p className="mt-2 text-[10px] font-bold text-blue-500 uppercase tracking-widest">Escuchando...</p>
+            ) : null}
+            {speechError ? (
+              <p className="mt-1 text-[10px] font-bold text-red-500">{speechError}</p>
+            ) : null}
           </form>
         </div>
       )}
