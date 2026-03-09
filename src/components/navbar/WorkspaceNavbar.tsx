@@ -1,16 +1,18 @@
 "use client"
 import React, { useEffect, useState } from 'react'
-import { User, LogOut, ChevronDown, Menu } from 'lucide-react'
+import { User, LogOut, ChevronDown, Menu, Crown, BadgeCheck } from 'lucide-react'
 import { supabaseClient } from '@/src/lib/supabase/client'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useRouter } from 'next/navigation'
+import type { User as SupabaseUser } from '@supabase/supabase-js'
 
 type WorkspaceNavbarProps = {
   onMenuClick?: () => void
 }
 
 export default function WorkspaceNavbar({ onMenuClick }: WorkspaceNavbarProps) {
-  const [user, setUser] = useState<any>(null)
+  const [user, setUser] = useState<SupabaseUser | null>(null)
+  const [billingTier, setBillingTier] = useState<'pro' | 'free'>('free')
   const [isProfileOpen, setIsProfileOpen] = useState(false)
   const router = useRouter()
   const firstName = String(user?.user_metadata?.first_name || '').trim()
@@ -25,11 +27,17 @@ export default function WorkspaceNavbar({ onMenuClick }: WorkspaceNavbarProps) {
   }).format(new Date())
 
   useEffect(() => {
-    const getUser = async () => {
+    const loadContext = async () => {
       const { data: { user } } = await supabaseClient.auth.getUser()
       setUser(user)
+      if (!user) return
+
+      const billingResponse = await fetch('/api/billing/status', { cache: 'no-store' }).catch(() => null)
+      if (!billingResponse || !billingResponse.ok) return
+      const billingJson = await billingResponse.json().catch(() => ({}))
+      setBillingTier(billingJson?.billing?.has_pro_access ? 'pro' : 'free')
     }
-    getUser()
+    loadContext()
   }, [])
 
   const handleLogout = async () => {
@@ -56,9 +64,21 @@ export default function WorkspaceNavbar({ onMenuClick }: WorkspaceNavbarProps) {
           <p className="text-xs sm:text-sm font-black text-black tracking-tight truncate">
             Hola, {userName}
           </p>
-          <p className="hidden sm:block text-xs font-black text-black/40 uppercase tracking-widest">
-            {formattedDate}
-          </p>
+          <div className="hidden sm:flex items-center gap-3">
+            <p className="text-xs font-black text-black/40 uppercase tracking-widest">
+              {formattedDate}
+            </p>
+            <span
+              className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-widest ${
+                billingTier === 'pro'
+                  ? 'bg-gradient-to-r from-[#D4AF37] to-(--accents) text-white'
+                  : 'bg-black/10 text-black/60'
+              }`}
+            >
+              {billingTier === 'pro' ? <Crown size={12} /> : <BadgeCheck size={12} />}
+              {billingTier}
+            </span>
+          </div>
         </div>
       </div>
 

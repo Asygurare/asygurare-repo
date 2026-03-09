@@ -41,7 +41,7 @@ export async function GET(request: Request) {
     .eq("user_id", memberUserId)
     .maybeSingle<{ id: string }>()
 
-  if (!membership) {
+  if (!membership?.id) {
     return NextResponse.json({ error: "Este usuario no es miembro de tu equipo" }, { status: 403 })
   }
 

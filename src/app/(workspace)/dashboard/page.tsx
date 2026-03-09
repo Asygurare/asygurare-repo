@@ -195,6 +195,7 @@ export default function DashboardPage() {
       nextMonth.setDate(today.getDate() + 30)
 
       const renovacionesCount = policies.filter((p) => {
+        if (!p.expiry_date) return false
         const expiry = new Date(p.expiry_date)
         return expiry >= today && expiry <= nextMonth
       }).length || 0

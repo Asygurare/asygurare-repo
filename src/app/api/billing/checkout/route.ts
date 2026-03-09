@@ -30,9 +30,9 @@ export async function POST() {
       .from(DATABASE.TABLES.WS_BILLING_CUSTOMERS)
       .select("stripe_customer_id")
       .eq("user_id", user.id)
-      .maybeSingle<{ stripe_customer_id: string }>()
+      .maybeSingle()
 
-    let stripeCustomerId = billingCustomer?.stripe_customer_id ?? null
+    let stripeCustomerId = (billingCustomer as { stripe_customer_id?: string } | null)?.stripe_customer_id ?? null
     if (!stripeCustomerId) {
       const customer = await stripe.customers.create({
         email: user.email || undefined,
@@ -48,7 +48,7 @@ export async function POST() {
             email: user.email ?? null,
             updated_at: new Date().toISOString(),
           },
-        ],
+        ] as unknown as never,
         { onConflict: "user_id" },
       )
     }
@@ -60,7 +60,7 @@ export async function POST() {
       line_items: [{ price: priceId, quantity: 1 }],
       payment_method_collection: "always",
       allow_promotion_codes: true,
-      success_url: `${appUrl}/dashboard?billing=success`,
+      success_url: `${appUrl}/dashboard?billing=success&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${appUrl}/pricing?billing=cancel`,
       metadata: {
         user_id: user.id,
@@ -74,6 +74,20 @@ export async function POST() {
         },
       },
     })
+
+    // Auditoría de intentos de checkout (ownership/session tracking).
+    await admin.from(DATABASE.TABLES.WS_BILLING_CHECKOUT_SESSIONS).upsert(
+      [
+        {
+          user_id: user.id,
+          stripe_checkout_session_id: checkoutSession.id,
+          stripe_customer_id: stripeCustomerId,
+          checkout_status: checkoutSession.status ?? "open",
+          payment_status: checkoutSession.payment_status ?? null,
+        },
+      ] as unknown as never,
+      { onConflict: "stripe_checkout_session_id" },
+    )
 
     return NextResponse.json(
       { ok: true, url: checkoutSession.url, sessionId: checkoutSession.id },

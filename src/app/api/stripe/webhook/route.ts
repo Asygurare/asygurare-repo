@@ -17,8 +17,8 @@ async function resolveUserIdByCustomer(stripeCustomerId: string) {
     .from(DATABASE.TABLES.WS_BILLING_CUSTOMERS)
     .select("user_id")
     .eq("stripe_customer_id", stripeCustomerId)
-    .maybeSingle<{ user_id: string }>()
-  return data?.user_id ?? null
+    .maybeSingle()
+  return (data as { user_id?: string } | null)?.user_id ?? null
 }
 
 async function upsertCustomer(params: { userId: string; stripeCustomerId: string; email?: string | null }) {
@@ -31,7 +31,7 @@ async function upsertCustomer(params: { userId: string; stripeCustomerId: string
         email: params.email ?? null,
         updated_at: new Date().toISOString(),
       },
-    ],
+    ] as unknown as never,
     { onConflict: "user_id" },
   )
 }
@@ -46,9 +46,23 @@ async function upsertSubscriptionForUser(userId: string, stripeSubscription: Str
         user_id: userId,
         ...mapped,
       },
-    ],
+    ] as unknown as never,
     { onConflict: "user_id" },
   )
+
+  // Si la suscripción ya existe en estado saludable, desbloquea onboarding obligatorio.
+  if (mapped.status === "active" || mapped.status === "trialing") {
+    const { data: authUser } = await admin.auth.admin.getUserById(userId)
+    const existingMetadata = (authUser?.user?.user_metadata || {}) as Record<string, unknown>
+    if (existingMetadata.trial_checkout_required) {
+      await admin.auth.admin.updateUserById(userId, {
+        user_metadata: {
+          ...existingMetadata,
+          trial_checkout_required: false,
+        },
+      })
+    }
+  }
 }
 
 async function syncSubscriptionById(subscriptionId: string, explicitUserId?: string | null) {
@@ -71,7 +85,7 @@ async function markEventAsProcessed(eventId: string, eventType: string) {
       event_type: eventType,
       processed_at: new Date().toISOString(),
     },
-  ])
+  ] as unknown as never)
 
   if (error && error.code === "23505") {
     return false
@@ -117,6 +131,21 @@ export async function POST(request: Request) {
             stripeCustomerId,
             email: session.customer_details?.email ?? null,
           })
+
+          await getAdminClient().from(DATABASE.TABLES.WS_BILLING_CHECKOUT_SESSIONS).upsert(
+            [
+              {
+                user_id: userId,
+                stripe_checkout_session_id: session.id,
+                stripe_customer_id: stripeCustomerId,
+                stripe_subscription_id: session.subscription ? String(session.subscription) : null,
+                checkout_status: session.status ?? "complete",
+                payment_status: session.payment_status ?? null,
+                completed_at: new Date().toISOString(),
+              },
+            ] as unknown as never,
+            { onConflict: "stripe_checkout_session_id" },
+          )
         }
         if (session.subscription) {
           await syncSubscriptionById(String(session.subscription), userId)
@@ -138,7 +167,8 @@ export async function POST(request: Request) {
       case "invoice.paid":
       case "invoice.payment_failed": {
         const invoice = event.data.object as Stripe.Invoice
-        const subscriptionId = invoice.subscription ? String(invoice.subscription) : null
+        const invoiceSubscription = (invoice as Stripe.Invoice & { subscription?: string | Stripe.Subscription | null }).subscription
+        const subscriptionId = invoiceSubscription ? String(invoiceSubscription) : null
         const userId =
           invoice.parent?.subscription_details?.metadata?.user_id ||
           (invoice.customer ? await resolveUserIdByCustomer(String(invoice.customer)) : null)

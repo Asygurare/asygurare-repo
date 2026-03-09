@@ -3,6 +3,13 @@ import { createClient } from '@/src/lib/supabase/server'
 import { getAdminClient } from '@/src/lib/supabase/admin'
 import { DATABASE } from '@/src/config/database'
 
+type PendingInvite = {
+  id: string
+  team_id: string
+  permissions: Record<string, unknown> | null
+  token: string
+}
+
 async function linkPendingInvitations(userId: string, userEmail: string | undefined) {
   if (!userEmail) return
   const email = userEmail.toLowerCase()
@@ -15,9 +22,10 @@ async function linkPendingInvitations(userId: string, userEmail: string | undefi
     .eq('email', email)
     .eq('status', 'pending')
 
-  if (!pendingInvites || pendingInvites.length === 0) return
+  const invites = (pendingInvites || []) as PendingInvite[]
+  if (invites.length === 0) return
 
-  for (const invite of pendingInvites) {
+  for (const invite of invites) {
     const { data: existingMember } = await admin
       .from(DATABASE.TABLES.WS_TEAM_MEMBERS)
       .select('id')
@@ -27,16 +35,20 @@ async function linkPendingInvitations(userId: string, userEmail: string | undefi
 
     if (existingMember) continue
 
-    await admin.from(DATABASE.TABLES.WS_TEAM_MEMBERS).insert({
+    const memberPayload = {
       team_id: invite.team_id,
       user_id: userId,
       role: 'member',
       permissions: invite.permissions ?? {},
-    })
+    } as unknown as never
+
+    await admin.from(DATABASE.TABLES.WS_TEAM_MEMBERS).insert(memberPayload)
+
+    const invitationUpdatePayload = { status: 'accepted', accepted_by: userId } as unknown as never
 
     await admin
       .from(DATABASE.TABLES.WS_TEAM_INVITATIONS)
-      .update({ status: 'accepted', accepted_by: userId })
+      .update(invitationUpdatePayload)
       .eq('id', invite.id)
   }
 }

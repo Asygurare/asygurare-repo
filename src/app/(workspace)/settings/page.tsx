@@ -54,6 +54,20 @@ type BillingState = {
   cancel_at_period_end: boolean
 }
 
+type UserSettingsMetadata = {
+  preferences?: Partial<Preferences>
+  notifications?: Partial<Notifications>
+}
+
+type UserMetadata = {
+  first_name?: string
+  last_name?: string
+  agency_name?: string
+  city?: string
+  country?: string
+  settings?: UserSettingsMetadata
+}
+
 const LS_KEY = "tg_settings_v1"
 
 const SETTINGS_TUTORIAL_STEPS: SectionTutorialStep[] = [
@@ -83,8 +97,12 @@ const SETTINGS_TUTORIAL_STEPS: SectionTutorialStep[] = [
   },
 ]
 
-function isPlainObject(value: unknown): value is Record<string, any> {
+function isPlainObject(value: unknown): value is Record<string, unknown> {
   return !!value && typeof value === "object" && !Array.isArray(value)
+}
+
+function getErrorMessage(error: unknown) {
+  return error instanceof Error ? error.message : "Error desconocido"
 }
 
 function Toggle({
@@ -182,7 +200,7 @@ export default function SettingsPage() {
 
         setEmail(user.email || "")
 
-        const meta = (user.user_metadata || {}) as Record<string, any>
+        const meta = (user.user_metadata || {}) as UserMetadata
         const metaSettings = isPlainObject(meta.settings) ? meta.settings : {}
         const metaPrefs = isPlainObject(metaSettings.preferences) ? metaSettings.preferences : {}
         const metaNotifs = isPlainObject(metaSettings.notifications) ? metaSettings.notifications : {}
@@ -237,8 +255,8 @@ export default function SettingsPage() {
             ),
           },
         }))
-      } catch (e: any) {
-        toast.error("No se pudieron cargar tus ajustes: " + (e?.message || "Error desconocido"))
+      } catch (error: unknown) {
+        toast.error("No se pudieron cargar tus ajustes: " + getErrorMessage(error))
       } finally {
         setLoading(false)
       }
@@ -292,7 +310,7 @@ export default function SettingsPage() {
       if (!authData.user) throw new Error("Sesión expirada")
       const userId = authData.user.id
 
-      const existing = (authData.user.user_metadata || {}) as Record<string, any>
+      const existing = (authData.user.user_metadata || {}) as UserMetadata
       const existingSettings = isPlainObject(existing.settings) ? existing.settings : {}
       const nextSettings = {
         ...existingSettings,
@@ -330,7 +348,7 @@ export default function SettingsPage() {
 
       persistLocal(state)
       toast.success("Cambios guardados correctamente")
-    } catch (e: any) {
+    } catch {
       toast.error("Hubo un error al guardar los cambios. Por favor verifica la información e intenta nuevamente")
       try {
         persistLocal(state)
@@ -367,8 +385,8 @@ export default function SettingsPage() {
       } else {
         toast.error(result.error ?? "No se pudo actualizar la contraseña")
       }
-    } catch (e: any) {
-      toast.error("No se pudo actualizar la contraseña: " + (e?.message || "Error desconocido"))
+    } catch (error: unknown) {
+      toast.error("No se pudo actualizar la contraseña: " + getErrorMessage(error))
     } finally {
       setSavingPassword(false)
     }

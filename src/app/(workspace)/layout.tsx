@@ -2,12 +2,12 @@
 
 import Link from 'next/link'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import {
   LayoutDashboard, Users, Target, Shield,
   CreditCard, Settings, BrainCircuit, CalendarDays, BarChart3,
   Cpu, Flag, X, ChevronDown,
-  User2Icon, UserPlus,
+  User2Icon,
   FileText, Signature,
   Mail,
   Send,
@@ -69,7 +69,7 @@ const menuItems: MenuItem[] = [
   { icon: User2Icon, label: 'Soporte', href: '/soporte', comingSoon: false },
 ]
 
-export default function WorkspaceLayout({ children }: { children: React.ReactNode }) {
+function WorkspaceLayoutContent({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -137,53 +137,45 @@ export default function WorkspaceLayout({ children }: { children: React.ReactNod
     if (billingStatus !== 'success') return
 
     let cancelled = false
-    let attempts = 0
-    const maxAttempts = 10
+    const sessionId = searchParams.get('session_id')
 
     const verifyBilling = async () => {
       if (cancelled) return
       setIsVerifyingBilling(true)
       setBillingVerifyError(null)
+      try {
+        if (sessionId) {
+          const confirmRes = await fetch(`/api/billing/confirm?session_id=${encodeURIComponent(sessionId)}`, {
+            method: 'POST',
+          })
+          const confirmJson = await confirmRes.json().catch(() => ({}))
+          if (!confirmRes.ok) {
+            throw new Error(confirmJson?.error || 'No se pudo confirmar la suscripción')
+          }
+        }
 
-      while (!cancelled && attempts < maxAttempts) {
-        attempts += 1
         await refreshMandatoryTrialGate()
-
-        const { data } = await supabaseClient.auth.getUser()
-        const metadata = (data.user?.user_metadata || {}) as Record<string, unknown>
-
         const billingRes = await fetch('/api/billing/status', { cache: 'no-store' })
         const billingJson = await billingRes.json().catch(() => ({}))
         const hasProAccess = Boolean(billingJson?.billing?.has_pro_access)
 
-        if (hasProAccess) {
-          // Marca onboarding de checkout como completado en metadata.
-          if (metadata.trial_checkout_required) {
-            await supabaseClient.auth.updateUser({
-              data: {
-                ...metadata,
-                trial_checkout_required: false,
-              },
-            })
-          }
-
-          if (!cancelled) {
-            if (typeof window !== 'undefined') {
-              window.sessionStorage.setItem('showAsygurareWelcomeModal', '1')
-            }
-            setIsVerifyingBilling(false)
-            setBillingVerifyError(null)
-            router.replace('/dashboard')
-          }
-          return
+        if (!hasProAccess) {
+          throw new Error('No pudimos validar tu activación. Intenta verificar de nuevo.')
         }
 
-        await new Promise((resolve) => setTimeout(resolve, 1500))
-      }
-
-      if (!cancelled) {
-        setIsVerifyingBilling(false)
-        setBillingVerifyError('Seguimos procesando tu activación. Reintenta en unos segundos.')
+        if (!cancelled) {
+          if (typeof window !== 'undefined') {
+            window.sessionStorage.setItem('showAsygurareWelcomeModal', '1')
+          }
+          setIsVerifyingBilling(false)
+          setBillingVerifyError(null)
+          router.replace('/dashboard')
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setIsVerifyingBilling(false)
+          setBillingVerifyError(error instanceof Error ? error.message : 'No pudimos validar tu activación.')
+        }
       }
     }
 
@@ -193,6 +185,26 @@ export default function WorkspaceLayout({ children }: { children: React.ReactNod
       cancelled = true
     }
   }, [pathname, refreshMandatoryTrialGate, router, searchParams])
+
+  const handleVerifyActivation = useCallback(async () => {
+    setMandatoryTrialGateLoading(true)
+    try {
+      await refreshMandatoryTrialGate()
+      const billingRes = await fetch('/api/billing/status', { cache: 'no-store' })
+      const billingJson = await billingRes.json().catch(() => ({}))
+      const hasProAccess = Boolean(billingJson?.billing?.has_pro_access)
+      if (hasProAccess) {
+        if (typeof window !== 'undefined') {
+          window.sessionStorage.setItem('showAsygurareWelcomeModal', '1')
+        }
+        router.replace('/dashboard')
+        return
+      }
+      setBillingVerifyError('Aún no vemos tu activación. Espera unos segundos y vuelve a intentar.')
+    } finally {
+      setMandatoryTrialGateLoading(false)
+    }
+  }, [refreshMandatoryTrialGate, router])
 
   const filteredMenuItems = menuItems.filter((item) => {
     if (item.hidden) return false
@@ -355,7 +367,7 @@ export default function WorkspaceLayout({ children }: { children: React.ReactNod
       </nav>
 
       <div className="mt-auto pt-6 border-t border-black/5 space-y-1">
-        {teamRole === "owner" && (
+        {/* {teamRole === "owner" && (
           <Link
             href="/equipo"
             onClick={onNavigate}
@@ -368,7 +380,7 @@ export default function WorkspaceLayout({ children }: { children: React.ReactNod
             <UserPlus size={20} />
             Mi equipo
           </Link>
-        )}
+        )} */}
         <Link
           href="/settings"
           onClick={onNavigate}
@@ -492,6 +504,14 @@ export default function WorkspaceLayout({ children }: { children: React.ReactNod
             >
               {mandatoryCheckoutLoading ? "Abriendo checkout..." : "Activar prueba gratis"}
             </button>
+            <button
+              type="button"
+              onClick={handleVerifyActivation}
+              disabled={mandatoryTrialGateLoading}
+              className="mt-3 inline-flex items-center justify-center gap-2 rounded-[1.2rem] border border-black/15 bg-white text-black px-8 py-3 text-[11px] font-black uppercase tracking-widest hover:bg-black/[0.03] transition-all disabled:opacity-60"
+            >
+              {mandatoryTrialGateLoading ? "Verificando..." : "Ya pagué, verificar activación"}
+            </button>
             {billingVerifyError ? (
               <p className="mt-4 text-xs font-bold text-black/50">{billingVerifyError}</p>
             ) : null}
@@ -499,5 +519,19 @@ export default function WorkspaceLayout({ children }: { children: React.ReactNod
         </div>
       ) : null}
     </div>
+  )
+}
+
+export default function WorkspaceLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen w-full bg-[#f7f4f0] flex items-center justify-center text-black/50 text-sm font-black uppercase tracking-widest">
+          Cargando workspace...
+        </div>
+      }
+    >
+      <WorkspaceLayoutContent>{children}</WorkspaceLayoutContent>
+    </Suspense>
   )
 }

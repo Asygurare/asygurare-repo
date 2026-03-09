@@ -69,7 +69,7 @@ export async function POST(request: Request) {
     .eq("status", "pending")
     .maybeSingle<{ id: string }>()
 
-  if (existingInvite) {
+  if (existingInvite?.id) {
     return NextResponse.json({ ok: false, error: "Ya existe una invitación pendiente para este email" }, { status: 409 })
   }
 
@@ -84,7 +84,7 @@ export async function POST(request: Request) {
       token,
       status: "pending",
       invited_by: user.id,
-    })
+    } as unknown as never)
 
   if (inviteErr) {
     return NextResponse.json({ ok: false, error: inviteErr.message }, { status: 500 })

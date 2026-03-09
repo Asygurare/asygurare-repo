@@ -30,19 +30,37 @@ export async function GET() {
       .select("id, user_id, role, permissions, joined_at")
       .eq("team_id", ownedTeam.id)
 
-    const memberUserIds = (members || []).map((m: any) => m.user_id).filter(Boolean)
+    type TeamMemberRow = {
+      id: string
+      user_id: string
+      role: string
+      permissions: unknown
+      joined_at: string | null
+    }
+    type ProfileRow = { id: string; first_name: string | null; last_name: string | null }
+    type InvitationRow = {
+      id: string
+      email: string
+      permissions: unknown
+      status: string
+      expires_at: string | null
+      created_at: string
+    }
+
+    const typedMembers = (members || []) as TeamMemberRow[]
+    const memberUserIds = typedMembers.map((m) => m.user_id).filter(Boolean)
     const profilesByUserId = new Map<string, { first_name: string | null; last_name: string | null }>()
     if (memberUserIds.length > 0) {
       const { data: profiles } = await admin
         .from(DATABASE.TABLES.PROFILES)
         .select("id, first_name, last_name")
         .in("id", memberUserIds)
-      for (const p of (profiles || []) as any[]) {
+      for (const p of (profiles || []) as ProfileRow[]) {
         profilesByUserId.set(p.id, { first_name: p.first_name, last_name: p.last_name })
       }
     }
 
-    const enrichedMembers = (members || []).map((m: any) => {
+    const enrichedMembers = typedMembers.map((m) => {
       const profile = profilesByUserId.get(m.user_id)
       return {
         ...m,
@@ -62,7 +80,7 @@ export async function GET() {
       role: "owner",
       team: ownedTeam,
       members: enrichedMembers,
-      invitations: (invitations || []).map((inv: any) => ({
+      invitations: ((invitations || []) as InvitationRow[]).map((inv) => ({
         ...inv,
         permissions: parsePermissions(inv.permissions),
       })),
@@ -82,7 +100,7 @@ export async function GET() {
       .from(DATABASE.TABLES.WS_TEAMS)
       .select("id, name")
       .eq("id", membership.team_id)
-      .maybeSingle<{ id: string; name: string }>()
+      .maybeSingle()
 
     return NextResponse.json({
       role: "member",

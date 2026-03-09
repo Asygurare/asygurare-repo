@@ -29,9 +29,10 @@ export async function POST() {
       .from(DATABASE.TABLES.WS_BILLING_CUSTOMERS)
       .select("stripe_customer_id")
       .eq("user_id", user.id)
-      .maybeSingle<{ stripe_customer_id: string }>()
+      .maybeSingle()
 
-    if (!billingCustomer?.stripe_customer_id) {
+    const stripeCustomerId = (billingCustomer as { stripe_customer_id?: string } | null)?.stripe_customer_id
+    if (!stripeCustomerId) {
       return NextResponse.json(
         { ok: false, error: "No se encontró cliente de facturación" },
         { status: 404 },
@@ -39,7 +40,7 @@ export async function POST() {
     }
 
     const portalSession = await stripe.billingPortal.sessions.create({
-      customer: billingCustomer.stripe_customer_id,
+      customer: stripeCustomerId,
       locale: "es",
       return_url: `${appUrl}/settings`,
     })

@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState, useEffect, useRef, useCallback, useMemo, Suspense } from 'react'
+import React, { useState, useEffect, useRef, useCallback, Suspense } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import Link from 'next/link'
 import Image from 'next/image'
@@ -34,19 +34,11 @@ function LoginContent() {
   const searchParams = useSearchParams()
   const codeParam = searchParams.get('code')
   const [showConfirmModal, setShowConfirmModal] = useState(false)
-  const [showTrialModal, setShowTrialModal] = useState(false)
-  const [trialLoading, setTrialLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
   const [resendLoading, setResendLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const emailInputRef = useRef<HTMLInputElement>(null)
-
-  const estimatedTrialEnd = useMemo(() => {
-    const date = new Date()
-    date.setDate(date.getDate() + 15)
-    return date.toLocaleDateString('es-MX')
-  }, [])
 
   useEffect(() => {
     if (codeParam === 'auth_error') {
@@ -73,51 +65,6 @@ function LoginContent() {
       router.replace('/login', { scroll: false })
     }
   }, [codeParam, router])
-
-  const shouldShowTrialPrompt = useCallback(async () => {
-    try {
-      const { data: authData } = await supabaseClient.auth.getUser()
-      const user = authData.user
-      if (!user) return false
-      const metadata = (user.user_metadata || {}) as Record<string, unknown>
-      if (!metadata.trial_checkout_required) return false
-
-      const billingRes = await fetch('/api/billing/status', { cache: 'no-store' })
-      const billingJson = await billingRes.json().catch(() => ({}))
-      const billing = billingJson?.billing as { status?: string; has_pro_access?: boolean } | undefined
-      if (!billingRes.ok) return false
-
-      return !billing?.has_pro_access
-    } catch {
-      return false
-    }
-  }, [])
-
-  const handleStartTrialCheckout = useCallback(async () => {
-    setTrialLoading(true)
-    try {
-      const { data: authData } = await supabaseClient.auth.getUser()
-      if (!authData.user) {
-        toast.error('Primero inicia sesión para activar tu prueba gratis.')
-        setShowTrialModal(false)
-        return
-      }
-
-      const response = await fetch('/api/billing/checkout', { method: 'POST' })
-      const json = await response.json().catch(() => ({}))
-
-      if (!response.ok || !json?.url) {
-        throw new Error(json?.error || 'No se pudo iniciar el checkout')
-      }
-
-      window.location.href = String(json.url)
-    } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : 'No se pudo iniciar el checkout'
-      toast.error(message)
-    } finally {
-      setTrialLoading(false)
-    }
-  }, [])
 
   const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -159,12 +106,6 @@ function LoginContent() {
       if (data?.user) {
         console.log("LOGIN EXITOSO:", data.user);
         setLoading(false)
-
-        const showTrialPrompt = await shouldShowTrialPrompt()
-        if (showTrialPrompt) {
-          setShowTrialModal(true)
-          return
-        }
 
         // window.location.replace es mejor que .href para logins
         // porque no deja la página de login en el historial (el botón "atrás" no te regresa al login)
@@ -262,49 +203,6 @@ function LoginContent() {
                   className="mt-6 w-full bg-[#1a1a1a] text-white py-3 rounded-2xl font-bold hover:bg-black transition-all"
                 >
                   Entendido
-                </button>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-        {showTrialModal && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
-          >
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 relative border border-black/5"
-            >
-              <div className="flex flex-col items-center text-center pt-2">
-                <div className="w-14 h-14 rounded-full bg-[#4A7766]/10 flex items-center justify-center mb-4">
-                  <MailCheck className="text-[#4A7766]" size={28} />
-                </div>
-                <h3 className="text-xl font-bold text-[#1a1a1a] mb-2">Activa tu prueba gratis</h3>
-                <p className="text-gray-600 text-sm leading-relaxed">
-                  Para comenzar a usar la plataforma, activa tu prueba gratis de 15 días del plan Pro.
-                </p>
-                <p className="text-gray-600 text-sm leading-relaxed mt-2">
-                  Tu primer cobro será hasta el {estimatedTrialEnd}. Puedes cancelar cuando quieras antes de esa fecha.
-                </p>
-                <button
-                  type="button"
-                  onClick={handleStartTrialCheckout}
-                  disabled={trialLoading}
-                  className="mt-6 w-full bg-[#1a1a1a] text-white py-3 rounded-2xl font-bold hover:bg-black transition-all disabled:opacity-70 inline-flex items-center justify-center gap-2"
-                >
-                  {trialLoading ? (
-                    <>
-                      <Loader2 size={16} className="animate-spin" />
-                      Abriendo checkout...
-                    </>
-                  ) : (
-                    'Empezar mi prueba gratis'
-                  )}
                 </button>
               </div>
             </motion.div>

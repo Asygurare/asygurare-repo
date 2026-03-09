@@ -2,20 +2,15 @@
 
 import React, { useState } from 'react'
 import { motion } from 'framer-motion'
-import { Check, Zap, Crown, Rocket, ArrowRight } from 'lucide-react'
+import { Check, Zap, Rocket, ArrowRight, CreditCard, ShieldCheck, Loader2 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 
-type BillingPeriod = "monthly" | "annual"
-
 type PricingPlan = {
-  key: "pro" | "ultimate"
+  key: "pro"
   icon: React.ReactNode
   title: string
   desc: string
-  priceMonthly: number
-  priceAnnualMonthlyEquivalent: number
-  highlight?: boolean
-  tag?: string
+  price: number
   features: string[]
   cta: string
 }
@@ -23,20 +18,15 @@ type PricingPlan = {
 
 export default function PricingPage() {
   const router = useRouter()
-  const [isAnnual, setIsAnnual] = useState(false)
-  const [loadingPlan, setLoadingPlan] = useState<null | "pro" | "ultimate">(null)
-  const billing: BillingPeriod = isAnnual ? "annual" : "monthly"
+  const [loadingPlan, setLoadingPlan] = useState<null | "pro">(null)
 
   const plans: PricingPlan[] = [
     {
       key: "pro",
-      icon: <Zap size={24} className="text-white" />,
+      icon: <Zap size={24} className="text-black" />,
       title: "Pro",
       desc: "El plan para vender más con automatización real.",
-      priceMonthly: 20,
-      priceAnnualMonthlyEquivalent: 16,
-      highlight: true,
-      tag: "Más popular",
+      price: 20,
       features: [
         "Workspace completo (Prospectos, Clientes, Pólizas, Calendario)",
         "Análisis (KPIs + gráficas del negocio)",
@@ -46,22 +36,6 @@ export default function PricingPage() {
         "Soporte prioritario",
       ],
       cta: "Elegir Pro",
-    },
-    {
-      key: "ultimate",
-      icon: <Crown size={24} className="text-(--accents)" />,
-      title: "Ultimate",
-      desc: "Para equipos o asesores que operan con volumen y datos.",
-      priceMonthly: 59,
-      priceAnnualMonthlyEquivalent: 47,
-      features: [
-        "Todo en Pro",
-        "GUROS AI: flujos, plantillas y automatizaciones avanzadas",
-        "Segmentación y campañas a gran escala",
-        "Analítica avanzada y reportes premium",
-        "Onboarding + soporte premium",
-      ],
-      cta: "Elegir Ultimate",
     },
   ]
 
@@ -107,7 +81,7 @@ export default function PricingPage() {
         <div className="text-center mb-20">
           <h1 className="text-5xl md:text-7xl text-(--text) font-medium tracking-tighter mb-6">
             Pruébalo gratis por 15 días. <br />
-            <span className="text-(--accents) italic">Después, elige tu plan.</span>
+            <span className="text-(--accents) italic"></span>
           </h1>
           <p className="text-xl text-gray-600 max-w-2xl mx-auto mb-10">
             Asygurare es el workspace para seguros. Prospectos, clientes, análisis y automatizaciones con correo.
@@ -128,36 +102,22 @@ export default function PricingPage() {
             </div>
           </div>
 
-          {/* Selector Mensual/Anual */}
-          <div className="flex items-center justify-center gap-4">
-            <span className={`text-sm font-bold ${!isAnnual ? 'text-[#1a1a1a]' : 'text-gray-400'}`}>Mensual</span>
-            <button
-              onClick={() => setIsAnnual(!isAnnual)}
-              className="w-14 h-8 bg-white border border-black/10 rounded-full p-1 relative transition-colors"
-            >
-              <motion.div
-                animate={{ x: isAnnual ? 24 : 0 }}
-                className="w-6 h-6 bg-(--accents) rounded-full shadow-sm"
-              />
-            </button>
-            <span className={`text-sm font-bold ${isAnnual ? 'text-[#1a1a1a]' : 'text-gray-400'}`}>Anual (Ahorra 20%)</span>
-          </div>
+          <p className="text-[11px] font-black uppercase tracking-[0.2em] text-[#9A7A17]">
+            Un solo plan, todo incluido
+          </p>
         </div>
 
         {/* Grid de Precios */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-end max-w-5xl mx-auto">
+        <div className="grid grid-cols-1 gap-8 items-end max-w-3xl mx-auto">
           {plans.map((p) => (
             <PricingCard
               key={p.key}
               icon={p.icon}
               title={p.title}
-              price={billing === "annual" ? p.priceAnnualMonthlyEquivalent : p.priceMonthly}
+              price={p.price}
               desc={p.desc}
               features={p.features}
               cta={p.cta}
-              isPopular={!!p.highlight}
-              tag={p.tag}
-              billing={billing}
               onSelect={() => handlePlanCheckout(p.key)}
               loading={loadingPlan === p.key}
             />
@@ -173,7 +133,7 @@ export default function PricingPage() {
             <span className="font-bold text-(--accents) text-xl">Cloud Secured</span>
           </div>
           <p className="text-xs text-gray-500 mt-8 max-w-3xl mx-auto leading-relaxed">
-            * “Ahorra 20%” aplica al seleccionar facturación anual. Los límites de envío y uso justo aplican para proteger la entregabilidad.
+            * Incluye prueba gratis de 15 días. Se solicita tarjeta al iniciar la prueba.
           </p>
         </div>
 
@@ -189,9 +149,6 @@ function PricingCard({
   desc,
   features,
   cta,
-  isPopular,
-  tag,
-  billing,
   onSelect,
   loading,
 }: {
@@ -201,48 +158,46 @@ function PricingCard({
   desc: string
   features: string[]
   cta: string
-  isPopular: boolean
-  tag?: string
-  billing: BillingPeriod
   onSelect: () => void
   loading: boolean
 }) {
   return (
     <motion.div
       whileHover={{ y: -10 }}
-      className={`relative p-8 rounded-[2.5rem] flex flex-col transition-all ${isPopular
-          ? 'bg-[#1a1a1a] text-white shadow-2xl scale-105 z-10'
-          : 'bg-white text-[#1a1a1a] border border-black/5'
-        }`}
+      className="relative p-8 rounded-[2.5rem] flex flex-col transition-all border border-[#D4AF37]/35 shadow-2xl bg-gradient-to-br from-[#FFF8DC] via-white to-[#EEF7F3]"
     >
-      {isPopular && (
-        <div className="absolute -top-5 left-1/2 -translate-x-1/2 bg-(--accents) text-white px-4 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest">
-          {tag || "Más popular"}
-        </div>
-      )}
+      <div className="absolute -top-5 left-1/2 -translate-x-1/2 bg-gradient-to-r from-[#D4AF37] to-(--accents) text-white px-4 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest shadow-md">
+        Plan Pro
+      </div>
 
-      <div className={`w-12 h-12 rounded-2xl mb-6 flex items-center justify-center ${isPopular ? 'bg-(--accents)' : 'bg-[#4A7766]/10'}`}>
+      <div className="w-12 h-12 rounded-2xl mb-6 flex items-center justify-center bg-gradient-to-br from-[#F8E7A4] to-[#D4AF37]">
         {icon}
       </div>
 
-      <h3 className="text-2xl font-bold mb-2">{title}</h3>
-      <p className={`text-sm mb-8 ${isPopular ? 'text-gray-400' : 'text-gray-500'}`}>{desc}</p>
+      <h3 className="text-2xl font-bold mb-2 text-black">{title}</h3>
+      <p className="text-sm mb-8 text-black/60">{desc}</p>
 
-      <div className="mb-8">
+      <div className="mb-8 text-black">
         <span className="text-5xl font-bold tracking-tighter">${price}</span>
-        <span className="text-sm opacity-50">/mes</span>
-        {billing === "annual" ? (
-          <div className={`mt-2 text-[11px] font-bold ${isPopular ? "text-gray-300" : "text-gray-500"}`}>
-            Facturado anual
-          </div>
-        ) : null}
+        <span className="text-sm opacity-60">/mes</span>
+      </div>
+
+      <div className="mb-6 grid grid-cols-1 sm:grid-cols-2 gap-2">
+        <div className="rounded-xl border border-[#D4AF37]/35 bg-white/80 px-3 py-2 text-[11px] font-bold uppercase tracking-wider text-black/70 inline-flex items-center gap-2">
+          <CreditCard size={14} className="text-(--accents)" />
+          Tarjeta requerida
+        </div>
+        <div className="rounded-xl border border-[#D4AF37]/35 bg-white/80 px-3 py-2 text-[11px] font-bold uppercase tracking-wider text-black/70 inline-flex items-center gap-2">
+          <ShieldCheck size={14} className="text-(--accents)" />
+          No cobro hoy
+        </div>
       </div>
 
       <ul className="space-y-4 mb-10 flex-1">
         {features.map((f: string, i: number) => (
           <li key={i} className="flex items-center gap-3 text-sm">
             <Check size={16} className="text-(--accents) shrink-0" />
-            <span className={isPopular ? 'text-gray-300' : 'text-gray-600'}>{f}</span>
+            <span className="text-black/70">{f}</span>
           </li>
         ))}
       </ul>
@@ -250,12 +205,19 @@ function PricingCard({
       <button
         onClick={onSelect}
         disabled={loading}
-        className={`w-full py-4 rounded-2xl font-bold transition-all flex items-center justify-center gap-2 disabled:opacity-60 ${isPopular
-          ? 'bg-(--accents) hover:bg-blue-500 text-white'
-          : 'bg-[#1a1a1a] hover:bg-black text-white'
-        }`}
+        className="w-full py-4 rounded-2xl font-bold transition-all flex items-center justify-center gap-2 disabled:opacity-60 text-white bg-gradient-to-r from-(--accents) to-[#D4AF37] hover:brightness-105"
       >
-        {loading ? "Conectando..." : cta} <ArrowRight size={18} />
+        {loading ? (
+          <>
+            <Loader2 size={16} className="animate-spin" />
+            Conectando...
+          </>
+        ) : (
+          <>
+            {cta}
+            <ArrowRight size={18} />
+          </>
+        )}
       </button>
     </motion.div>
   )

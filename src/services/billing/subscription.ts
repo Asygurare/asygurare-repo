@@ -19,7 +19,20 @@ export function canAccessPro(status: string | null | undefined) {
   return status === "active" || status === "trialing"
 }
 
+export function isSubscriptionHealthy(status: string | null | undefined) {
+  return (
+    status === "active" ||
+    status === "trialing" ||
+    status === "past_due" ||
+    status === "incomplete"
+  )
+}
+
 export function mapStripeSubscription(stripeSubscription: Stripe.Subscription) {
+  const subscriptionWithPeriods = stripeSubscription as Stripe.Subscription & {
+    current_period_start?: number | null
+    current_period_end?: number | null
+  }
   const subscriptionItem = stripeSubscription.items.data[0]
   return {
     stripe_customer_id: String(stripeSubscription.customer),
@@ -27,8 +40,8 @@ export function mapStripeSubscription(stripeSubscription: Stripe.Subscription) {
     stripe_price_id: subscriptionItem?.price?.id ?? null,
     status: stripeSubscription.status,
     trial_ends_at: fromUnixToIso(stripeSubscription.trial_end),
-    current_period_starts_at: fromUnixToIso(stripeSubscription.current_period_start),
-    current_period_ends_at: fromUnixToIso(stripeSubscription.current_period_end),
+    current_period_starts_at: fromUnixToIso(subscriptionWithPeriods.current_period_start),
+    current_period_ends_at: fromUnixToIso(subscriptionWithPeriods.current_period_end),
     cancel_at_period_end: Boolean(stripeSubscription.cancel_at_period_end),
     canceled_at: fromUnixToIso(stripeSubscription.canceled_at),
     updated_at: new Date().toISOString(),
