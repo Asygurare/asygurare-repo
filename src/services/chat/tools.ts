@@ -265,132 +265,132 @@ export function buildChatTools(ctx: ToolCtx) {
         fn.obtenerContextoOperativoWorkspaceConCache(supabase, { tz, nowIso }),
     }),
 
-    buscarWeb: tool({
-      description:
-        'Busca información en internet (noticias, regulación, aseguradoras, promotorías, eventos y contexto externo). Devuelve resultados y links.',
-      inputSchema: z.object({
-        query: z.string().min(2).max(300),
-        limit: z.number().optional().describe('Máximo de resultados (default 5, max 8)'),
-      }),
-      execute: async (args) => {
-        const q = String(args.query || '').trim()
-        const limit = Math.max(1, Math.min(8, Number(args.limit || 5)))
-        if (!q) return { ok: false, error: 'Consulta vacía.' }
+    // buscarWeb: tool({
+    //   description:
+    //     'Busca información en internet (noticias, regulación, aseguradoras, promotorías, eventos y contexto externo). Devuelve resultados y links.',
+    //   inputSchema: z.object({
+    //     query: z.string().min(2).max(300),
+    //     limit: z.number().optional().describe('Máximo de resultados (default 5, max 8)'),
+    //   }),
+    //   execute: async (args) => {
+    //     const q = String(args.query || '').trim()
+    //     const limit = Math.max(1, Math.min(8, Number(args.limit || 5)))
+    //     if (!q) return { ok: false, error: 'Consulta vacía.' }
 
-        const isNewsIntent = /(noticia|noticias|reciente|recientes|hoy|semana|actualidad|evento|eventos|regulaci[oó]n|ley|leyes)/i.test(q)
-        const expandedQueries = buildInsuranceExpandedQueries(q)
-        const combined = new Map<string, { title: string; snippet: string; url: string; source: string }>()
-        const searchLinks: string[] = []
+    //     const isNewsIntent = /(noticia|noticias|reciente|recientes|hoy|semana|actualidad|evento|eventos|regulaci[oó]n|ley|leyes)/i.test(q)
+    //     const expandedQueries = buildInsuranceExpandedQueries(q)
+    //     const combined = new Map<string, { title: string; snippet: string; url: string; source: string }>()
+    //     const searchLinks: string[] = []
 
-        // 1) Google News RSS (fuerte para noticias/eventos/regulación)
-        if (isNewsIntent || expandedQueries.length > 1) {
-          for (const queryItem of expandedQueries.slice(0, 2)) {
-            const newsUrl = new URL('https://news.google.com/rss/search')
-            newsUrl.searchParams.set('q', `${queryItem} when:30d`)
-            newsUrl.searchParams.set('hl', 'es-419')
-            newsUrl.searchParams.set('gl', 'MX')
-            newsUrl.searchParams.set('ceid', 'MX:es-419')
-            searchLinks.push(newsUrl.toString())
+    //     // 1) Google News RSS (fuerte para noticias/eventos/regulación)
+    //     if (isNewsIntent || expandedQueries.length > 1) {
+    //       for (const queryItem of expandedQueries.slice(0, 2)) {
+    //         const newsUrl = new URL('https://news.google.com/rss/search')
+    //         newsUrl.searchParams.set('q', `${queryItem} when:30d`)
+    //         newsUrl.searchParams.set('hl', 'es-419')
+    //         newsUrl.searchParams.set('gl', 'MX')
+    //         newsUrl.searchParams.set('ceid', 'MX:es-419')
+    //         searchLinks.push(newsUrl.toString())
 
-            const newsRes = await fetch(newsUrl.toString(), {
-              method: 'GET',
-              headers: { Accept: 'application/rss+xml, application/xml, text/xml' },
-              cache: 'no-store',
-            })
-            if (newsRes.ok) {
-              const xml = await newsRes.text()
-              const parsed = parseGoogleNewsRss(xml)
-              for (const item of parsed) {
-                if (!combined.has(item.url)) {
-                  combined.set(item.url, {
-                    title: item.title,
-                    snippet: item.snippet,
-                    url: item.url,
-                    source: item.source,
-                  })
-                }
-              }
-            }
-          }
-        }
+    //         const newsRes = await fetch(newsUrl.toString(), {
+    //           method: 'GET',
+    //           headers: { Accept: 'application/rss+xml, application/xml, text/xml' },
+    //           cache: 'no-store',
+    //         })
+    //         if (newsRes.ok) {
+    //           const xml = await newsRes.text()
+    //           const parsed = parseGoogleNewsRss(xml)
+    //           for (const item of parsed) {
+    //             if (!combined.has(item.url)) {
+    //               combined.set(item.url, {
+    //                 title: item.title,
+    //                 snippet: item.snippet,
+    //                 url: item.url,
+    //                 source: item.source,
+    //               })
+    //             }
+    //           }
+    //         }
+    //       }
+    //     }
 
-        // 2) DuckDuckGo Instant Answer + DuckDuckGo HTML para mayor cobertura
-        for (const queryItem of expandedQueries) {
-          const instantUrl = new URL('https://api.duckduckgo.com/')
-          instantUrl.searchParams.set('q', queryItem)
-          instantUrl.searchParams.set('format', 'json')
-          instantUrl.searchParams.set('no_html', '1')
-          instantUrl.searchParams.set('no_redirect', '1')
-          instantUrl.searchParams.set('skip_disambig', '1')
-          searchLinks.push(instantUrl.toString())
+    //     // 2) DuckDuckGo Instant Answer + DuckDuckGo HTML para mayor cobertura
+    //     for (const queryItem of expandedQueries) {
+    //       const instantUrl = new URL('https://api.duckduckgo.com/')
+    //       instantUrl.searchParams.set('q', queryItem)
+    //       instantUrl.searchParams.set('format', 'json')
+    //       instantUrl.searchParams.set('no_html', '1')
+    //       instantUrl.searchParams.set('no_redirect', '1')
+    //       instantUrl.searchParams.set('skip_disambig', '1')
+    //       searchLinks.push(instantUrl.toString())
 
-          const res = await fetch(instantUrl.toString(), {
-            method: 'GET',
-            headers: { Accept: 'application/json' },
-            cache: 'no-store',
-          })
+    //       const res = await fetch(instantUrl.toString(), {
+    //         method: 'GET',
+    //         headers: { Accept: 'application/json' },
+    //         cache: 'no-store',
+    //       })
 
-          if (res.ok) {
-            const data = (await res.json()) as {
-              Heading?: string
-              AbstractText?: string
-              AbstractURL?: string
-              RelatedTopics?: unknown[]
-              Results?: Array<{ Text?: string; FirstURL?: string }>
-            }
+    //       if (res.ok) {
+    //         const data = (await res.json()) as {
+    //           Heading?: string
+    //           AbstractText?: string
+    //           AbstractURL?: string
+    //           RelatedTopics?: unknown[]
+    //           Results?: Array<{ Text?: string; FirstURL?: string }>
+    //         }
 
-            const primary = data.AbstractText && data.AbstractURL
-              ? [{ title: data.Heading || 'Resultado principal', snippet: data.AbstractText, url: data.AbstractURL }]
-              : []
+    //         const primary = data.AbstractText && data.AbstractURL
+    //           ? [{ title: data.Heading || 'Resultado principal', snippet: data.AbstractText, url: data.AbstractURL }]
+    //           : []
 
-            const fromResults = (data.Results || [])
-              .map((r) => ({
-                title: String(r.Text || '').trim(),
-                snippet: String(r.Text || '').trim(),
-                url: String(r.FirstURL || '').trim(),
-              }))
-              .filter((r) => r.title && r.url)
+    //         const fromResults = (data.Results || [])
+    //           .map((r) => ({
+    //             title: String(r.Text || '').trim(),
+    //             snippet: String(r.Text || '').trim(),
+    //             url: String(r.FirstURL || '').trim(),
+    //           }))
+    //           .filter((r) => r.title && r.url)
 
-            const fromRelated = flattenDuckDuckGoTopics(Array.isArray(data.RelatedTopics) ? data.RelatedTopics : [])
-              .map((r) => ({ title: r.title, snippet: r.title, url: r.url }))
+    //         const fromRelated = flattenDuckDuckGoTopics(Array.isArray(data.RelatedTopics) ? data.RelatedTopics : [])
+    //           .map((r) => ({ title: r.title, snippet: r.title, url: r.url }))
 
-            for (const item of [...primary, ...fromResults, ...fromRelated]) {
-              if (!item.url || combined.has(item.url)) continue
-              combined.set(item.url, { ...item, source: 'duckduckgo' })
-            }
-          }
+    //         for (const item of [...primary, ...fromResults, ...fromRelated]) {
+    //           if (!item.url || combined.has(item.url)) continue
+    //           combined.set(item.url, { ...item, source: 'duckduckgo' })
+    //         }
+    //       }
 
-          const htmlUrl = new URL('https://html.duckduckgo.com/html/')
-          htmlUrl.searchParams.set('q', queryItem)
-          searchLinks.push(htmlUrl.toString())
-          const htmlRes = await fetch(htmlUrl.toString(), {
-            method: 'GET',
-            headers: { Accept: 'text/html' },
-            cache: 'no-store',
-          })
-          if (htmlRes.ok) {
-            const html = await htmlRes.text()
-            const parsedHtmlResults = parseDuckDuckGoHtml(html)
-            for (const item of parsedHtmlResults) {
-              if (!item.url || combined.has(item.url)) continue
-              combined.set(item.url, item)
-            }
-          }
-        }
+    //       const htmlUrl = new URL('https://html.duckduckgo.com/html/')
+    //       htmlUrl.searchParams.set('q', queryItem)
+    //       searchLinks.push(htmlUrl.toString())
+    //       const htmlRes = await fetch(htmlUrl.toString(), {
+    //         method: 'GET',
+    //         headers: { Accept: 'text/html' },
+    //         cache: 'no-store',
+    //       })
+    //       if (htmlRes.ok) {
+    //         const html = await htmlRes.text()
+    //         const parsedHtmlResults = parseDuckDuckGoHtml(html)
+    //         for (const item of parsedHtmlResults) {
+    //           if (!item.url || combined.has(item.url)) continue
+    //           combined.set(item.url, item)
+    //         }
+    //       }
+    //     }
 
-        const results = Array.from(combined.values()).slice(0, limit)
-        if (results.length === 0) {
-          return { ok: false, error: 'No se encontraron resultados web para esa consulta.' }
-        }
-        return {
-          ok: true,
-          query: q,
-          source: isNewsIntent ? 'google_news+duckduckgo' : 'duckduckgo_multi',
-          search_links: Array.from(new Set(searchLinks)).slice(0, 8),
-          results,
-        }
-      },
-    }),
+    //     const results = Array.from(combined.values()).slice(0, limit)
+    //     if (results.length === 0) {
+    //       return { ok: false, error: 'No se encontraron resultados web para esa consulta.' }
+    //     }
+    //     return {
+    //       ok: true,
+    //       query: q,
+    //       source: isNewsIntent ? 'google_news+duckduckgo' : 'duckduckgo_multi',
+    //       search_links: Array.from(new Set(searchLinks)).slice(0, 8),
+    //       results,
+    //     }
+    //   },
+    // }),
 
     crearTarea: tool({
       description:
