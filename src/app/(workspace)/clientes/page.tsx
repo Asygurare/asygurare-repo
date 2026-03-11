@@ -7,7 +7,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import {
   Users, Search, X, UserPlus, Mail, Phone, Loader2, CheckCircle2,
   Building2, User, Trash2, Save, Calendar, MoreVertical, FileText, StickyNote,
-  Edit3, ChevronRight, ChevronUp, ChevronDown, FileCheck
+  Edit3, ChevronRight, ChevronUp, ChevronDown, FileCheck, FileUp
 } from 'lucide-react'
 import { supabaseClient } from '@/src/lib/supabase/client'
 import { toast, Toaster } from 'sonner'
@@ -15,6 +15,7 @@ import { getFullName, calculateAge } from '@/src/lib/utils/utils'
 import { SelectWithOther } from '@/src/components/ui/SelectWithOther'
 import { RefreshButton } from '@/src/components/workspace/RefreshButton'
 import { SectionTutorial, type SectionTutorialStep } from '@/src/components/workspace/tutorial/SectionTutorial'
+import FileImportModal from '@/src/components/workspace/import/FileImportModal'
 
 const INSURANCE_TYPES = Object.values(InsuranceType)
 const ORIGIN_SOURCES = Object.values(OriginSource)
@@ -121,6 +122,7 @@ function ClientesPageContent() {
   const [policyCountByCustomerId, setPolicyCountByCustomerId] = useState<Record<string, number>>({})
   const router = useRouter()
   const searchParams = useSearchParams()
+  const [isImportOpen, setIsImportOpen] = useState(false)
 
   // 1. CARGA DE DATOS
   const fetchCustomers = useCallback(async () => {
@@ -138,9 +140,9 @@ function ClientesPageContent() {
         .from(DATABASE.TABLES.WS_POLICIES)
         .select('customer_id')
       const countMap: Record<string, number> = {}
-      ;(policiesData || []).forEach((p: { customer_id: string }) => {
-        countMap[p.customer_id] = (countMap[p.customer_id] ?? 0) + 1
-      })
+        ; (policiesData || []).forEach((p: { customer_id: string }) => {
+          countMap[p.customer_id] = (countMap[p.customer_id] ?? 0) + 1
+        })
       setPolicyCountByCustomerId(countMap)
     } catch (error: any) {
       toast.error('Error al cargar clientes: ' + error.message)
@@ -490,16 +492,24 @@ function ClientesPageContent() {
             triggerLabel="TUTORIAL"
             triggerClassName="bg-white text-black px-6 py-4 rounded-[1.5rem] font-black text-xs sm:text-sm flex items-center gap-2 border border-black/10 hover:bg-black/5 transition-all shadow-sm active:scale-95"
           />
-          <button
-            data-tutorial="clientes-new-record"
-            onClick={() => {
-              setSelectedCustomer(null)
-              setIsModalOpen(true)
-            }}
-            className="bg-black text-white px-10 py-5 rounded-[2rem] font-black text-sm flex items-center gap-3 hover:bg-black/80 transition-all shadow-2xl active:scale-95"
-          >
-            <UserPlus size={20} /> NUEVO REGISTRO
-          </button>
+          <div className="flex gap-3">
+            <button
+              onClick={() => setIsImportOpen(true)}
+              className="bg-white text-black px-8 py-5 rounded-[2rem] font-black text-sm flex items-center gap-3 hover:bg-black/5 border-2 border-black/10 transition-all shadow-sm active:scale-95"
+            >
+              <FileUp size={18} /> IMPORTAR
+            </button>
+            <button
+              data-tutorial="clientes-new-record"
+              onClick={() => {
+                setSelectedCustomer(null)
+                setIsModalOpen(true)
+              }}
+              className="bg-black text-white px-10 py-5 rounded-[2rem] font-black text-sm flex items-center gap-3 hover:bg-black/80 transition-all shadow-2xl active:scale-95"
+            >
+              <UserPlus size={20} /> NUEVO REGISTRO
+            </button>
+          </div>
         </div>
       </div>
 
@@ -536,18 +546,16 @@ function ClientesPageContent() {
           <button
             type="button"
             onClick={() => setActiveTab('activos')}
-            className={`px-6 py-3 rounded-[1rem] text-sm font-black uppercase tracking-widest transition-all ${
-              activeTab === 'activos' ? 'bg-black text-white' : 'text-black/60 hover:bg-black/5'
-            }`}
+            className={`px-6 py-3 rounded-[1rem] text-sm font-black uppercase tracking-widest transition-all ${activeTab === 'activos' ? 'bg-black text-white' : 'text-black/60 hover:bg-black/5'
+              }`}
           >
             Clientes activos ({activeCustomers.length})
           </button>
           <button
             type="button"
             onClick={() => setActiveTab('descartados')}
-            className={`px-6 py-3 rounded-[1rem] text-sm font-black uppercase tracking-widest transition-all ${
-              activeTab === 'descartados' ? 'bg-red-600 text-white' : 'text-black/60 hover:bg-black/5'
-            }`}
+            className={`px-6 py-3 rounded-[1rem] text-sm font-black uppercase tracking-widest transition-all ${activeTab === 'descartados' ? 'bg-red-600 text-white' : 'text-black/60 hover:bg-black/5'
+              }`}
           >
             Descartados ({discardedCustomers.length})
           </button>
@@ -562,14 +570,12 @@ function ClientesPageContent() {
                 role="switch"
                 aria-checked={includeDiscarded}
                 onClick={() => setIncludeDiscarded((v) => !v)}
-                className={`relative inline-flex h-7 w-12 shrink-0 rounded-full border-2 transition-colors focus:outline-none ${
-                  includeDiscarded ? 'bg-black border-black' : 'bg-black/10 border-black/20'
-                }`}
+                className={`relative inline-flex h-7 w-12 shrink-0 rounded-full border-2 transition-colors focus:outline-none ${includeDiscarded ? 'bg-black border-black' : 'bg-black/10 border-black/20'
+                  }`}
               >
                 <span
-                  className={`pointer-events-none inline-block h-6 w-6 rounded-full bg-white shadow-sm transition-transform ${
-                    includeDiscarded ? 'translate-x-6' : 'translate-x-0.5'
-                  }`}
+                  className={`pointer-events-none inline-block h-6 w-6 rounded-full bg-white shadow-sm transition-transform ${includeDiscarded ? 'translate-x-6' : 'translate-x-0.5'
+                    }`}
                   style={{ marginTop: 2 }}
                 />
               </button>
@@ -1069,9 +1075,8 @@ function ClientesPageContent() {
                   <button
                     type="submit"
                     disabled={loading || success}
-                    className={`w-full py-6 rounded-3xl font-black text-xl transition-all flex items-center justify-center gap-3 shadow-2xl active:scale-95 ${
-                      success ? 'bg-green-600 text-white' : 'bg-black text-white hover:bg-black/90'
-                    }`}
+                    className={`w-full py-6 rounded-3xl font-black text-xl transition-all flex items-center justify-center gap-3 shadow-2xl active:scale-95 ${success ? 'bg-green-600 text-white' : 'bg-black text-white hover:bg-black/90'
+                      }`}
                   >
                     {loading ? (
                       <Loader2 className="animate-spin" size={28} />
@@ -1282,6 +1287,13 @@ function ClientesPageContent() {
           </>
         )}
       </AnimatePresence>
+
+      <FileImportModal
+        open={isImportOpen}
+        onClose={() => setIsImportOpen(false)}
+        entity="customers"
+        onImportComplete={fetchCustomers}
+      />
     </div>
   )
 }

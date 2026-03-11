@@ -19,7 +19,7 @@ import {
 import { 
   Zap, Target, X, Mail, Phone, Loader2, CheckCircle2, 
   TrendingUp, DollarSign, UserCheck, Trash2, Edit3, 
-  Search, Clock, Info, Share2, MessageSquare, ChevronRight, User, FileCheck
+  Search, Clock, Info, Share2, MessageSquare, ChevronRight, User, FileCheck, FileUp
 } from 'lucide-react'
 import { supabaseClient } from '@/src/lib/supabase/client'
 import { toast, Toaster } from 'sonner'
@@ -54,6 +54,7 @@ const PROSPECTOS_TUTORIAL_STEPS: SectionTutorialStep[] = [
     selector: '[data-tutorial="prospectos-list"]',
   },
 ]
+import FileImportModal from '@/src/components/workspace/import/FileImportModal'
 
 export default function ProspectosFinalUltraPage() {
   const [leads, setLeads] = useState<any[]>([])
@@ -72,6 +73,7 @@ export default function ProspectosFinalUltraPage() {
   const [monthlyGoal, setMonthlyGoal] = useState(0)
   const [searchTerm, setSearchTerm] = useState('')
   const [loading, setLoading] = useState(false)
+  const [isImportOpen, setIsImportOpen] = useState(false)
   const [hasChildren, setHasChildren] = useState<'yes' | 'no' | ''>('')
   const [children, setChildren] = useState<Array<{ name: string; age: string; contact: string }>>([])
   const [additionalForm, setAdditionalForm] = useState<{
@@ -697,9 +699,14 @@ export default function ProspectosFinalUltraPage() {
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
-        <button onClick={() => {setSelectedLead(null); setIsModalOpen(true)}} className="bg-black text-white px-10 py-6 rounded-[2rem] font-black flex items-center gap-3 hover:bg-(--accents) transition-all shadow-xl active:scale-95">
-          <Zap size={22} className="text-yellow-400" fill="currentColor"/> NUEVA OPORTUNIDAD
-        </button>
+        <div className="flex gap-3">
+          <button onClick={() => setIsImportOpen(true)} className="bg-white text-black px-8 py-6 rounded-[2rem] font-black flex items-center gap-3 hover:bg-black/5 border-2 border-black/10 transition-all shadow-sm active:scale-95">
+            <FileUp size={20}/> IMPORTAR
+          </button>
+          <button onClick={() => {setSelectedLead(null); setIsModalOpen(true)}} className="bg-black text-white px-10 py-6 rounded-[2rem] font-black flex items-center gap-3 hover:bg-(--accents) transition-all shadow-xl active:scale-95">
+            <Zap size={22} className="text-yellow-400" fill="currentColor"/> NUEVA OPORTUNIDAD
+          </button>
+        </div>
       </div>
 
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4" data-tutorial="prospectos-filters">
@@ -1737,6 +1744,13 @@ export default function ProspectosFinalUltraPage() {
           </>
         )}
       </AnimatePresence>
+
+      <FileImportModal
+        open={isImportOpen}
+        onClose={() => setIsImportOpen(false)}
+        entity="leads"
+        onImportComplete={fetchData}
+      />
     </div>
   )
 }
